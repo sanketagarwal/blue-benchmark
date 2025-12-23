@@ -1,0 +1,184 @@
+#!/usr/bin/env sh
+
+# Pre-commit hook: Quality gates on staged files
+# Runs fast checks on affected packages only
+
+set -e
+
+echo "Running pre-commit quality gates..."
+
+# Get list of staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED_FILES" ]; then
+  echo "No staged files to check."
+  exit 0
+fi
+
+# Determine turbo filter: use HEAD^1 if available, otherwise run all packages
+if git rev-parse HEAD^1 >/dev/null 2>&1; then
+  TURBO_FILTER="--filter=...[HEAD^1]"
+else
+  # Initial commit: no HEAD^1, run on all packages
+  TURBO_FILTER=""
+fi
+
+# ============================================================================
+# LINT: Run ESLint on affected packages only
+# ============================================================================
+echo ""
+echo "=== Running lint (affected packages) ==="
+pnpm turbo lint $TURBO_FILTER --output-logs=errors-only || {
+  echo "Lint failed. Fix errors before committing."
+  exit 1
+}
+
+# ============================================================================
+# TYPE CHECK: Run TypeScript on affected packages only
+# ============================================================================
+echo ""
+echo "=== Running type-check (affected packages) ==="
+pnpm turbo check-types $TURBO_FILTER --output-logs=errors-only || {
+  echo "Type check failed. Fix errors before committing."
+  exit 1
+}
+
+# ============================================================================
+# TESTS: Run tests on affected packages only
+# ============================================================================
+echo ""
+echo "=== Running tests (affected packages) ==="
+pnpm turbo test $TURBO_FILTER --output-logs=errors-only || {
+  echo "Tests failed. Fix errors before committing."
+  exit 1
+}
+
+# ============================================================================
+# DATABASE SCHEMA VALIDATION: Check schema matches migrations
+# ============================================================================
+echo ""
+echo "=== Checking database schema integrity ==="
+DB_FILES_CHANGED=""
+for file in $STAGED_FILES; do
+  if echo "$file" | grep -qE '^packages/database/(src/schema|drizzle/)'; then
+    DB_FILES_CHANGED="yes"
+    break
+  fi
+done
+
+if [ -n "$DB_FILES_CHANGED" ]; then
+  echo "Database files modified. Validating schema..."
+  if [ -n "$DATABASE_URL" ]; then
+    pnpm db:check || {
+      echo "BLOCKED: Database schema is out of sync with migrations."
+      echo "Run 'pnpm db:generate' to create a new migration."
+      exit 1
+    }
+  else
+    echo "Skipping db:check (DATABASE_URL not set)"
+  fi
+else
+  echo "No database files modified."
+fi
+
+# ============================================================================
+# CONSOLE.LOG DETECTION: Warn about console.log in staged TS/TSX files
+# ============================================================================
+echo ""
+echo "=== Checking for console.log statements ==="
+CONSOLE_LOG_FILES=""
+for file in $STAGED_FILES; do
+  # Skip test files and config files
+  if echo "$file" | grep -qE '\.(ts|tsx)$' && ! echo "$file" | grep -qE '(\.test\.|\.spec\.|\.config\.)'; then
+    if git show ":$file" 2>/dev/null | grep -q 'console\.log'; then
+      CONSOLE_LOG_FILES="$CONSOLE_LOG_FILES $file"
+    fi
+  fi
+done
+
+if [ -n "$CONSOLE_LOG_FILES" ]; then
+  echo "WARNING: console.log found in staged files:"
+  for file in $CONSOLE_LOG_FILES; do
+    echo "  - $file"
+  done
+  echo "Consider removing before committing to production code."
+fi
+
+# ============================================================================
+# SECRETS DETECTION: Block commits with hardcoded secrets
+# ============================================================================
+echo ""
+echo "=== Checking for hardcoded secrets ==="
+SECRET_PATTERN='(password|secret|api_key|apikey|token|credential|auth_token|access_token|private_key)\s*[:=]\s*["\x27][^"\x27]{8,}'
+
+for file in $STAGED_FILES; do
+  if echo "$file" | grep -qE '\.(ts|tsx|js|jsx|json|env)$'; then
+    # Skip .env.example files
+    if echo "$file" | grep -qE '\.example$'; then
+      continue
+    fi
+    if git show ":$file" 2>/dev/null | grep -iEq "$SECRET_PATTERN"; then
+      echo "BLOCKED: Potential secret found in $file"
+      echo "Remove hardcoded credentials before committing."
+      exit 1
+    fi
+  fi
+done
+
+# ============================================================================
+# ANY TYPE DETECTION: Warn about TypeScript 'any' types
+# ============================================================================
+echo ""
+echo "=== Checking for 'any' types ==="
+ANY_TYPE_FILES=""
+for file in $STAGED_FILES; do
+  # Skip .d.ts files and test files
+  if echo "$file" | grep -qE '\.tsx?$' && ! echo "$file" | grep -qE '(\.d\.ts|\.test\.|\.spec\.)'; then
+    if git show ":$file" 2>/dev/null | grep -qE ':\s*any\b|<any>|as\s+any'; then
+      ANY_TYPE_FILES="$ANY_TYPE_FILES $file"
+    fi
+  fi
+done
+
+if [ -n "$ANY_TYPE_FILES" ]; then
+  echo "WARNING: 'any' type found in staged files:"
+  for file in $ANY_TYPE_FILES; do
+    echo "  - $file"
+  done
+  echo "Consider using proper types instead of 'any'."
+fi
+
+# ============================================================================
+# COVERAGE EXCLUSION GAMING: Block modifications that cheat coverage
+# ============================================================================
+echo ""
+echo "=== Checking for coverage exclusion gaming ==="
+for file in $STAGED_FILES; do
+  if echo "$file" | grep -qE 'vitest\.config\.(ts|js|mjs)$'; then
+    # Check if coverage.exclude was modified to add new exclusions
+    DIFF=$(git diff --cached "$file" | grep -E '^\+.*exclude' || true)
+    if [ -n "$DIFF" ]; then
+      echo "WARNING: Coverage exclusions modified in $file"
+      echo "Review changes to ensure coverage metrics aren't being gamed."
+      echo "$DIFF"
+    fi
+  fi
+done
+
+# ============================================================================
+# MARKDOWN HYGIENE: Enforce docs location
+# ============================================================================
+echo ""
+echo "=== Checking markdown file locations ==="
+for file in $STAGED_FILES; do
+  if echo "$file" | grep -qE '\.md$'; then
+    # Allow: docs/, README.md, CONTRIBUTING.md, CLAUDE.md, package READMEs
+    if ! echo "$file" | grep -qE '^(docs/|README\.md|CONTRIBUTING\.md|CLAUDE\.md|AGENTS\.md|packages/[^/]+/README\.md|apps/[^/]+/README\.md)'; then
+      echo "WARNING: Markdown file outside docs/: $file"
+      echo "Consider moving documentation to docs/ directory."
+    fi
+  fi
+done
+
+echo ""
+echo "Pre-commit checks passed!"

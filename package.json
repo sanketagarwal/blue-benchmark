@@ -1,0 +1,43 @@
+{
+  "name": "nullagent",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "test": "turbo run test",
+    "test:unit": "vitest run --workspace=vitest.workspace.ts",
+    "test:watch": "vitest --workspace=vitest.workspace.ts",
+    "test:coverage": "vitest run --coverage --workspace=vitest.workspace.ts",
+    "qa:quick": "pnpm lint && pnpm check-types",
+    "qa": "pnpm lint && pnpm check-types && pnpm db:check && pnpm test && pnpm build",
+    "ci": "pnpm qa",
+    "prepare": "husky",
+    "db:generate": "pnpm --filter @nullagent/database db:generate",
+    "db:migrate": "pnpm --filter @nullagent/database db:migrate",
+    "db:push": "pnpm --filter @nullagent/database db:push",
+    "db:studio": "pnpm --filter @nullagent/database db:studio",
+    "db:check": "pnpm --filter @nullagent/database db:check"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "@vitest/coverage-v8": "^2.0.0",
+    "dotenv": "^17.2.3",
+    "husky": "^9.1.0",
+    "jsdom": "^25.0.0",
+    "lint-staged": "^16.0.0",
+    "prettier": "^3.7.4",
+    "tsx": "4.21.0",
+    "turbo": "^2.6.3",
+    "typescript": "5.9.2",
+    "vite": "^5.0.0",
+    "vitest": "^2.0.0",
+    "vitest-mock-extended": "2.0.2"
+  },
+  "packageManager": "pnpm@10.26.0",
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@nullagent/agent-core",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.88",
+    "@nullagent/database": "workspace:*",
+    "ai": "^5.0.0",
+    "drizzle-orm": "^0.36.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@nullagent/eslint-config": "workspace:*",
+    "@nullagent/typescript-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "drizzle-orm": "^0.38.3",
+    "eslint": "^9.18.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.20.0",
+    "vitest": "^2.1.8"
+  }
+}

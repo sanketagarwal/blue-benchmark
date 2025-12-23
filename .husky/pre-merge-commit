@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+
+# Pre-merge-commit hook: Full QA before merging
+# Ensures merged code passes all quality gates
+
+set -e
+
+echo "Running pre-merge QA (lint, type-check, tests, build)..."
+echo ""
+
+pnpm qa || {
+  echo "QA failed. Fix errors before merging."
+  exit 1
+}
+
+echo ""
+echo "Pre-merge QA passed!"

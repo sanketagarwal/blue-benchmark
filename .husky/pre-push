@@ -1,0 +1,80 @@
+#!/usr/bin/env sh
+
+# Pre-push hook: Full QA pipeline
+# Runs comprehensive checks before pushing to remote
+# Mirrors CI behavior to catch issues locally
+
+set -e
+
+echo "Running pre-push QA pipeline..."
+echo ""
+
+# ============================================================================
+# UNCOMMITTED CHANGES CHECK
+# Prevents cache mismatches between local and CI
+# ============================================================================
+echo "=== Checking for uncommitted changes ==="
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "BLOCKED: You have uncommitted changes."
+  echo ""
+  echo "This blocks push because:"
+  echo "  1. Turbo cache may include uncommitted files locally"
+  echo "  2. CI runs on committed state only"
+  echo "  3. This can cause CI failures that pass locally"
+  echo ""
+  echo "Please commit or stash your changes before pushing."
+  exit 1
+fi
+echo "No uncommitted changes."
+
+# ============================================================================
+# FORCE FRESH RUNS
+# Disable Turbo caching to match CI behavior exactly
+# ============================================================================
+export TURBO_FORCE=true
+echo ""
+echo "=== Running full QA with TURBO_FORCE=true (no cache) ==="
+echo "This ensures local behavior matches CI exactly."
+echo ""
+
+# ============================================================================
+# LINT
+# ============================================================================
+echo "=== Running lint ==="
+pnpm lint || {
+  echo "Lint failed. Fix errors before pushing."
+  exit 1
+}
+
+# ============================================================================
+# TYPE CHECK
+# ============================================================================
+echo ""
+echo "=== Running type-check ==="
+pnpm check-types || {
+  echo "Type check failed. Fix errors before pushing."
+  exit 1
+}
+
+# ============================================================================
+# TESTS WITH COVERAGE
+# ============================================================================
+echo ""
+echo "=== Running tests with coverage ==="
+pnpm test:coverage || {
+  echo "Tests failed. Fix errors before pushing."
+  exit 1
+}
+
+# ============================================================================
+# BUILD
+# ============================================================================
+echo ""
+echo "=== Running build ==="
+pnpm build || {
+  echo "Build failed. Fix errors before pushing."
+  exit 1
+}
+
+echo ""
+echo "Pre-push QA passed! Safe to push."
