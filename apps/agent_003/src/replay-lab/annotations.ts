@@ -16,7 +16,32 @@ export type ContractId = (typeof CONTRACT_IDS)[number];
 
 export type GroundTruth = Record<ContractId, boolean>;
 
-type BatchAnnotationResponse = Record<string, { timestamp: string }[]>;
+interface Annotation {
+  id: string;
+  time_start: string;
+  time_end: string | null;
+  type: string;
+  schema_version: string;
+  payload: Record<string, unknown>;
+  source: string;
+}
+
+interface AnnotationsResponse {
+  symbol_id: string;
+  annotations: Annotation[];
+}
+
+async function getAnnotationsForSource(
+  symbolId: string,
+  source: string,
+  from: string,
+  to: string
+): Promise<boolean> {
+  const response = await replayLabFetch<AnnotationsResponse>(
+    `/api/annotations/${symbolId}?source=${source}&from=${from}&to=${to}&limit=1`
+  );
+  return response.annotations.length > 0;
+}
 
 export async function getGroundTruthBatch(
   symbolId: string,
@@ -25,18 +50,24 @@ export async function getGroundTruthBatch(
 ): Promise<GroundTruth> {
   const fromTime = predictionTime.toISOString();
   const toTime = predictionEndTime.toISOString();
-  const sources = CONTRACT_IDS.join(',');
 
-  const response = await replayLabFetch<BatchAnnotationResponse>(
-    `/api/annotations/${symbolId}?sources=${sources}&from=${fromTime}&to=${toTime}`
+  // Fetch all contract annotations in parallel
+  const results = await Promise.all(
+    CONTRACT_IDS.map(async (contractId) => {
+      const hasAnnotation = await getAnnotationsForSource(
+        symbolId,
+        contractId,
+        fromTime,
+        toTime
+      );
+      return [contractId, hasAnnotation] as const;
+    })
   );
 
   const groundTruth: Record<string, boolean> = {};
-  for (const contractId of CONTRACT_IDS) {
+  for (const [contractId, hasAnnotation] of results) {
     // eslint-disable-next-line security/detect-object-injection -- contractId is from CONTRACT_IDS constant
-    const annotations = response[contractId] ?? [];
-    // eslint-disable-next-line security/detect-object-injection -- contractId is from CONTRACT_IDS constant
-    groundTruth[contractId] = annotations.length > 0;
+    groundTruth[contractId] = hasAnnotation;
   }
 
   return groundTruth as GroundTruth;

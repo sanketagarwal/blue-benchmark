@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getConfig, replayLabFetch } from '../src/replay-lab/client';
 import {
-  getSignedChartUrl,
+  buildChartUrl,
   getForecastingCharts,
   type ChartParams,
 } from '../src/replay-lab/charts';
@@ -106,110 +106,70 @@ describe('Replay Lab Client', () => {
 });
 
 describe('Replay Lab Charts', () => {
-  const mockFetch = vi.fn();
-  const originalFetch = global.fetch;
-
   beforeEach(() => {
     vi.stubEnv('REPLAY_LAB_API_KEY', 'test-api-key');
     vi.stubEnv('REPLAY_LAB_BASE_URL', 'https://test.example.com');
-    global.fetch = mockFetch;
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    global.fetch = originalFetch;
-    mockFetch.mockReset();
   });
 
-  describe('getSignedChartUrl', () => {
-    it('should call correct endpoint with auth header', async () => {
+  describe('buildChartUrl', () => {
+    it('should build correct URL with all parameters', () => {
       const params: ChartParams = {
         symbolId: 'COINBASE_SPOT_ETH_USD',
-        timeframe: '1m',
-        from: new Date('2025-12-22T14:00:00Z'),
-        to: new Date('2025-12-22T15:00:00Z'),
-        layers: 'candles,sma',
+        timeframe: '5m',
+        from: new Date('2025-12-22T10:00:00Z'),
+        to: new Date('2025-12-22T14:00:00Z'),
+        layers: 'candles,sma:20',
+        width: 1200,
+        height: 800,
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          url: 'https://signed-url.example.com',
-          expiresAt: '2025-12-22T16:00:00Z',
-        }),
-      });
+      const url = buildChartUrl(params);
 
-      const url = await getSignedChartUrl(params);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://test.example.com/api/signed-url',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'x-api-key': 'test-api-key',
-            'content-type': 'application/json',
-          }),
-          body: expect.stringContaining('COINBASE_SPOT_ETH_USD'),
-        })
-      );
-      expect(url).toBe('https://signed-url.example.com');
+      expect(url).toContain('https://test.example.com/api/charts/COINBASE_SPOT_ETH_USD/image');
+      expect(url).toContain('timeframe=5m');
+      expect(url).toContain('from=2025-12-22T10%3A00%3A00.000Z');
+      expect(url).toContain('to=2025-12-22T14%3A00%3A00.000Z');
+      expect(url).toContain('layers=candles%2Csma%3A20');
+      expect(url).toContain('width=1200');
+      expect(url).toContain('height=800');
     });
 
-    it('should construct correct chart path in request body', async () => {
+    it('should use default width and height', () => {
       const params: ChartParams = {
         symbolId: 'COINBASE_SPOT_ETH_USD',
         timeframe: '1h',
-        from: new Date('2025-12-22T14:00:00Z'),
-        to: new Date('2025-12-22T15:00:00Z'),
-        layers: 'candles,bb',
+        from: new Date('2025-12-22T10:00:00Z'),
+        to: new Date('2025-12-22T14:00:00Z'),
+        layers: 'candles',
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          url: 'https://signed-url.example.com',
-          expiresAt: '2025-12-22T16:00:00Z',
-        }),
-      });
+      const url = buildChartUrl(params);
 
-      await getSignedChartUrl(params);
-
-      const callBody = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body ?? '{}');
-      expect(callBody.path).toContain('COINBASE_SPOT_ETH_USD');
-      expect(callBody.path).toContain('1h');
-      expect(callBody.path).toContain('candles,bb');
-      expect(callBody.expiresIn).toBe(3600);
+      expect(url).toContain('width=1200');
+      expect(url).toContain('height=800');
     });
   });
 
   describe('getForecastingCharts', () => {
-    it('should fetch two chart types in parallel (4h/5m and 24h/15m)', async () => {
+    it('should return two chart URLs with correct timeframes', () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const currentTime = new Date('2025-12-22T14:00:00Z');
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            url: 'https://chart-4h-5m.example.com',
-            expiresAt: '2025-12-22T16:00:00Z',
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            url: 'https://chart-24h-15m.example.com',
-            expiresAt: '2025-12-22T16:00:00Z',
-          }),
-        });
+      const result = getForecastingCharts(symbolId, currentTime);
 
-      const result = await getForecastingCharts(symbolId, currentTime);
+      // 4h/5m chart
+      expect(result.chart4h5m).toContain('timeframe=5m');
+      expect(result.chart4h5m).toContain('from=2025-12-22T10%3A00%3A00.000Z');
+      expect(result.chart4h5m).toContain('to=2025-12-22T14%3A00%3A00.000Z');
 
-      expect(result).toEqual({
-        chart4h5m: 'https://chart-4h-5m.example.com',
-        chart24h15m: 'https://chart-24h-15m.example.com',
-      });
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      // 24h/15m chart
+      expect(result.chart24h15m).toContain('timeframe=15m');
+      expect(result.chart24h15m).toContain('from=2025-12-21T14%3A00%3A00.000Z');
+      expect(result.chart24h15m).toContain('to=2025-12-22T14%3A00%3A00.000Z');
     });
   });
 });
@@ -231,7 +191,7 @@ describe('Replay Lab Orderbook', () => {
   });
 
   describe('getOrderbookSnapshot', () => {
-    it('should fetch from replay endpoint with nearest=true', async () => {
+    it('should fetch from orderbook endpoint with 15-minute lookback window', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const at = new Date('2025-12-22T14:00:00Z');
 
@@ -239,26 +199,15 @@ describe('Replay Lab Orderbook', () => {
         ok: true,
         json: async () => ({
           symbol_id: 'COINBASE_SPOT_ETH_USD',
-          from: '2025-12-22T14:00:00Z',
-          to: '2025-12-22T14:00:00Z',
-          observations: [
+          snapshots: [
             {
-              timestamp: '2025-12-22T14:00:00Z',
-              ohlcv: {
-                open: 3500,
-                high: 3510,
-                low: 3495,
-                close: 3505,
-                volume: 1000,
-              },
-              orderbook: {
-                mid_price: 3500.5,
-                spread: 0.5,
-                spread_bps: 1.43,
-                imbalance: 0.15,
-                bid_depth: 100000,
-                ask_depth: 85000,
-              },
+              timestamp: '2025-12-22T13:55:00Z',
+              mid_price: 3500.5,
+              spread: 0.5,
+              spread_bps: 1.43,
+              imbalance: 0.15,
+              bid_depth: 100000,
+              ask_depth: 85000,
             },
           ],
         }),
@@ -267,19 +216,24 @@ describe('Replay Lab Orderbook', () => {
       const snapshot = await getOrderbookSnapshot(symbolId, at);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/replay/COINBASE_SPOT_ETH_USD?from='),
+        expect.stringContaining('/api/orderbook/COINBASE_SPOT_ETH_USD?from='),
+        expect.anything()
+      );
+      // Should use 15-minute lookback (from 13:45 to 14:00)
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('from=2025-12-22T13:45:00.000Z'),
         expect.anything()
       );
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('&to='),
+        expect.stringContaining('to=2025-12-22T14:00:00.000Z'),
         expect.anything()
       );
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('nearest=true'),
+        expect.stringContaining('limit=1'),
         expect.anything()
       );
       expect(snapshot).toEqual({
-        timestamp: '2025-12-22T14:00:00Z',
+        timestamp: '2025-12-22T13:55:00Z',
         mid_price: 3500.5,
         spread: 0.5,
         spread_bps: 1.43,
@@ -289,20 +243,18 @@ describe('Replay Lab Orderbook', () => {
       });
     });
 
-    it('should throw if no observations returned', async () => {
+    it('should throw if no snapshots returned', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           symbol_id: 'COINBASE_SPOT_ETH_USD',
-          from: '2025-12-22T13:00:00Z',
-          to: '2025-12-22T14:00:00Z',
-          observations: [],
+          snapshots: [],
         }),
       });
 
       await expect(
         getOrderbookSnapshot('COINBASE_SPOT_ETH_USD', new Date())
-      ).rejects.toThrow('No replay data found');
+      ).rejects.toThrow('No orderbook data found');
     });
   });
 
@@ -393,30 +345,26 @@ describe('Replay Lab Annotations', () => {
   });
 
   describe('getGroundTruthBatch', () => {
-    it('should fetch all contracts in single batch request', async () => {
+    it('should fetch all contracts in parallel', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const predictionTime = new Date('2025-12-22T14:00:00Z');
       const predictionEndTime = new Date('2025-12-22T15:00:00Z');
 
-      // Mock single batch response with all contracts
-      const batchResponse: Record<string, { timestamp: string }[]> = {};
-      for (const contractId of CONTRACT_IDS) {
-        batchResponse[contractId] = [];
+      // Mock response for each contract (9 calls)
+      for (let i = 0; i < CONTRACT_IDS.length; i++) {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            symbol_id: 'COINBASE_SPOT_ETH_USD',
+            annotations: [],
+          }),
+        });
       }
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => batchResponse,
-      });
 
       await getGroundTruthBatch(symbolId, predictionTime, predictionEndTime);
 
-      // Should only make one request with sources= parameter
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('sources='),
-        expect.anything()
-      );
+      // Should make one request per contract
+      expect(mockFetch).toHaveBeenCalledTimes(CONTRACT_IDS.length);
     });
 
     it('should return true for contracts with annotations', async () => {
@@ -424,18 +372,18 @@ describe('Replay Lab Annotations', () => {
       const predictionTime = new Date('2025-12-22T14:00:00Z');
       const predictionEndTime = new Date('2025-12-22T15:00:00Z');
 
-      // Batch response: first contract has annotation, rest are empty
-      const batchResponse: Record<string, { timestamp: string }[]> = {};
+      // Mock responses: first contract has annotation, rest are empty
       for (const contractId of CONTRACT_IDS) {
-        batchResponse[contractId] = contractId === 'dump-simple-15m-1pct'
-          ? [{ timestamp: '2025-12-22T14:30:00Z' }]
-          : [];
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            symbol_id: 'COINBASE_SPOT_ETH_USD',
+            annotations: contractId === 'dump-simple-15m-1pct'
+              ? [{ id: '123', time_start: '2025-12-22T14:30:00Z', type: 'dump_event', source: contractId }]
+              : [],
+          }),
+        });
       }
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => batchResponse,
-      });
 
       const result = await getGroundTruthBatch(
         symbolId,
@@ -447,31 +395,30 @@ describe('Replay Lab Annotations', () => {
       expect(result['dump-simple-15m-3pct']).toBe(false);
     });
 
-    it('should fetch with correct query parameters', async () => {
+    it('should use source filter for each contract', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const predictionTime = new Date('2025-12-22T14:00:00Z');
       const predictionEndTime = new Date('2025-12-22T15:00:00Z');
 
-      const batchResponse: Record<string, { timestamp: string }[]> = {};
-      for (const contractId of CONTRACT_IDS) {
-        batchResponse[contractId] = [];
+      for (let i = 0; i < CONTRACT_IDS.length; i++) {
+        mockFetch.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            symbol_id: 'COINBASE_SPOT_ETH_USD',
+            annotations: [],
+          }),
+        });
       }
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => batchResponse,
-      });
 
       await getGroundTruthBatch(symbolId, predictionTime, predictionEndTime);
 
-      const callUrl = mockFetch.mock.calls[0]?.[0] ?? '';
-      expect(callUrl).toContain('COINBASE_SPOT_ETH_USD');
-      expect(callUrl).toContain('sources=');
-      expect(callUrl).toContain('from=');
-      expect(callUrl).toContain('to=');
-      // Verify all contract IDs are in sources parameter
-      for (const contractId of CONTRACT_IDS) {
-        expect(callUrl).toContain(contractId);
+      // Verify each call uses source= (not sources=)
+      for (let i = 0; i < CONTRACT_IDS.length; i++) {
+        const callUrl = mockFetch.mock.calls[i]?.[0] ?? '';
+        expect(callUrl).toContain('source=');
+        expect(callUrl).toContain('from=');
+        expect(callUrl).toContain('to=');
+        expect(callUrl).not.toContain('sources=');
       }
     });
   });

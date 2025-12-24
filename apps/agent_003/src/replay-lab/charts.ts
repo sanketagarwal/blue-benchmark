@@ -1,9 +1,4 @@
-import { replayLabFetch } from './client';
-
-export interface SignedUrlResponse {
-  url: string;
-  expiresAt: string;
-}
+import { getConfig } from './client';
 
 export interface ChartParams {
   symbolId: string;
@@ -15,30 +10,24 @@ export interface ChartParams {
   height?: number;
 }
 
-// Full indicator layers for comprehensive technical analysis
-const FULL_INDICATOR_LAYERS =
-  'candles,sma:20,ema:20,bb:20:2,vwap,supertrend:10:3,rsi:14,macd:12:26:9,stochRsi:14:3:3,adx:14,cmf:20,chop:14,volume,volumeRatio:20';
+// Chartable layers (per API spec): candles, sma, ema, bb, vwap, volume
+const CHART_LAYERS = 'candles,sma:20,ema:20,bb:20:2,vwap,volume';
 
-export async function getSignedChartUrl(
-  params: ChartParams
-): Promise<string> {
+export function buildChartUrl(params: ChartParams): string {
+  const { baseUrl } = getConfig();
   const width = params.width ?? 1200;
   const height = params.height ?? 800;
 
-  const chartPath = `/api/charts/${params.symbolId}/image?timeframe=${params.timeframe}&from=${params.from.toISOString()}&to=${params.to.toISOString()}&layers=${params.layers}&width=${String(width)}&height=${String(height)}`;
-
-  const response = await replayLabFetch<SignedUrlResponse>('/api/signed-url', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      path: chartPath,
-      expiresIn: 3600,
-    }),
+  const searchParams = new URLSearchParams({
+    timeframe: params.timeframe,
+    from: params.from.toISOString(),
+    to: params.to.toISOString(),
+    layers: params.layers,
+    width: String(width),
+    height: String(height),
   });
 
-  return response.url;
+  return `${baseUrl}/api/charts/${params.symbolId}/image?${searchParams.toString()}`;
 }
 
 export interface ForecastingCharts {
@@ -48,10 +37,10 @@ export interface ForecastingCharts {
   chart24h15m: string;
 }
 
-export async function getForecastingCharts(
+export function getForecastingCharts(
   symbolId: string,
   currentTime: Date
-): Promise<ForecastingCharts> {
+): ForecastingCharts {
   // Chart 1: 4 hours of 5m candles (ending at current time)
   const fourHoursAgo = new Date(currentTime);
   fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
@@ -60,26 +49,25 @@ export async function getForecastingCharts(
   const twentyFourHoursAgo = new Date(currentTime);
   twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-  const [chart4h5m, chart24h15m] = await Promise.all([
-    getSignedChartUrl({
-      symbolId,
-      timeframe: '5m',
-      from: fourHoursAgo,
-      to: currentTime,
-      layers: FULL_INDICATOR_LAYERS,
-      width: 1200,
-      height: 800,
-    }),
-    getSignedChartUrl({
-      symbolId,
-      timeframe: '15m',
-      from: twentyFourHoursAgo,
-      to: currentTime,
-      layers: FULL_INDICATOR_LAYERS,
-      width: 1200,
-      height: 800,
-    }),
-  ]);
+  const chart4h5m = buildChartUrl({
+    symbolId,
+    timeframe: '5m',
+    from: fourHoursAgo,
+    to: currentTime,
+    layers: CHART_LAYERS,
+    width: 1200,
+    height: 800,
+  });
+
+  const chart24h15m = buildChartUrl({
+    symbolId,
+    timeframe: '15m',
+    from: twentyFourHoursAgo,
+    to: currentTime,
+    layers: CHART_LAYERS,
+    width: 1200,
+    height: 800,
+  });
 
   return { chart4h5m, chart24h15m };
 }
