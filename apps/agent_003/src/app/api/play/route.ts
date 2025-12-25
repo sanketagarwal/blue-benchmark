@@ -27,8 +27,8 @@ export async function POST(): Promise<NextResponse> {
       throw new Error('SYMBOL_ID environment variable is required');
     }
 
-    // 3. Get chart URLs (4hr/5m and 24hr/15m with indicators)
-    const charts = getForecastingCharts(symbolId, clockState.currentTime);
+    // 3. Get signed chart URLs (4hr/5m and 24hr/15m with indicators)
+    const charts = await getForecastingCharts(symbolId, clockState.currentTime);
 
     // 4. Get orderbook snapshot at current time
     const orderbook = await getOrderbookSnapshot(symbolId, clockState.currentTime);

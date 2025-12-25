@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getConfig, replayLabFetch } from '../src/replay-lab/client';
 import {
-  buildChartUrl,
+  getSignedChartUrl,
   getForecastingCharts,
   type ChartParams,
 } from '../src/replay-lab/charts';
@@ -106,17 +106,23 @@ describe('Replay Lab Client', () => {
 });
 
 describe('Replay Lab Charts', () => {
+  const mockFetch = vi.fn();
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
     vi.stubEnv('REPLAY_LAB_API_KEY', 'test-api-key');
     vi.stubEnv('REPLAY_LAB_BASE_URL', 'https://test.example.com');
+    global.fetch = mockFetch;
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    global.fetch = originalFetch;
+    mockFetch.mockReset();
   });
 
-  describe('buildChartUrl', () => {
-    it('should build correct URL with all parameters', () => {
+  describe('getSignedChartUrl', () => {
+    it('should POST to signed-url endpoint with chart path', async () => {
       const params: ChartParams = {
         symbolId: 'COINBASE_SPOT_ETH_USD',
         timeframe: '5m',
@@ -127,49 +133,82 @@ describe('Replay Lab Charts', () => {
         height: 800,
       };
 
-      const url = buildChartUrl(params);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          url: 'https://signed.example.com/chart',
+          expiresAt: '2025-12-22T16:00:00Z',
+        }),
+      });
 
-      expect(url).toContain('https://test.example.com/api/charts/COINBASE_SPOT_ETH_USD/image');
-      expect(url).toContain('timeframe=5m');
-      expect(url).toContain('from=2025-12-22T10%3A00%3A00.000Z');
-      expect(url).toContain('to=2025-12-22T14%3A00%3A00.000Z');
-      expect(url).toContain('layers=candles%2Csma%3A20');
-      expect(url).toContain('width=1200');
-      expect(url).toContain('height=800');
+      const url = await getSignedChartUrl(params);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://test.example.com/api/signed-url',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'x-api-key': 'test-api-key',
+            'content-type': 'application/json',
+          }),
+        })
+      );
+      expect(url).toBe('https://signed.example.com/chart');
     });
 
-    it('should use default width and height', () => {
+    it('should include chart path with all parameters in request body', async () => {
       const params: ChartParams = {
         symbolId: 'COINBASE_SPOT_ETH_USD',
         timeframe: '1h',
         from: new Date('2025-12-22T10:00:00Z'),
         to: new Date('2025-12-22T14:00:00Z'),
-        layers: 'candles',
+        layers: 'candles,bb',
       };
 
-      const url = buildChartUrl(params);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          url: 'https://signed.example.com/chart',
+          expiresAt: '2025-12-22T16:00:00Z',
+        }),
+      });
 
-      expect(url).toContain('width=1200');
-      expect(url).toContain('height=800');
+      await getSignedChartUrl(params);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]?.[1]?.body ?? '{}');
+      expect(callBody.path).toContain('COINBASE_SPOT_ETH_USD');
+      expect(callBody.path).toContain('1h');
+      expect(callBody.path).toContain('candles,bb');
+      expect(callBody.expiresIn).toBe(3600);
     });
   });
 
   describe('getForecastingCharts', () => {
-    it('should return two chart URLs with correct timeframes', () => {
+    it('should fetch two signed chart URLs in parallel', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const currentTime = new Date('2025-12-22T14:00:00Z');
 
-      const result = getForecastingCharts(symbolId, currentTime);
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            url: 'https://signed.example.com/chart-4h-5m',
+            expiresAt: '2025-12-22T16:00:00Z',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            url: 'https://signed.example.com/chart-24h-15m',
+            expiresAt: '2025-12-22T16:00:00Z',
+          }),
+        });
 
-      // 4h/5m chart
-      expect(result.chart4h5m).toContain('timeframe=5m');
-      expect(result.chart4h5m).toContain('from=2025-12-22T10%3A00%3A00.000Z');
-      expect(result.chart4h5m).toContain('to=2025-12-22T14%3A00%3A00.000Z');
+      const result = await getForecastingCharts(symbolId, currentTime);
 
-      // 24h/15m chart
-      expect(result.chart24h15m).toContain('timeframe=15m');
-      expect(result.chart24h15m).toContain('from=2025-12-21T14%3A00%3A00.000Z');
-      expect(result.chart24h15m).toContain('to=2025-12-22T14%3A00%3A00.000Z');
+      expect(result.chart4h5m).toBe('https://signed.example.com/chart-4h-5m');
+      expect(result.chart24h15m).toBe('https://signed.example.com/chart-24h-15m');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 });
