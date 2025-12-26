@@ -4,10 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 3001",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint src --ext .ts,.tsx",
+    "benchmark": "tsx src/benchmark.ts",
+    "lint": "eslint src --ext .ts",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,18 +14,15 @@
   "dependencies": {
     "@nullagent/agent-core": "workspace:*",
     "@nullagent/database": "workspace:*",
-    "next": "^15.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@nullagent/eslint-config": "workspace:*",
     "@nullagent/typescript-config": "workspace:*",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
     "@vitest/coverage-v8": "^2.0.0",
     "eslint": "^9.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.9.0",
     "vitest": "^2.0.0"
   }
