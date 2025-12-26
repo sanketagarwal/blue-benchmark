@@ -138,9 +138,14 @@ async function main(): Promise<void> {
 }
 
 // Use top-level await pattern for CLI
-await main().catch((error: unknown) => {
-  console.error('Benchmark failed:', error);
-  // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
-  process.exit(1);
-});
+await main()
+  .then(() => {
+    // eslint-disable-next-line unicorn/no-process-exit -- CLI must exit explicitly to close DB connections
+    process.exit(0);
+  })
+  .catch((error: unknown) => {
+    console.error('Benchmark failed:', error);
+    // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
+    process.exit(1);
+  });
 /* eslint-enable no-console -- Re-enable console rule after CLI benchmark output */
