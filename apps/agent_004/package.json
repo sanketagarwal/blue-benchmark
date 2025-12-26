@@ -1,0 +1,30 @@
+{
+  "name": "agent_004",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "benchmark": "tsx src/benchmark.ts",
+    "lint": "eslint src --ext .ts",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@nullagent/agent-core": "workspace:*",
+    "@nullagent/database": "workspace:*",
+    "@nullagent/scorers": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@nullagent/eslint-config": "workspace:*",
+    "@nullagent/typescript-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.0.0"
+  }
+}
