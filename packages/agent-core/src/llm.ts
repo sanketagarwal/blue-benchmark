@@ -52,4 +52,5 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'openai/gpt-4o-mini': 128_000,
   'deepseek/deepseek-v3.2': 128_000,
   'anthropic/claude-sonnet-4': 200_000,
+  'xai/grok-4.1-fast-reasoning': 2_000_000,
 };
