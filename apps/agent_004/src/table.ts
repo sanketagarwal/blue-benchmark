@@ -51,7 +51,7 @@ export function printResultsTable(
     CORNER_TR;
 
   // Title separator
-  const titleSep =
+  const titleSeparator =
     T_RIGHT +
     BORDER_CHAR.repeat(COL_WIDTH_MODEL) +
     T_DOWN +
@@ -75,7 +75,7 @@ export function printResultsTable(
     VERTICAL;
 
   // Header separator
-  const headerSep =
+  const headerSeparator =
     T_RIGHT +
     BORDER_CHAR.repeat(COL_WIDTH_MODEL) +
     CROSS +
@@ -100,7 +100,7 @@ export function printResultsTable(
   );
 
   // Footer separator
-  const footerSep =
+  const footerSeparator =
     T_RIGHT +
     BORDER_CHAR.repeat(COL_WIDTH_MODEL) +
     T_UP +
@@ -112,9 +112,10 @@ export function printResultsTable(
     T_LEFT;
 
   // Winner line
-  const winnerText = winner
-    ? `Winner: ${winner.modelId} (lowest Brier score)`
-    : 'No winner determined';
+  const winnerText =
+    winner === undefined
+      ? 'No winner determined'
+      : `Winner: ${winner.modelId} (lowest Brier score)`;
   const winnerLine = VERTICAL + ' ' + winnerText.padEnd(totalWidth - 3) + VERTICAL;
 
   // Bottom border
@@ -124,15 +125,17 @@ export function printResultsTable(
     CORNER_BR;
 
   // Print everything
+  /* eslint-disable no-console -- CLI table output */
   console.log(topBorder);
   console.log(titleLine);
-  console.log(titleSep);
+  console.log(titleSeparator);
   console.log(header);
-  console.log(headerSep);
+  console.log(headerSeparator);
   for (const row of dataRows) {
     console.log(row);
   }
-  console.log(footerSep);
+  console.log(footerSeparator);
   console.log(winnerLine);
   console.log(bottomBorder);
+  /* eslint-enable no-console -- Re-enable console rule after CLI table output */
 }

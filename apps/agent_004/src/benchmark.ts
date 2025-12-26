@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI benchmark tool requires console output */
 import { runRound } from '@nullagent/agent-core';
 
 import {
@@ -16,7 +17,6 @@ import { forecastScorer } from './scorers/aggregate-scorer.js';
 import { printResultsTable } from './table.js';
 
 import type { ModelId } from './matrix.js';
-import type { ForecastOutput } from './forecaster.js';
 import type { BenchmarkResults, ModelResults, RoundResult } from './results.js';
 import type { ContractId } from './scorers/types.js';
 
@@ -25,12 +25,12 @@ async function runModelRound(
   symbolId: string,
   roundNumber: number
 ): Promise<RoundResult> {
-  // Set MODEL_ID env var for this model
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- MODEL_ID is set dynamically per model in benchmark
   process.env['MODEL_ID'] = modelId;
 
   const forecaster = createForecaster(modelId);
   const result = await runRound(forecaster);
-  const output = result.output as ForecastOutput;
+  const output = result.output;
 
   const predictionWindow = getPredictionWindow();
   const groundTruth = await getGroundTruthBatch(
@@ -39,14 +39,16 @@ async function runModelRound(
     predictionWindow.to
   );
 
-  const scoreResult = forecastScorer.score({
+  const scoreResult = await forecastScorer.score({
     predictions: output.predictions as Record<ContractId, number>,
     actuals: groundTruth as Record<ContractId, boolean>,
     predictionTime: predictionWindow.from,
     symbolId,
   });
 
-  console.log(`  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`);
+  console.log(
+    `  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`
+  );
 
   return {
     roundNumber,
@@ -76,7 +78,7 @@ async function main(): Promise<void> {
   console.log(`Rounds: ${String(BENCHMARK_ROUNDS)}\n`);
 
   // Initialize results tracking
-  const modelResults: Map<ModelId, RoundResult[]> = new Map();
+  const modelResults = new Map<ModelId, RoundResult[]>();
   for (const modelId of MODEL_MATRIX) {
     modelResults.set(modelId, []);
   }
@@ -135,7 +137,10 @@ async function main(): Promise<void> {
   printResultsTable(summaries, BENCHMARK_ROUNDS, winner);
 }
 
-main().catch((error: unknown) => {
+// Use top-level await pattern for CLI
+await main().catch((error: unknown) => {
   console.error('Benchmark failed:', error);
+  // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
   process.exit(1);
 });
+/* eslint-enable no-console -- Re-enable console rule after CLI benchmark output */

@@ -1,3 +1,10 @@
-import baseConfig from '@nullagent/eslint-config/library';
+import { config as nextjs } from '@nullagent/eslint-config/nextjs';
+import { config as testing } from '@nullagent/eslint-config/testing';
 
-export default [...baseConfig];
+export default [
+  ...nextjs,
+  {
+    files: ['**/__tests__/**/*.ts', '**/*.test.ts'],
+    ...testing[0],
+  },
+];

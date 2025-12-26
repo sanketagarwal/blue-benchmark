@@ -2,6 +2,7 @@ import { defineAgent } from '@nullagent/agent-core';
 import { z } from 'zod';
 
 import type { ModelId } from './matrix.js';
+import type { Agent } from '@nullagent/agent-core';
 
 export interface ForecastContext {
   chart4h5mUrl: string;
@@ -43,8 +44,10 @@ export type ForecastOutput = z.infer<typeof OutputSchema>;
 /**
  * Create a forecaster agent for a specific model.
  * Uses the modelId as the agentId for isolated message history.
+ * @param modelId - The model identifier
+ * @returns An agent definition for the forecaster
  */
-export function createForecaster(modelId: ModelId) {
+export function createForecaster(modelId: ModelId): Agent<ForecastOutput> {
   return defineAgent({
     // Use model ID as agent ID for isolated history per model
     id: modelId,
