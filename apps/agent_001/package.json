@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "benchmark": "tsx src/benchmark.ts",
+    "benchmark": "node --env-file=.env.local --import tsx src/benchmark.ts",
     "lint": "eslint src --ext .ts,.tsx",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
@@ -21,6 +21,7 @@
     "@nullagent/typescript-config": "workspace:*",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^2.0.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.0",

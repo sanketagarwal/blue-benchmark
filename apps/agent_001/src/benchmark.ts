@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI benchmark tool requires console output */
 import { runRound } from '@nullagent/agent-core';
 
 import {
@@ -59,9 +60,7 @@ async function runSingleGame(gameNumber: number): Promise<GameResult> {
     throw new Error('Game state should exist after puzzle creation');
   }
 
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(`\nGame ${String(gameNumber)}: "${phrase}" (${puzzleOutput.category})`);
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(`Board: ${getCurrentBoard(gameState)}`);
 
   while (!gameState.solved && !gameState.failed && moves < MAX_MOVES_PER_GAME) {
@@ -78,20 +77,16 @@ async function runSingleGame(gameNumber: number): Promise<GameResult> {
       playerOutput.guess === undefined
         ? `tried "${playerOutput.letter ?? 'unknown'}"`
         : `guessed "${playerOutput.guess}"`;
-    // eslint-disable-next-line no-console -- CLI benchmark requires console output
     console.log(`  Move ${String(moves)}: ${action} => ${board}`);
 
     if (gameState.solved) {
-      // eslint-disable-next-line no-console -- CLI benchmark requires console output
       console.log(`  SOLVED in ${String(moves)} moves!`);
     } else if (gameState.failed) {
-      // eslint-disable-next-line no-console -- CLI benchmark requires console output
       console.log(`  FAILED - wrong phrase guess`);
     }
   }
 
   if (!gameState.solved && !gameState.failed) {
-    // eslint-disable-next-line no-console -- CLI benchmark requires console output
     console.log(`  TIMEOUT - exceeded ${String(MAX_MOVES_PER_GAME)} moves`);
   }
 
@@ -118,17 +113,11 @@ function printResults(results: GameResult[]): void {
 
   const titleText = `agent_001 Benchmark Results (${String(TOTAL_GAMES)} games)`;
 
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log('\n');
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(BORDER_LINE);
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(`|${padCenter(titleText, 65)}|`);
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(HEADER_SEPARATOR);
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log('|  Game   |   Result   |   Moves   |           Phrase            |');
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(HEADER_SEPARATOR);
 
   for (const result of results) {
@@ -137,23 +126,17 @@ function printResults(results: GameResult[]): void {
     const movesString = padCenter(String(result.moves), 9);
     const phraseString =
       result.phrase.length > 27 ? result.phrase.slice(0, 24) + '...' : result.phrase.padEnd(27);
-    // eslint-disable-next-line no-console -- CLI benchmark requires console output
     console.log(`|${gameString}|${resultString}|${movesString}| ${phraseString}|`);
   }
 
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(HEADER_SEPARATOR);
   const summaryText = `Summary: ${String(wins)}/${String(results.length)} won (${winRate.toFixed(1)}%), avg ${averageMoves.toFixed(1)} moves`;
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(`| ${summaryText.padEnd(63)}|`);
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(BORDER_LINE);
 }
 
 async function main(): Promise<void> {
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log('Starting agent_001 benchmark...');
-  // eslint-disable-next-line no-console -- CLI benchmark requires console output
   console.log(`Running ${String(TOTAL_GAMES)} complete puzzle games\n`);
 
   const results: GameResult[] = [];
@@ -173,7 +156,6 @@ async function run(): Promise<void> {
   try {
     await main();
   } catch (error: unknown) {
-    // eslint-disable-next-line no-console -- CLI benchmark requires console output for errors
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI benchmark must exit with error code on failure
     process.exit(1);
@@ -182,3 +164,5 @@ async function run(): Promise<void> {
 
 // eslint-disable-next-line unicorn/prefer-top-level-await -- Entry point wrapper
 void run();
+
+/* eslint-enable no-console -- end of CLI benchmark file */

@@ -162,8 +162,12 @@ async function main(): Promise<void> {
   console.log(
     '┌─────────────────────────────────────────────────────────────┐',
   );
+  const titleText = `agent_002 Benchmark Results (${String(BENCHMARK_GAMES)} game)`;
+  const titlePadding = 61 - titleText.length;
+  const titlePadLeft = Math.floor(titlePadding / 2);
+  const titlePadRight = titlePadding - titlePadLeft;
   console.log(
-    '│            agent_002 Benchmark Results (3 games)            │',
+    `│${' '.repeat(titlePadLeft)}${titleText}${' '.repeat(titlePadRight)}│`,
   );
   console.log(
     '├─────────┬────────────┬───────────┬─────────────────────────┤',
