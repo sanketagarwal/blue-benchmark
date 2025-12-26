@@ -26,16 +26,23 @@ vi.mock('../src/history.js', () => ({
   loadRecentRounds: vi.fn(),
 }));
 
-vi.mock('../src/llm.js', () => ({
-  getLLMClient: vi.fn(() => mockOpenAIProvider),
-  getModelId: vi.fn(() => 'deepseek/deepseek-v3.2'),
-  MODEL_CONTEXT_WINDOWS: {
+vi.mock('../src/llm.js', () => {
+  const contextWindows: Record<string, number> = {
     'openai/gpt-4o': 128_000,
     'openai/gpt-4o-mini': 128_000,
     'deepseek/deepseek-v3.2': 128_000,
     'anthropic/claude-sonnet-4': 200_000,
-  },
-}));
+  };
+  return {
+    getLLMClient: vi.fn(() => mockOpenAIProvider),
+    getModelId: vi.fn(() => 'deepseek/deepseek-v3.2'),
+    MODEL_CONTEXT_WINDOWS: contextWindows,
+    DEFAULT_CONTEXT_WINDOW: 100_000,
+    getContextWindow: vi.fn((modelId: string) => {
+      return contextWindows[modelId] ?? 100_000;
+    }),
+  };
+});
 
 vi.mock('ai', () => ({
   generateText: vi.fn(),
@@ -133,17 +140,20 @@ describe('compaction', () => {
       expect(result).toBe(true);
     });
 
-    it('throws error for unknown model', async () => {
+    it('uses default context window for unknown model', async () => {
       const trigger: CompactionTrigger = {
         type: 'context-window',
         modelId: 'unknown/model',
         threshold: 0.8,
       };
-      const messages = [{ content: 'test' }];
+      // Message with ~80k tokens worth of content (default is 100k)
+      const messages = [{ content: 'x'.repeat(320_000) }];
 
-      await expect(shouldCompact(trigger, 'test-agent', messages)).rejects.toThrow(
-        'Unknown model ID: unknown/model'
-      );
+      // Should not throw, should use default 100k context window
+      const result = await shouldCompact(trigger, 'test-agent', messages);
+
+      // 80k / 100k = 0.8 which equals threshold, so should compact
+      expect(result).toBe(true);
     });
   });
 
@@ -202,10 +212,11 @@ describe('compaction', () => {
       expect(result).toBe(true);
     });
 
-    it('throws error for unknown model in custom trigger', async () => {
+    it('uses default context window for unknown model in custom trigger', async () => {
+      const shouldCompactFn = vi.fn().mockReturnValue(true);
       const trigger: CompactionTrigger = {
         type: 'custom',
-        shouldCompact: () => true,
+        shouldCompact: shouldCompactFn,
       };
       const messages = [{ content: 'test' }];
 
@@ -215,8 +226,15 @@ describe('compaction', () => {
       const { getModelId } = await import('../src/llm.js');
       vi.mocked(getModelId).mockReturnValue('unknown/model');
 
-      await expect(shouldCompact(trigger, 'test-agent', messages)).rejects.toThrow(
-        'Unknown model ID: unknown/model'
+      // Should not throw, should use default 100k context window
+      const result = await shouldCompact(trigger, 'test-agent', messages);
+
+      expect(result).toBe(true);
+      // Verify custom function received default context window size (100,000)
+      expect(shouldCompactFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contextWindowSize: 100_000,
+        })
       );
     });
   });

@@ -45,6 +45,11 @@ export function getModelId(): string {
 }
 
 /**
+ * Default context window size for unknown models
+ */
+export const DEFAULT_CONTEXT_WINDOW = 100_000;
+
+/**
  * Known model context window sizes
  */
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -54,3 +59,21 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'anthropic/claude-sonnet-4': 200_000,
   'xai/grok-4.1-fast-reasoning': 2_000_000,
 };
+
+/**
+ * Get context window size for a model, with fallback to default
+ * @param modelId - The model identifier (e.g., 'openai/gpt-4o')
+ * @returns The context window size in tokens
+ */
+export function getContextWindow(modelId: string): number {
+  const contextWindow = MODEL_CONTEXT_WINDOWS[modelId];
+  if (contextWindow === undefined) {
+    // eslint-disable-next-line no-console -- Intentional warning for unknown models to help developers add them to the list
+    console.warn(
+      `⚠️  WARNING: Unknown model "${modelId}" - using default context window of ${String(DEFAULT_CONTEXT_WINDOW)} tokens. ` +
+      `Add this model to MODEL_CONTEXT_WINDOWS in packages/agent-core/src/llm.ts for accurate compaction.`
+    );
+    return DEFAULT_CONTEXT_WINDOW;
+  }
+  return contextWindow;
+}

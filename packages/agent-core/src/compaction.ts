@@ -2,7 +2,7 @@ import { getDatabase, agentMessages } from '@nullagent/database';
 import { generateText } from 'ai';
 
 import { getCurrentRoundNumber, loadRecentRounds } from './history.js';
-import { getLLMClient, getModelId, MODEL_CONTEXT_WINDOWS } from './llm.js';
+import { getLLMClient, getModelId, getContextWindow } from './llm.js';
 
 import type { CompactionTrigger, AgentDefinition } from './types.js';
 
@@ -33,11 +33,7 @@ export async function shouldCompact(
   }
 
   if (trigger.type === 'context-window') {
-    const contextWindow = MODEL_CONTEXT_WINDOWS[trigger.modelId];
-    if (!contextWindow) {
-      throw new Error(`Unknown model ID: ${trigger.modelId}`);
-    }
-
+    const contextWindow = getContextWindow(trigger.modelId);
     const estimatedTokens = estimateTokenCount(messages);
     return estimatedTokens / contextWindow >= trigger.threshold;
   }
@@ -46,11 +42,7 @@ export async function shouldCompact(
     const roundNumber = await getCurrentRoundNumber(agentId);
     const estimatedTokens = estimateTokenCount(messages);
     const modelId = getModelId();
-    const contextWindowSize = MODEL_CONTEXT_WINDOWS[modelId];
-
-    if (!contextWindowSize) {
-      throw new Error(`Unknown model ID: ${modelId}`);
-    }
+    const contextWindowSize = getContextWindow(modelId);
 
     const context = {
       roundNumber,
