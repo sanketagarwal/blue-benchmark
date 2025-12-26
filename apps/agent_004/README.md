@@ -1,35 +1,28 @@
-# agent_003: Market Forecaster
+# agent_004: Model Matrix Forecaster
 
-An LLM agent that forecasts cryptocurrency price movements using technical chart analysis and orderbook data.
+A benchmark tool that runs multiple LLM models in parallel on the same forecasting scenario, comparing their performance.
 
 ## What It Does
 
-Predicts probabilities for 9 different "dump" contracts over 15-minute and 1-hour horizons:
+Runs the same forecasting task across a matrix of models:
+- `xai/grok-4-fast-reasoning`
+- `anthropic/claude-haiku-4.5`
+- `openai/gpt-5-nano`
 
-**Simple Dump Contracts** (absolute price drops):
-- `dump-simple-15m-1pct` / `3pct` / `5pct` - Price drops within 15 minutes
-- `dump-simple-1h-0.5pct` / `1pct` - Price drops within 1 hour
-
-**Volatility-Adjusted Contracts** (z-score based):
-- `dump-vol-adjusted-15m-z2` / `1h-z2` - 2 standard deviation moves
-
-**Drawdown Contracts** (from recent peak):
-- `dump-drawdown-1pct` / `3pct` - Falls from highest point in window
+Each model maintains its own isolated agent (separate message history, compaction). After 3 rounds, a comparison table shows which model performed best.
 
 ## Usage
 
 Run the benchmark with:
 
 ```bash
-cd apps/agent_003
+cd apps/agent_004
 pnpm benchmark
 ```
 
-This runs 3 forecast rounds, scoring each prediction against ground truth.
-
 ## Chart Analysis
 
-The forecaster receives two signed chart URLs with full technical indicators:
+Each model receives the same two signed chart URLs with full technical indicators:
 
 | Chart | Lookback | Timeframe | Purpose |
 |-------|----------|-----------|---------|
@@ -62,37 +55,30 @@ The forecaster receives two signed chart URLs with full technical indicators:
 └───────────────────────────┬─────────────────────────────────┘
                             │
               ┌─────────────┴─────────────┐
-              │     Clock State           │
-              │  (simulation time mgmt)   │
+              │       Matrix Config       │
+              │   [model1, model2, ...]   │
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │     For each round:       │
+              │   1. Fetch data once      │
+              │   2. Run all models       │
+              │   3. Score all models     │
+              │   4. Advance clock        │
               └─────────────┬─────────────┘
                             │
         ┌───────────────────┼───────────────────┐
         │                   │                   │
         ▼                   ▼                   ▼
 ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-│  Replay Lab   │  │  Replay Lab   │  │  Replay Lab   │
-│  Charts API   │  │  Replay API   │  │ Annotations   │
-│  (signed URLs)│  │  (orderbook)  │  │ (ground truth)│
-└───────┬───────┘  └───────┬───────┘  └───────┬───────┘
-        │                   │                   │
-        └───────────────────┼───────────────────┘
+│   Model A     │  │   Model B     │  │   Model C     │
+│  (isolated)   │  │  (isolated)   │  │  (isolated)   │
+└───────────────┘  └───────────────┘  └───────────────┘
                             │
                             ▼
               ┌─────────────────────────┐
-              │       Forecaster        │
-              │  ┌───────────────────┐  │
-              │  │ Chart Images (2x) │  │  ← 4h/5m + 24h/15m
-              │  │ Orderbook Data    │  │
-              │  │ Full Indicators   │  │
-              │  └───────────────────┘  │
-              └───────────┬─────────────┘
-                          │
-                          ▼
-              ┌─────────────────────────┐
-              │    Forecast Scorer      │
-              │  • Brier Score          │
-              │  • Log Loss             │
-              │  • Accuracy @ 0.5       │
+              │   Comparison Table      │
+              │   (winner highlighted)  │
               └─────────────────────────┘
 ```
 
@@ -101,12 +87,12 @@ The forecaster receives two signed chart URLs with full technical indicators:
 | File | Purpose |
 |------|---------|
 | `src/benchmark.ts` | CLI benchmark entry point |
-| `src/forecaster.ts` | Forecaster agent definition + output schema |
+| `src/matrix.ts` | Model matrix configuration |
+| `src/forecaster.ts` | Forecaster factory (creates per-model agents) |
 | `src/clock-state.ts` | Simulation time management |
-| `src/replay-lab/client.ts` | Replay Lab API client |
-| `src/replay-lab/charts.ts` | Chart URL signing |
-| `src/replay-lab/orderbook.ts` | Orderbook data fetching |
-| `src/replay-lab/annotations.ts` | Ground truth fetching |
+| `src/results.ts` | Result aggregation |
+| `src/table.ts` | ASCII table formatting |
+| `src/replay-lab/` | Replay Lab API clients |
 | `src/scorers/` | Brier, log loss, accuracy scorers |
 
 ## Environment Variables
@@ -117,43 +103,52 @@ Create `.env.local`:
 DATABASE_URL=postgresql://localhost:5432/nullagent
 AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
 AI_GATEWAY_API_KEY=your-key
-MODEL_ID=xai/grok-4.1-fast-reasoning
 REPLAY_LAB_API_KEY=rn_...
 REPLAY_LAB_BASE_URL=https://replay-lab-delta.preview.recall.network
 SIMULATION_START_TIME=2025-12-22T14:00:00Z
 SYMBOL_ID=COINBASE_SPOT_ETH_USD
 ```
 
+Note: `MODEL_ID` is not needed - the matrix defines all models.
+
 ## Example Output
 
 ```
-agent_003 Benchmark - Market Forecaster
-=======================================
+agent_004 Matrix Benchmark - Model Comparison
+=============================================
 
 Round 1/3 - 2025-12-22T14:00:00.000Z
-Prediction:
-  dump-simple-15m-1pct: 0.15
-  dump-simple-15m-3pct: 0.08
-  dump-simple-15m-5pct: 0.03
-  ...
-Scores:
-  Brier: 0.12
-  LogLoss: 0.38
-  Accuracy: 0.78
 
-Round 2/3 - 2025-12-22T15:00:00.000Z
+  xai/grok-4-fast-reasoning:
+    dump-simple-15m-1pct: 0.15
+    ...
+    Brier: 0.12, LogLoss: 0.38, Accuracy: 0.78
+
+  anthropic/claude-haiku-4.5:
+    dump-simple-15m-1pct: 0.18
+    ...
+    Brier: 0.14, LogLoss: 0.41, Accuracy: 0.72
+
+  openai/gpt-5-nano:
+    dump-simple-15m-1pct: 0.12
+    ...
+    Brier: 0.11, LogLoss: 0.35, Accuracy: 0.81
+
 ...
 
-Summary:
-  Avg Brier: 0.14
-  Avg LogLoss: 0.42
-  Avg Accuracy: 0.72
+┌────────────────────────────┬─────────┬─────────┬──────────┐
+│           Model            │  Brier  │ LogLoss │ Accuracy │
+├────────────────────────────┼─────────┼─────────┼──────────┤
+│ xai/grok-4-fast-reasoning  │  0.132  │  0.401  │  0.741   │
+│ anthropic/claude-haiku-4.5 │  0.145  │  0.428  │  0.704   │
+│ openai/gpt-5-nano       *  │  0.118  │  0.362  │  0.796   │
+└────────────────────────────┴─────────┴─────────┴──────────┘
+* Winner (lowest Brier score)
 ```
 
 ## When to Use This Pattern
 
-- Probability forecasting with ground truth validation
-- Multi-output predictions with constraint validation
-- Integrating external data sources (charts, orderbooks)
-- Time-series simulation with clock management
-- Comprehensive scoring with multiple metrics
+- Comparing multiple models on identical tasks
+- A/B testing LLM providers
+- Finding the best model for a specific use case
+- Benchmarking cost vs. performance tradeoffs

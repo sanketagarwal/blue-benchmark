@@ -1,97 +1,112 @@
-# agent_001: Multi-Agent Orchestration
+# agent_001: Two-Agent Puzzle Game
 
-Two LLM agents collaborating on Wheel of Fortune - one creates puzzles, one solves them.
+A two-agent system where one LLM creates puzzles and another solves them.
 
 ## What It Does
 
-**Puzzle Master** generates creative phrases with categories:
-- "BREAK A LEG" (Theater)
-- "PIECE OF CAKE" (Food Idioms)
+Uses two specialized agents:
+1. **Puzzle Master**: Creates phrases with categories (e.g., "Famous Phrases", "Movie Titles")
+2. **Player**: Strategically guesses letters or solves the puzzle
 
-**Player** solves the puzzles:
-- Sees the board: `_ _ _ _ _   _   _ _ _`
-- Guesses letters strategically based on category hints
-- Can attempt to solve the whole phrase
+This demonstrates multi-agent coordination where agents have distinct roles.
 
-Each agent has its own memory. Puzzle Master learns what makes good puzzles. Player learns solving strategies. Neither sees the other's history.
+## Usage
+
+Run the benchmark with:
+
+```bash
+cd apps/agent_001
+pnpm benchmark
+```
+
+This runs complete puzzle games, tracking wins, losses, and average moves.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│              POST /api/play             │
-└─────────────────┬───────────────────────┘
-                  │
-        ┌─────────┴─────────┐
-        │  needsNewPuzzle?  │
-        └─────────┬─────────┘
-                  │
-       ┌──────────┴──────────┐
-       │ yes                 │ no
-       ▼                     │
-┌──────────────────┐         │
-│  Puzzle Master   │         │
-│  ┌────────────┐  │         │
-│  │  Memory A  │  │         │
-│  └────────────┘  │         │
-└────────┬─────────┘         │
-         │                   │
-         ▼                   │
-    startNewGame()           │
-         │                   │
-         └───────┬───────────┘
-                 │
-                 ▼
-       ┌──────────────────┐
-       │      Player      │
-       │  ┌────────────┐  │
-       │  │  Memory B  │  │
-       │  └────────────┘  │
-       └──────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     pnpm benchmark                          │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │       Game State          │
+              │  • Puzzle storage         │
+              │  • Board state tracking   │
+              │  • Win/fail detection     │
+              └─────────────┬─────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   │                   ▼
+┌───────────────┐           │           ┌───────────────┐
+│ Puzzle Master │           │           │    Player     │
+│  (creates)    │           │           │   (solves)    │
+│               │           │           │               │
+│ Output:       │           │           │ Output:       │
+│ • phrase      │           │           │ • letter OR   │
+│ • category    │           │           │ • guess       │
+└───────┬───────┘           │           └───────┬───────┘
+        │                   │                   │
+        └───────────────────┴───────────────────┘
+                            │
+                            ▼
+              ┌─────────────────────────┐
+              │   Results Summary       │
+              │  • Win/loss per game    │
+              │  • Move counts          │
+              │  • Win rate statistics  │
+              └─────────────────────────┘
 ```
-
-## Key Concepts
-
-**Separate Memories**: Each agent maintains independent message history. Puzzle Master's compaction summarizes "what puzzles worked well." Player's compaction summarizes "what strategies worked."
-
-**Conditional Orchestration**: Puzzle Master only runs when needed (no active game, or previous game ended). Player runs every request.
-
-**Agent-to-Agent Data Flow**: Puzzle Master's output becomes Player's input, but through game state - not direct message passing.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `src/puzzle-master.ts` | Generates puzzles (phrase + category) |
-| `src/player.ts` | Solves puzzles (letter/phrase guesses) |
-| `src/game-state.ts` | Shared state between agents |
-| `src/app/api/play/route.ts` | Orchestration logic |
-| `src/app/api/debug/route.ts` | View both agents' message histories |
+| `src/benchmark.ts` | CLI benchmark entry point |
+| `src/puzzle-master.ts` | Agent that creates puzzles with categories |
+| `src/player.ts` | Agent that guesses letters/phrases |
+| `src/game-state.ts` | State management between agents |
 
-## Usage
+## Environment Variables
+
+Create `.env.local`:
 
 ```bash
-pnpm dev --filter=agent_001
-curl -X POST http://localhost:3002/api/play  # Creates puzzle + makes move
-curl http://localhost:3002/api/debug          # View message histories
+DATABASE_URL=postgresql://localhost:5432/nullagent
+AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
+AI_GATEWAY_API_KEY=your-key
+MODEL_ID=xai/grok-4.1-fast-reasoning
 ```
 
-## Example Response
+## Example Output
 
-```json
-{
-  "success": true,
-  "puzzleCreated": true,
-  "category": "Movie Quotes",
-  "board": "_ _ _ _ _   _ _   _ _ _ _   _ _ _ _",
-  "move": { "letter": "e", "reasoning": "E is most common in English" },
-  "message": "Found \"e\"!",
-  "gameState": { "solved": false, "failed": false, "guessedLetters": ["E"] }
-}
+```
+Starting agent_001 benchmark...
+Running 1 complete puzzle games
+
+Game 1: "THE EARLY BIRD CATCHES THE WORM" (Famous Phrases)
+Board: _ _ _   _ _ _ _ _   _ _ _ _   _ _ _ _ _ _ _   _ _ _   _ _ _ _
+  Move 1: tried "E" => T H E   E _ _ L _   _ _ _ _   _ _ T _ H E _   T H E   _ _ _ _
+  Move 2: tried "A" => T H E   E A _ L _   _ _ _ _   _ A T _ H E _   T H E   _ _ _ _
+  ...
+  Move 12: guessed "THE EARLY BIRD CATCHES THE WORM"
+  SOLVED in 12 moves!
+
+
++-----------------------------------------------------------------+
+|          agent_001 Benchmark Results (1 games)                  |
++---------+------------+-----------+-----------------------------+
+|  Game   |   Result   |   Moves   |           Phrase            |
++---------+------------+-----------+-----------------------------+
+|    1    |    WON     |    12     | THE EARLY BIRD CATCHES THE  |
++---------+------------+-----------+-----------------------------+
+| Summary: 1/1 won (100.0%), avg 12.0 moves                       |
++-----------------------------------------------------------------+
 ```
 
 ## When to Use This Pattern
 
-- Separation of concerns (generator vs consumer)
-- Agents that learn different things from the same workflow
-- Different compaction strategies per agent role
+- Multi-agent coordination
+- Creator/solver game dynamics
+- Separate concerns between agents
+- Testing LLM collaboration

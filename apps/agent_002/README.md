@@ -1,125 +1,136 @@
-# agent_002: Multi-Agent with Scoring
+# agent_002: Scored Puzzle Game
 
-Two LLM agents playing Wheel of Fortune, with deterministic scoring after each move.
+Extends agent_001 with per-move scoring to evaluate the quality of each guess.
 
 ## What It Does
 
-Same as agent_001 (Puzzle Master + Player), but adds **scoring** to evaluate each move:
+Like agent_001, uses two agents (Puzzle Master + Player), but adds detailed scoring:
+- **Letter reveals**: Points based on letters uncovered
+- **Strategic guesses**: Bonus for efficient solving
+- **Wrong guesses**: Penalties for misses
 
-- **Correctness** (0 or 1): Did the guess find letters or solve the puzzle?
-- **Difficulty** (0-1): What proportion of letters were still hidden?
-- **Score** (0-1): Combined metric: `correctness * (0.5 + difficulty * 0.5)`
+This enables quantitative comparison between different models or strategies.
 
-Scores are persisted to a `scorer_results` table and correlated via `trace_id`.
+## Usage
+
+Run the benchmark with:
+
+```bash
+cd apps/agent_002
+pnpm benchmark
+```
+
+This runs scored puzzle games, tracking wins, moves, and average score per move.
+
+## Scoring Metrics
+
+| Metric | Description |
+|--------|-------------|
+| **Letter Found** | +1.0 base, bonus for multiple occurrences |
+| **Letter Not Found** | -0.5 penalty for wrong letter |
+| **Phrase Solved** | +5.0 bonus for correct full guess |
+| **Phrase Failed** | -3.0 penalty for wrong phrase guess |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│              POST /api/play             │
-└─────────────────┬───────────────────────┘
-                  │
-        ┌─────────┴─────────┐
-        │  needsNewPuzzle?  │
-        └─────────┬─────────┘
-                  │
-       ┌──────────┴──────────┐
-       │ yes                 │ no
-       ▼                     │
-┌──────────────────┐         │
-│  Puzzle Master   │         │
-│  ┌────────────┐  │         │
-│  │  Memory A  │  │         │
-│  └────────────┘  │         │
-└────────┬─────────┘         │
-         │                   │
-         ▼                   │
-    startNewGame()           │
-         │                   │
-         └───────┬───────────┘
-                 │
-                 ▼
-       ┌──────────────────┐
-       │      Player      │
-       │  ┌────────────┐  │
-       │  │  Memory B  │  │
-       │  └────────────┘  │
-       └────────┬─────────┘
-                │
-                ▼
-       ┌──────────────────┐
-       │  playerRound     │
-       │  Scorer          │  ← Deterministic function
-       │  (no memory)     │     not an LLM agent
-       └────────┬─────────┘
-                │
-                ▼
-         ┌────────────┐
-         │ scorer_    │
-         │ results DB │
-         └────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     pnpm benchmark                          │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │       Game State          │
+              │  • Puzzle storage         │
+              │  • Board state tracking   │
+              │  • Win/fail detection     │
+              └─────────────┬─────────────┘
+                            │
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   │                   ▼
+┌───────────────┐           │           ┌───────────────┐
+│ Puzzle Master │           │           │    Player     │
+│  (creates)    │           │           │   (solves)    │
+└───────┬───────┘           │           └───────┬───────┘
+        │                   │                   │
+        └───────────────────┼───────────────────┘
+                            │
+                            ▼
+              ┌─────────────────────────┐
+              │    Player Scorer        │
+              │  ┌───────────────────┐  │
+              │  │ Board before      │  │
+              │  │ Board after       │  │
+              │  │ Move type/result  │  │
+              │  └───────────────────┘  │
+              └───────────┬─────────────┘
+                          │
+                          ▼
+              ┌─────────────────────────┐
+              │   Scored Results        │
+              │  • Score per move       │
+              │  • Average score        │
+              │  • Win statistics       │
+              └─────────────────────────┘
 ```
-
-## Scoring Logic
-
-The `playerRoundScorer` evaluates each move:
-
-```typescript
-correctness = move found letters or solved? 1 : 0
-difficulty  = hiddenLettersBefore / totalLetters  // 0-1 scale
-score       = correctness * (0.5 + difficulty * 0.5)
-```
-
-**Why this formula?**
-- Correct guesses when most letters hidden (hard) score ~1.0
-- Correct guesses when few letters hidden (easy) score ~0.5
-- Incorrect guesses always score 0
-
-## Trace Correlation
-
-Every request generates a `trace_id` (UUID) that links:
-- All `agent_messages` for that round
-- The `scorer_results` entry
-
-Query scores with: `SELECT * FROM scorer_results WHERE trace_id = '...'`
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `src/puzzle-master.ts` | Generates puzzles (phrase + category) |
-| `src/player.ts` | Solves puzzles (letter/phrase guesses) |
-| `src/scorers/player-round-scorer.ts` | Deterministic scoring function |
-| `src/game-state.ts` | Shared state between agents |
-| `src/app/api/play/route.ts` | Orchestration + scoring logic |
-| `src/app/api/debug/route.ts` | View agents' message histories |
+| `src/benchmark.ts` | CLI benchmark entry point |
+| `src/puzzle-master.ts` | Agent that creates puzzles with categories |
+| `src/player.ts` | Agent that guesses letters/phrases |
+| `src/game-state.ts` | State management between agents |
+| `src/scorers/player-round-scorer.ts` | Per-move scoring logic |
 
-## Usage
+## Environment Variables
+
+Create `.env.local`:
 
 ```bash
-pnpm dev --filter=agent_002
-curl -X POST http://localhost:3003/api/play
+DATABASE_URL=postgresql://localhost:5432/nullagent
+AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
+AI_GATEWAY_API_KEY=your-key
+MODEL_ID=xai/grok-4.1-fast-reasoning
 ```
 
-## Example Response
+## Example Output
 
-```json
-{
-  "success": true,
-  "traceId": "3d2e7d30-fffd-4112-a84f-07eb11935983",
-  "puzzleCreated": true,
-  "category": "Movie",
-  "board": "_ _ E   _ _ _ _   _ _ _ _ _ _",
-  "move": { "letter": "e", "reasoning": "E is most common" },
-  "message": "Found \"e\"!",
-  "gameState": { "solved": false, "failed": false, "guessedLetters": ["E"] },
-  "score": { "score": 1, "correctness": 1, "difficulty": 1 }
-}
+```
+agent_002 Benchmark (Puzzle Game with Scoring)
+==============================================
+
+Game 1/1
+────────────────────────────────────────
+Category: Famous Phrases
+Board: _ _ _   _ _ _ _ _   _ _ _ _   _ _ _ _ _ _ _   _ _ _   _ _ _ _
+  Move 1: letter "E" → score 1.50
+  Move 2: letter "A" → score 1.00
+  Move 3: letter "T" → score 1.50
+  Move 4: letter "R" → score 1.00
+  Move 5: letter "S" → score -0.50
+  Move 6: letter "I" → score 1.00
+  ...
+  Move 10: phrase "THE EARLY BIRD CATCHES THE WORM" → score 5.00 [SOLVED]
+Result: WON in 10 moves
+Phrase: THE EARLY BIRD CATCHES THE WORM
+
+
+┌─────────────────────────────────────────────────────────────┐
+│          agent_002 Benchmark Results (1 game)               │
+├─────────┬────────────┬───────────┬─────────────────────────┤
+│  Game   │   Result   │   Moves   │         Phrase          │
+├─────────┼────────────┼───────────┼─────────────────────────┤
+│    1    │    WON     │    10     │ THE EARLY BIRD CATCHE...│
+├─────────┴────────────┴───────────┴─────────────────────────┤
+│ Summary: 1/1 won (100.0%), avg 10.0 moves, avg score 1.35  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## When to Use This Pattern
 
-- Measuring agent performance over time
-- A/B testing different agent prompts or models
-- Building dashboards for agent quality metrics
-- Creating training data with quality labels
+- Quantitative evaluation of LLM decisions
+- A/B testing different models on same task
+- Training data generation with quality scores
+- Detailed move-by-move analysis
