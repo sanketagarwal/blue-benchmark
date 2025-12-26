@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createLLMClient, getLLMClient, getModelId, MODEL_CONTEXT_WINDOWS } from '../src/llm.js';
+import { createLLMClient, getLLMClient, getModelId, MODEL_CONTEXT_WINDOWS, getContextWindow, DEFAULT_CONTEXT_WINDOW } from '../src/llm.js';
 
 describe('llm', () => {
   const originalEnv = process.env;
@@ -81,6 +81,39 @@ describe('llm', () => {
       expect(MODEL_CONTEXT_WINDOWS['openai/gpt-4o-mini']).toBe(128_000);
       expect(MODEL_CONTEXT_WINDOWS['deepseek/deepseek-v3.2']).toBe(128_000);
       expect(MODEL_CONTEXT_WINDOWS['anthropic/claude-sonnet-4']).toBe(200_000);
+    });
+  });
+
+  describe('getContextWindow', () => {
+    it('returns correct context window for known models', () => {
+      expect(getContextWindow('openai/gpt-4o')).toBe(128_000);
+      expect(getContextWindow('anthropic/claude-sonnet-4')).toBe(200_000);
+      expect(getContextWindow('xai/grok-4-fast-reasoning')).toBe(2_000_000);
+    });
+
+    it('returns default context window for unknown models', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = getContextWindow('unknown/model');
+
+      expect(result).toBe(DEFAULT_CONTEXT_WINDOW);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Unknown model "unknown/model"')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('warns with correct message format for unknown models', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      getContextWindow('test/unknown-model');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`using default context window of ${String(DEFAULT_CONTEXT_WINDOW)} tokens`)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

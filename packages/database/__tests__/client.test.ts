@@ -32,4 +32,11 @@ describe('getDatabase', () => {
     expect(database).toBeDefined();
     expect(typeof database.select).toBe('function');
   });
+
+  it('returns same instance on subsequent calls (singleton)', () => {
+    process.env.DATABASE_URL = 'postgresql://localhost:5432/test';
+    const database1 = getDatabase();
+    const database2 = getDatabase();
+    expect(database1).toBe(database2);
+  });
 });
