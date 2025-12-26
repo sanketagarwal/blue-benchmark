@@ -849,7 +849,7 @@
   "info": {
     "title": "Replay Lab API",
     "version": "2.0.0",
-    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
+    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator and sweep-reclaim annotations\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20&annotations=sweep-reclaim-low-5bar\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
   },
   "servers": [
     {
@@ -868,11 +868,11 @@
     },
     {
       "name": "Annotators",
-      "description": "Annotation generation system for ground truth labels.\n\n## What Are Annotations?\n\nAnnotations are **labeled time ranges** representing ground truth events:\n- **Agent evaluation** - Measure how well trading agents detect dumps, pumps, regime changes\n- **Backtesting** - Test strategies against historical events\n- **Data labeling** - Create supervised learning datasets\n\n## Building Custom Annotators\n\nAn annotator is a registered function that processes candles and emits annotations.\n\n### Annotator Definition\n\n```typescript\ndefineAnnotator({\n  name: 'dump-simple-1m-3pct',\n  version: 'v1',\n  annotationType: 'dump_event',\n  source: 'ohlcv_candles',\n  windowSize: '1h',\n  config: { threshold: -0.03 },\n\n  transform: async (context) => {\n    const dumps = []\n    for (const candle of context.candles) {\n      const returnPct = (candle.close - candle.open) / candle.open\n      if (returnPct <= context.config.threshold) {\n        dumps.push({\n          timeStart: candle.timestamp,\n          payload: { returnPct, method: 'simple-threshold' }\n        })\n      }\n    }\n    return dumps\n  }\n})\n```\n\n### Annotator Types\n\n**Simple Threshold**: Flag candles crossing a return threshold\n- `dump-simple-{timeframe}-{pct}` - e.g., dump-simple-1m-3pct\n\n**Volatility-Adjusted**: Normalize returns by rolling volatility (z-score)\n- `dump-vol-adjusted-{timeframe}-z{threshold}` - e.g., dump-vol-adjusted-1m-z2\n\n**Drawdown**: Track peak-to-trough with recovery detection\n- `dump-drawdown-{pct}` - e.g., dump-drawdown-3pct\n\n### Version Bumping\n\nBump `version` when algorithm logic changes - triggers fresh backfill while preserving old annotations.\n"
+      "description": "Annotation generation system for ground truth labels.\n\n## What Are Annotations?\n\nAnnotations are **labeled time ranges** representing ground truth events:\n- **Agent evaluation** - Measure how well trading agents detect dumps, pumps, regime changes\n- **Backtesting** - Test strategies against historical events\n- **Data labeling** - Create supervised learning datasets\n\n## Building Custom Annotators (V2 Pattern)\n\nAn annotator is a registered function that processes candles and emits annotations with explicit hindsight semantics.\n\n### Annotator Definition\n\n```typescript\nimport type { AvailabilityMeta } from '@recallnet/core-domain/replay-lab'\n\ndefineAnnotator({\n  name: 'dump-simple-1m-3pct',\n  version: 'v2',\n  annotationType: 'dump_event',\n  source: 'ohlcv_candles',\n  windowSize: '1h',\n  config: { threshold: -0.03, candleTimeframe: '1m' },\n\n  // V2 REQUIRED: Hindsight specification\n  hindsight: {\n    mode: 'none', // or 'fixed_bars' or 'variable'\n    description: 'Available when candle closes.',\n  },\n\n  transform: async (context) => {\n    const candles = await context.getCandles('1m')\n    const dumps = []\n    for (const candle of candles) {\n      const returnPct = (candle.close - candle.open) / candle.open\n      if (returnPct <= context.config.threshold) {\n        const availability: AvailabilityMeta = {\n          availableAt: candle.timestamp.toISOString(),\n          futureBarsUsed: 0,\n          mode: 'none',\n        }\n        dumps.push({\n          timeStart: candle.timestamp,\n          payload: {\n            method: 'simple-threshold',\n            params: { threshold: -0.03 }, // V2: params separated\n            availability,                  // V2: REQUIRED\n            returnPct,\n          }\n        })\n      }\n    }\n    return dumps\n  }\n})\n```\n\n### Annotator Types\n\n**Simple Threshold**: Flag candles crossing a return threshold\n- `dump-simple-{timeframe}-{pct}` - e.g., dump-simple-1m-3pct\n- `pump-simple-{timeframe}-{pct}` - e.g., pump-simple-1m-3pct\n\n**Volatility-Adjusted**: Normalize returns by rolling volatility (z-score)\n- `dump-vol-adjusted-{timeframe}-z{threshold}` - e.g., dump-vol-adjusted-1m-z2\n- `pump-vol-adjusted-{timeframe}-z{threshold}` - e.g., pump-vol-adjusted-1m-z2\n\n**Drawdown/Drawup**: Track peak-to-trough/trough-to-peak with recovery detection\n- `dump-drawdown-{pct}` - e.g., dump-drawdown-3pct\n- `pump-drawup-{pct}` - e.g., pump-drawup-3pct\n\n**Local Extrema**: Fractal pivots and ZigZag turning points\n- `local-extrema-fractal-{timeframe}-L{bars}` - e.g., local-extrema-fractal-1m-L5\n- `local-extrema-zigzag-{timeframe}-{pct}` - e.g., local-extrema-zigzag-1m-3pct\n\n### Version Bumping\n\nBump `version` when algorithm logic changes - triggers fresh backfill while preserving old annotations.\n"
     },
     {
       "name": "Annotations",
-      "description": "Query ground truth annotations for agent self-scoring.\n\nAnnotations are computed lazily on first request, then cached incrementally.\nSubsequent queries for the same time range are instant.\n\n### Cache Warming\n\nPre-compute annotations for your training date ranges:\n```bash\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?from=2025-12-01&to=2025-12-08\"\n# Subsequent queries will be instant (cache hits)\n```\n"
+      "description": "Query ground truth annotations for agent self-scoring.\n\nAnnotations are computed lazily on first request, then cached incrementally.\nSubsequent queries for the same time range are instant.\n\n### On-Demand Computation\n\nUse the `/compute` endpoint to run annotation detection with custom parameters without pre-registration:\n\n```bash\nPOST /api/annotations/COINBASE_SPOT_BTC_USD/compute\n{\n  \"type\": \"dump_event\",\n  \"method\": \"simple-threshold\",\n  \"params\": { \"threshold\": -0.05, \"candleTimeframe\": \"1m\" },\n  \"from\": \"2025-12-16T00:00:00Z\",\n  \"to\": \"2025-12-16T23:59:59Z\",\n  \"cachePolicy\": \"none\"\n}\n```\n\nAvailable methods:\n- **dump_event**: simple-threshold, vol-adjusted-zscore, drawdown\n- **pump_event**: simple-threshold, vol-adjusted-zscore, drawup\n- **local_extrema**: fractal, zigzag\n- **sweep_reclaim**: sweep-reclaim (not yet implemented)\n\n### Cache Warming\n\nPre-compute annotations for your training date ranges:\n```bash\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?from=2025-12-01&to=2025-12-08\"\n# Subsequent queries will be instant (cache hits)\n```\n"
     },
     {
       "name": "System",
@@ -2144,6 +2144,8 @@
               "type": "string",
               "enum": [
                 "dump_event",
+                "pump_event",
+                "local_extrema",
                 "regime",
                 "vol_spike",
                 "sweep_reclaim"
@@ -2173,8 +2175,34 @@
                 "dump-vol-adjusted-1h-z2",
                 "dump-drawdown-1pct",
                 "dump-drawdown-3pct",
+                "pump-simple-1m-1pct",
+                "pump-simple-1m-3pct",
+                "pump-simple-1m-5pct",
+                "pump-simple-15m-1pct",
+                "pump-simple-15m-3pct",
+                "pump-simple-15m-5pct",
+                "pump-simple-1h-0.5pct",
+                "pump-simple-1h-1pct",
+                "pump-vol-adjusted-1m-z2",
+                "pump-vol-adjusted-1m-z3",
+                "pump-vol-adjusted-15m-z2",
+                "pump-vol-adjusted-15m-z3",
+                "pump-vol-adjusted-1h-z2",
+                "pump-drawup-1pct",
+                "pump-drawup-3pct",
+                "local-extrema-fractal-1m-L5",
+                "local-extrema-fractal-1m-L10",
+                "local-extrema-fractal-15m-L5",
+                "local-extrema-fractal-15m-L10",
+                "local-extrema-zigzag-1m-1pct",
+                "local-extrema-zigzag-1m-3pct",
+                "local-extrema-zigzag-1m-5pct",
+                "local-extrema-zigzag-15m-3pct",
+                "local-extrema-zigzag-15m-5pct",
                 "sweep-reclaim-low-5bar",
-                "sweep-reclaim-high-5bar"
+                "sweep-reclaim-high-5bar",
+                "sweep-reclaim-low-10bar",
+                "sweep-reclaim-high-10bar"
               ],
               "description": "Filter by specific annotator/detector",
               "example": "dump-simple-1h-0.5pct"
@@ -2182,6 +2210,19 @@
             "required": false,
             "description": "Filter by specific annotator/detector",
             "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "format": "date",
+              "description": "Filter annotations available at or before this timestamp (ISO 8601). Only returns annotations where payload.availability.availableAt <= this value.",
+              "example": "2025-12-24T12:00:00Z"
+            },
+            "required": false,
+            "description": "Filter annotations available at or before this timestamp (ISO 8601). Only returns annotations where payload.availability.availableAt <= this value.",
+            "name": "availableAt",
             "in": "query"
           },
           {
@@ -2711,6 +2752,240 @@
                     "ohlcvCount",
                     "orderbookCount",
                     "symbols"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotations/{symbolId}/compute": {
+      "post": {
+        "summary": "Compute annotations on-demand",
+        "description": "Run parameterized annotation detection without pre-registration.\nComputes annotations for a given symbol, type, method, params, and time range.\n\nAvailable methods:\n- **dump_event**: simple-threshold, vol-adjusted-zscore, drawdown\n- **pump_event**: simple-threshold, vol-adjusted-zscore, drawup\n- **local_extrema**: fractal, zigzag\n- **sweep_reclaim**: sweep-reclaim (not yet implemented)\n",
+        "tags": [
+          "Annotations"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "dump_event",
+                      "pump_event",
+                      "local_extrema",
+                      "sweep_reclaim"
+                    ],
+                    "description": "Annotation type template"
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "Detection method (e.g., simple-threshold, fractal)"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "description": "Method parameters"
+                  },
+                  "from": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date",
+                    "description": "Time range start (ISO 8601)"
+                  },
+                  "to": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date",
+                    "description": "Time range end (ISO 8601)"
+                  },
+                  "cachePolicy": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "ephemeral",
+                      "persist"
+                    ],
+                    "default": "none",
+                    "description": "Cache policy"
+                  }
+                },
+                "required": [
+                  "type",
+                  "method",
+                  "params",
+                  "from",
+                  "to"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed annotations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "params": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "annotations": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "cachePolicy": {
+                          "type": "string"
+                        },
+                        "cacheHit": {
+                          "type": "boolean"
+                        },
+                        "computeTimeMs": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "cachePolicy",
+                        "cacheHit",
+                        "computeTimeMs"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "type",
+                    "method",
+                    "params",
+                    "from",
+                    "to",
+                    "annotations",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No candle data found for time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Method not implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }

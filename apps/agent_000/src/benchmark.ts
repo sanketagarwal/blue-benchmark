@@ -9,12 +9,13 @@ import {
   guessPhrase,
   isSolved,
   resetGameState,
+  updateGameState,
 } from './game-state.js';
 
 import type { AgentOutput } from './agent.js';
 import type { GameState } from './game.js';
 
-const BENCHMARK_ROUNDS = 3;
+const BENCHMARK_ROUNDS = 1;
 const TABLE_SEPARATOR = '-----|---------------------|--------|--------';
 
 interface RoundResult {
@@ -76,11 +77,13 @@ async function playGame(gameNumber: number): Promise<RoundResult> {
     if (guessValue !== undefined && guessValue !== '') {
       const processResult = processPhraseGuess(gameState, guessValue);
       gameState = processResult.newState;
+      updateGameState(gameState);
       message = processResult.message;
       console.log(`  Guess #${String(guessCount)}: Phrase "${guessValue}" - ${message}`);
     } else if (letterValue !== undefined && letterValue !== '') {
       const processResult = processLetterGuess(gameState, letterValue);
       gameState = processResult.newState;
+      updateGameState(gameState);
       message = processResult.message;
       console.log(`  Guess #${String(guessCount)}: Letter "${letterValue}" - ${message}`);
     } else {

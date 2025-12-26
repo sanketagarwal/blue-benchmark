@@ -4,13 +4,20 @@ import postgres from 'postgres';
 
 config();
 
+// Singleton database instance to prevent connection exhaustion
+let databaseInstance: PostgresJsDatabase | undefined;
+
 /**
- * Get a Drizzle database instance
+ * Get a Drizzle database instance (singleton)
  *
  * @returns The Drizzle database instance
  * @throws Error if DATABASE_URL is not set
  */
 export function getDatabase(): PostgresJsDatabase {
+  if (databaseInstance !== undefined) {
+    return databaseInstance;
+  }
+
   const databaseUrl = process.env['DATABASE_URL'];
 
   if (typeof databaseUrl !== 'string' || databaseUrl.trim() === '') {
@@ -18,5 +25,6 @@ export function getDatabase(): PostgresJsDatabase {
   }
 
   const client = postgres(databaseUrl);
-  return drizzle(client);
+  databaseInstance = drizzle(client);
+  return databaseInstance;
 }

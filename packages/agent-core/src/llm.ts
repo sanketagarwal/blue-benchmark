@@ -61,6 +61,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'anthropic/claude-haiku-4.5': 200_000,
   'xai/grok-4.1-fast-reasoning': 2_000_000,
   'xai/grok-4-fast-reasoning': 2_000_000,
+  'xai/grok-4-fast-non-reasoning': 2_000_000,
 };
 
 /**

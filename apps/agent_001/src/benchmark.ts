@@ -16,7 +16,7 @@ import type { GameState } from './game-state';
 import type { PlayerOutput } from './player';
 import type { PuzzleOutput } from './puzzle-master';
 
-const TOTAL_GAMES = 3;
+const TOTAL_GAMES = 1;
 const MAX_MOVES_PER_GAME = 50;
 const BORDER_LINE = '+-----------------------------------------------------------------+';
 const HEADER_SEPARATOR = '+---------+------------+-----------+-----------------------------+';

@@ -17,7 +17,7 @@ import type { GameState } from './game-state.js';
 import type { PlayerOutput } from './player.js';
 import type { PuzzleOutput } from './puzzle-master.js';
 
-const BENCHMARK_GAMES = 3;
+const BENCHMARK_GAMES = 1;
 const MAX_GUESSES = 26;
 
 interface GameResult {
