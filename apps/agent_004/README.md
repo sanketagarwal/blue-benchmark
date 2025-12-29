@@ -1,132 +1,43 @@
-# agent_004: Limit Order Fill Predictor
+# agent_004: Model Matrix Forecaster
 
-An LLM agent that predicts the fill probability of hypothetical limit orders, simulating an HFT market-maker's core competency.
+A benchmark tool that runs multiple LLM models in parallel on the same forecasting scenario, comparing their performance.
 
 ## What It Does
 
-Predicts the probability that a limit order placed RIGHT NOW at the current best bid or best ask would fill within various time horizons.
+Runs the same forecasting task across a matrix of models:
+- `xai/grok-4-fast-reasoning`
+- `anthropic/claude-haiku-4.5`
+- `openai/gpt-5-nano`
 
-**6 Fill Probability Contracts:**
-
-| Contract | Description |
-|----------|-------------|
-| `bid-fill-1m` | Limit BUY at best_bid fills within 1 minute |
-| `bid-fill-5m` | Limit BUY at best_bid fills within 5 minutes |
-| `bid-fill-15m` | Limit BUY at best_bid fills within 15 minutes |
-| `ask-fill-1m` | Limit SELL at best_ask fills within 1 minute |
-| `ask-fill-5m` | Limit SELL at best_ask fills within 5 minutes |
-| `ask-fill-15m` | Limit SELL at best_ask fills within 15 minutes |
-
-**Monotonicity Constraints:**
-- `bid-fill-15m >= bid-fill-5m >= bid-fill-1m`
-- `ask-fill-15m >= ask-fill-5m >= ask-fill-1m`
-
-More time = more chances to fill.
-
-## Why This Matters
-
-From HFT research: *"The real-time model that estimates the expected value of placing, keeping, or canceling a limit order right now."*
-
-This is the core of market-making:
-- **Capturing spread** is easy
-- **Avoiding adverse selection** (being filled then price moves against you) is hard
-- **Fill probability** is the foundation for expected value calculations
-
-## How Fill Detection Works
-
-The ground truth uses tick-by-tick trade data with `taker_side`:
-
-```
-Limit BUY at best_bid fills when:
-  trade.taker_side = SELL AND trade.price <= best_bid
-
-Limit SELL at best_ask fills when:
-  trade.taker_side = BUY AND trade.price >= best_ask
-```
-
-This mirrors real exchange mechanics—a limit BUY fills when someone sells into it.
+Each model maintains its own isolated agent (separate message history, compaction). After 3 rounds, a comparison table shows which model performed best.
 
 ## Usage
 
+Run the benchmark with:
+
 ```bash
 cd apps/agent_004
-
-# Normal mode (spinners only)
 pnpm benchmark
-
-# Verbose mode (detailed predictions and results)
-pnpm benchmark --verbose
 ```
-
-## Example Output
-
-**Normal mode:**
-```
-agent_004 Benchmark
-===================
-Symbol: COINBASE_SPOT_ETH_USD
-Model: xai/grok-4.1-fast-reasoning
-Start Time: 2025-12-22T14:00:00.000Z
-
-✓ Round 1/3: Complete
-✓ Round 2/3: Complete
-✓ Round 3/3: Complete
-
-Results
--------
-Model: xai/grok-4.1-fast-reasoning
-Average Brier Score: 0.187
-Average Log Loss: 0.542
-Average Accuracy: 72.2%
-```
-
-**Verbose mode (`--verbose`):**
-```
-agent_004 Benchmark
-===================
-Round 1/3
-
-Predictions:
-  bid-fill-1m           0.150
-  bid-fill-5m           0.350
-  bid-fill-15m          0.550
-  ask-fill-1m           0.250
-  ask-fill-5m           0.500
-  ask-fill-15m          0.700
-
-Ground Truth:
-  ✗ bid-fill-1m         (predicted 0.15)
-  ✓ bid-fill-5m         (predicted 0.35)
-  ✓ bid-fill-15m        (predicted 0.55)
-  ✗ ask-fill-1m         (predicted 0.25)
-  ✓ ask-fill-5m         (predicted 0.50)
-  ✓ ask-fill-15m        (predicted 0.70)
-
-Scores: Brier=0.187, LogLoss=0.542, Accuracy=66.7%
-✓ Round 1/3: Complete
-```
-
-## Orderbook Interpretation
-
-The agent receives orderbook state and learns to interpret:
-
-| Signal | Meaning | Fill Implication |
-|--------|---------|------------------|
-| **Positive imbalance (+)** | More bid depth, buying pressure | Asks more likely to fill |
-| **Negative imbalance (-)** | More ask depth, selling pressure | Bids more likely to fill |
-| **Tight spread** | Stable prices | Lower fill probability |
-| **Wide spread** | Higher volatility | Higher fill probability |
 
 ## Chart Analysis
 
-The agent receives two signed chart URLs with full technical indicators:
+Each model receives the same two signed chart URLs with full technical indicators:
 
 | Chart | Lookback | Timeframe | Purpose |
 |-------|----------|-----------|---------|
 | 4h/5m | 4 hours | 5-minute candles | Short-term momentum |
 | 24h/15m | 24 hours | 15-minute candles | Medium-term trend |
 
-**Indicators:** SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, SuperTrend(10,3), RSI(14), MACD(12,26,9), Stochastic RSI(14,3,3), ADX(14), CMF(20), Choppiness(14), Volume, Volume Ratio(20)
+**Indicators included**: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, SuperTrend(10,3), RSI(14), MACD(12,26,9), Stochastic RSI(14,3,3), ADX(14), CMF(20), Choppiness(14), Volume, Volume Ratio(20)
+
+### Example Charts
+
+**4-Hour Chart (5-minute candles):**
+![4h Chart](https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_ETH_USD/image?timeframe=5m&from=2025-12-26T17%3A26%3A16.282Z&to=2025-12-26T21%3A26%3A16.282Z&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&width=1200&height=800&expires=1782336376&userId=uakn2PdwRJzHyFRFzmXcgkZ7tNmTMjvP&sig=WSipQ_URJkWAyWwWq2g-kfvMmrt1RJKBDojeF9ZoX5o)
+
+**24-Hour Chart (15-minute candles):**
+![24h Chart](https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_ETH_USD/image?timeframe=15m&from=2025-12-25T21%3A26%3A16.282Z&to=2025-12-26T21%3A26%3A16.282Z&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&width=1200&height=800&expires=1782336376&userId=uakn2PdwRJzHyFRFzmXcgkZ7tNmTMjvP&sig=I5ianPjsAVDUOrfrZouGDIxEoiJKB4dZ6xMDVzBAZZM)
 
 ## Scoring Metrics
 
@@ -134,80 +45,55 @@ The agent receives two signed chart URLs with full technical indicators:
 |--------|-------------|-------|
 | **Brier Score** | Mean squared error of probabilities | 0 (perfect) to 1 (worst) |
 | **Log Loss** | Cross-entropy loss | 0 (perfect) to +inf |
-| **Accuracy** | Correct predictions at 0.5 threshold | 0% to 100% |
-| **Monotonicity Violations** | Count of constraint breaches | 0 (perfect) |
+| **Accuracy** | Correct predictions at 0.5 threshold | 0 to 1 |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     pnpm benchmark                          │
-│                    (--verbose flag)                         │
 └───────────────────────────┬─────────────────────────────────┘
                             │
               ┌─────────────┴─────────────┐
-              │       Clock State         │
-              │   (simulation time mgmt)  │
+              │       Matrix Config       │
+              │   [model1, model2, ...]   │
+              └─────────────┬─────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │     For each round:       │
+              │   1. Fetch data once      │
+              │   2. Run all models       │
+              │   3. Score all models     │
+              │   4. Advance clock        │
               └─────────────┬─────────────┘
                             │
         ┌───────────────────┼───────────────────┐
         │                   │                   │
         ▼                   ▼                   ▼
 ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-│  Replay Lab   │  │  Replay Lab   │  │  Replay Lab   │
-│  Charts API   │  │  Orderbook    │  │  Trades API   │
-│ (signed URLs) │  │  (bid/ask)    │  │ (taker_side)  │
-└───────┬───────┘  └───────┬───────┘  └───────┬───────┘
-        │                   │                   │
-        └─────────┬─────────┘                   │
-                  │                             │
-                  ▼                             │
-    ┌─────────────────────────┐                 │
-    │      Market Maker       │                 │
-    │  ┌───────────────────┐  │                 │
-    │  │ Chart Images (2x) │  │                 │
-    │  │ Orderbook State   │  │                 │
-    │  │ (mid, spread,     │  │                 │
-    │  │  imbalance, bid,  │  │                 │
-    │  │  ask)             │  │                 │
-    │  └───────────────────┘  │                 │
-    │           │             │                 │
-    │           ▼             │                 │
-    │   6 Fill Predictions    │                 │
-    └───────────┬─────────────┘                 │
-                │                               │
-                ▼                               ▼
-    ┌─────────────────────┐       ┌─────────────────────┐
-    │     Predictions     │       │    Fill Checker     │
-    │   (probabilities)   │       │   (ground truth)    │
-    └─────────┬───────────┘       └─────────┬───────────┘
-              │                             │
-              └──────────────┬──────────────┘
-                             │
-                             ▼
-               ┌─────────────────────────┐
-               │     Forecast Scorer     │
-               │  • Brier Score          │
-               │  • Log Loss             │
-               │  • Accuracy             │
-               │  • Monotonicity Check   │
-               └─────────────────────────┘
+│   Model A     │  │   Model B     │  │   Model C     │
+│  (isolated)   │  │  (isolated)   │  │  (isolated)   │
+└───────────────┘  └───────────────┘  └───────────────┘
+                            │
+                            ▼
+              ┌─────────────────────────┐
+              │   Comparison Table      │
+              │   (winner highlighted)  │
+              └─────────────────────────┘
 ```
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `src/benchmark.ts` | CLI benchmark entry point with --verbose support |
-| `src/market-maker.ts` | Market maker agent definition + output schema |
+| `src/benchmark.ts` | CLI benchmark entry point |
+| `src/matrix.ts` | Model matrix configuration |
+| `src/forecaster.ts` | Forecaster factory (creates per-model agents) |
 | `src/clock-state.ts` | Simulation time management |
-| `src/ground-truth/fill-checker.ts` | **Fill simulation from trade data** |
-| `src/replay-lab/client.ts` | Replay Lab API client |
-| `src/replay-lab/trades.ts` | **Tick-by-tick trade data with taker_side** |
-| `src/replay-lab/charts.ts` | Chart URL signing |
-| `src/replay-lab/orderbook.ts` | Orderbook data (mid, spread, imbalance, bid, ask) |
-| `src/scorers/` | Brier, log loss, monotonicity, aggregate scorers |
-| `src/app/api/play/route.ts` | Next.js API route for web interface |
+| `src/results.ts` | Result aggregation |
+| `src/table.ts` | ASCII table formatting |
+| `src/replay-lab/` | Replay Lab API clients |
+| `src/scorers/` | Brier, log loss, accuracy scorers |
 
 ## Environment Variables
 
@@ -217,35 +103,52 @@ Create `.env.local`:
 DATABASE_URL=postgresql://localhost:5432/nullagent
 AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
 AI_GATEWAY_API_KEY=your-key
-MODEL_ID=xai/grok-4.1-fast-reasoning
 REPLAY_LAB_API_KEY=rn_...
 REPLAY_LAB_BASE_URL=https://replay-lab-delta.preview.recall.network
 SIMULATION_START_TIME=2025-12-22T14:00:00Z
 SYMBOL_ID=COINBASE_SPOT_ETH_USD
 ```
 
-## Test Coverage
+Note: `MODEL_ID` is not needed - the matrix defines all models.
+
+## Example Output
 
 ```
-155 tests passing
-97.39% line coverage
-93.89% branch coverage
-100% function coverage
+agent_004 Matrix Benchmark - Model Comparison
+=============================================
+
+Round 1/3 - 2025-12-22T14:00:00.000Z
+
+  xai/grok-4-fast-reasoning:
+    dump-simple-15m-1pct: 0.15
+    ...
+    Brier: 0.12, LogLoss: 0.38, Accuracy: 0.78
+
+  anthropic/claude-haiku-4.5:
+    dump-simple-15m-1pct: 0.18
+    ...
+    Brier: 0.14, LogLoss: 0.41, Accuracy: 0.72
+
+  openai/gpt-5-nano:
+    dump-simple-15m-1pct: 0.12
+    ...
+    Brier: 0.11, LogLoss: 0.35, Accuracy: 0.81
+
+...
+
+┌────────────────────────────┬─────────┬─────────┬──────────┐
+│           Model            │  Brier  │ LogLoss │ Accuracy │
+├────────────────────────────┼─────────┼─────────┼──────────┤
+│ xai/grok-4-fast-reasoning  │  0.132  │  0.401  │  0.741   │
+│ anthropic/claude-haiku-4.5 │  0.145  │  0.428  │  0.704   │
+│ openai/gpt-5-nano       *  │  0.118  │  0.362  │  0.796   │
+└────────────────────────────┴─────────┴─────────┴──────────┘
+* Winner (lowest Brier score)
 ```
-
-## Future Extensions
-
-Per the design document (`docs/plans/2025-12-29-agent-004-limit-order-value-design.md`):
-
-- **Phase 2:** Price direction contracts (`price-up-1m`, `price-down-1m`)
-- **Phase 3:** Expected value contracts (`bid-ev-1m`, `ask-ev-1m`)
-- **Phase 4:** Adverse selection scoring
-- **Phase 5:** Queue position modeling
 
 ## When to Use This Pattern
 
-- Probability forecasting with deterministic ground truth from data
-- Multi-output predictions with monotonicity constraints
-- Integrating external data sources (charts, orderbooks, trades)
-- Time-series simulation with clock management
-- HFT/market-making strategy research
+- Comparing multiple models on identical tasks
+- A/B testing LLM providers
+- Finding the best model for a specific use case
+- Benchmarking cost vs. performance tradeoffs

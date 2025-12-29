@@ -1,11 +1,9 @@
-import { resolve } from 'path';
 import { defineConfig } from 'vitest/config';
+import { resolve } from 'path';
 
-// eslint-disable-next-line import-x/no-default-export -- vitest requires default export
 export default defineConfig({
   test: {
     environment: 'node',
-    passWithNoTests: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -13,8 +11,16 @@ export default defineConfig({
         '**/node_modules/**',
         '**/__tests__/**',
         '**/dist/**',
+        '**/.next/**',
+        '**/next.config.ts',
+        '**/next-env.d.ts',
         '**/vitest.config.ts',
         '**/eslint.config.js',
+        '**/src/app/layout.tsx',
+        '**/src/app/page.tsx',
+        '**/src/app/api/**',
+        '**/src/benchmark.ts',
+        '**/scripts/**',
       ],
       thresholds: {
         lines: 90,

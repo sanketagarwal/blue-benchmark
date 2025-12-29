@@ -1,57 +1,70 @@
+/* eslint-disable no-console -- CLI benchmark tool requires console output */
 import { runRound } from '@nullagent/agent-core';
-import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
 import {
   initializeClock,
   advanceClock,
-  getPredictionWindow,
   resetClockState,
 } from './clock-state.js';
-import { createForecaster, setForecastContext, clearForecastContext } from './forecaster.js';
+import { computeFillGroundTruth } from './ground-truth/fill-checker.js';
+import { createMarketMaker, setMarketMakerContext, clearMarketMakerContext } from './market-maker.js';
 import { MODEL_MATRIX, BENCHMARK_ROUNDS } from './matrix.js';
-import { getGroundTruthBatch } from './replay-lab/annotations.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
-import { getOrderbookSnapshot, formatOrderbookForPrompt } from './replay-lab/orderbook.js';
+import { getOrderbookSnapshot, formatOrderbookForPrompt, getBestBidAsk } from './replay-lab/orderbook.js';
+import { getTrades } from './replay-lab/trades.js';
 import { calculateModelSummary, findWinner } from './results.js';
 import { forecastScorer } from './scorers/aggregate-scorer.js';
 import { printResultsTable } from './table.js';
 
 import type { ModelId } from './matrix.js';
 import type { BenchmarkResults, ModelResults, RoundResult } from './results.js';
-import type { ContractId } from './scorers/types.js';
+import type { FillContractId } from './scorers/types.js';
 
-// Create logger with --verbose flag support
-const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
+const isVerbose = process.argv.includes('--verbose');
 
 async function runModelRound(
   modelId: ModelId,
   symbolId: string,
-  roundNumber: number
+  roundNumber: number,
+  bestBid: number,
+  bestAsk: number,
+  predictionTime: Date
 ): Promise<RoundResult> {
   // eslint-disable-next-line turbo/no-undeclared-env-vars -- MODEL_ID is set dynamically per model in benchmark
   process.env['MODEL_ID'] = modelId;
 
-  const forecaster = createForecaster(modelId);
-  const result = await runRound(forecaster);
+  const marketMaker = createMarketMaker(modelId);
+  const result = await runRound(marketMaker);
   const output = result.output;
 
-  const predictionWindow = getPredictionWindow();
-  const groundTruth = await getGroundTruthBatch(
-    symbolId,
-    predictionWindow.from,
-    predictionWindow.to
+  // Fetch trades from prediction time to +15 minutes (covers all horizons)
+  const horizonEnd = new Date(predictionTime.getTime() + 15 * 60 * 1000);
+  const trades = await getTrades(symbolId, predictionTime, horizonEnd);
+
+  // Compute fill ground truth using best bid/ask from orderbook
+  const groundTruth = computeFillGroundTruth(
+    trades,
+    bestBid,
+    bestAsk,
+    predictionTime
   );
 
   const scoreResult = await forecastScorer.score({
-    predictions: output.predictions as Record<ContractId, number>,
-    actuals: groundTruth as Record<ContractId, boolean>,
-    predictionTime: predictionWindow.from,
+    predictions: output.predictions as Record<FillContractId, number>,
+    actuals: groundTruth as Record<FillContractId, boolean>,
+    predictionTime,
     symbolId,
   });
 
-  logger.log(
-    `  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`
-  );
+  if (isVerbose) {
+    console.log(`\n  ${modelId}:`);
+    console.log(`    Predictions: ${JSON.stringify(output.predictions)}`);
+    console.log(`    Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`);
+  } else {
+    console.log(
+      `  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`
+    );
+  }
 
   return {
     roundNumber,
@@ -60,8 +73,8 @@ async function runModelRound(
 }
 
 async function main(): Promise<void> {
-  logger.header('agent_004 Model Matrix Benchmark');
-  logger.objective('Compare LLM model performance on identical forecasting tasks');
+  console.log('agent_005 Model Matrix Benchmark');
+  console.log('================================\n');
 
   const startTime = new Date().toISOString();
 
@@ -75,10 +88,10 @@ async function main(): Promise<void> {
   resetClockState();
   let clockState = initializeClock();
 
-  logger.log(`Symbol: ${symbolId}`);
-  logger.log(`Start Time: ${clockState.currentTime.toISOString()}`);
-  logger.log(`Models: ${MODEL_MATRIX.join(', ')}`);
-  logger.log(`Rounds: ${String(BENCHMARK_ROUNDS)}`);
+  console.log(`Symbol: ${symbolId}`);
+  console.log(`Start Time: ${clockState.currentTime.toISOString()}`);
+  console.log(`Models: ${MODEL_MATRIX.join(', ')}`);
+  console.log(`Rounds: ${String(BENCHMARK_ROUNDS)}\n`);
 
   // Initialize results tracking
   const modelResults = new Map<ModelId, RoundResult[]>();
@@ -88,15 +101,16 @@ async function main(): Promise<void> {
 
   // Run benchmark rounds
   for (let round = 1; round <= BENCHMARK_ROUNDS; round++) {
-    logger.startSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} (${clockState.currentTime.toISOString()})`);
+    console.log(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} (${clockState.currentTime.toISOString()})`);
 
     // Fetch data once for this round
     const charts = await getForecastingCharts(symbolId, clockState.currentTime);
     const orderbook = await getOrderbookSnapshot(symbolId, clockState.currentTime);
     const orderbookData = formatOrderbookForPrompt(orderbook);
+    const { bestBid, bestAsk } = getBestBidAsk(orderbook);
 
     // Set context for all models
-    setForecastContext({
+    setMarketMakerContext({
       chart4h5mUrl: charts.chart4h5m,
       chart24h15mUrl: charts.chart24h15m,
       orderbookData,
@@ -106,17 +120,23 @@ async function main(): Promise<void> {
 
     // Run each model sequentially
     for (const modelId of MODEL_MATRIX) {
-      logger.updateSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} - ${modelId}`);
-      const roundResult = await runModelRound(modelId, symbolId, round);
+      const roundResult = await runModelRound(
+        modelId,
+        symbolId,
+        round,
+        bestBid,
+        bestAsk,
+        clockState.currentTime
+      );
       modelResults.get(modelId)?.push(roundResult);
     }
 
     // Clear context
-    clearForecastContext();
+    clearMarketMakerContext();
 
     // Advance clock for next round
     clockState = advanceClock();
-    logger.succeedSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} complete`);
+    console.log('');
   }
 
   const endTime = new Date().toISOString();
@@ -136,7 +156,8 @@ async function main(): Promise<void> {
   const summaries = results.models.map((m) => calculateModelSummary(m));
   const winner = findWinner(summaries);
 
-  // Print results table (always displayed)
+  // Print results table
+  console.log('');
   printResultsTable(summaries, BENCHMARK_ROUNDS, winner);
 }
 
@@ -147,8 +168,8 @@ await main()
     process.exit(0);
   })
   .catch((error: unknown) => {
-    // eslint-disable-next-line no-console -- Error handler needs console.error
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);
   });
+/* eslint-enable no-console -- Re-enable console rule after CLI benchmark output */

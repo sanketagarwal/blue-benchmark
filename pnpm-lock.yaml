@@ -240,6 +240,52 @@ importers:
       '@nullagent/scorers':
         specifier: workspace:*
         version: link:../../packages/scorers
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@nullagent/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@nullagent/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.3
+      '@vitest/coverage-v8':
+        specifier: ^2.0.0
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.2
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+
+  apps/agent_005:
+    dependencies:
+      '@nullagent/agent-core':
+        specifier: workspace:*
+        version: link:../../packages/agent-core
+      '@nullagent/cli-utils':
+        specifier: workspace:*
+        version: link:../../packages/cli-utils
+      '@nullagent/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@nullagent/scorers':
+        specifier: workspace:*
+        version: link:../../packages/scorers
       next:
         specifier: ^15.0.0
         version: 15.5.9(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
