@@ -4,17 +4,17 @@ import { runRound } from '@nullagent/agent-core';
 import {
   initializeClock,
   advanceClock,
-  getPredictionWindow,
   resetClockState,
 } from './clock-state.js';
-import { forecaster, setForecastContext, clearForecastContext } from './forecaster.js';
-import { getGroundTruthBatch } from './replay-lab/annotations.js';
+import { computeFillGroundTruth } from './ground-truth/fill-checker.js';
+import { marketMaker, setMarketMakerContext, clearMarketMakerContext } from './market-maker.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
-import { getOrderbookSnapshot, formatOrderbookForPrompt } from './replay-lab/orderbook.js';
+import { getOrderbookSnapshot, formatOrderbookForPrompt, getBestBidAsk } from './replay-lab/orderbook.js';
+import { getTrades } from './replay-lab/trades.js';
 import { forecastScorer } from './scorers/aggregate-scorer.js';
 
-import type { ForecastOutput } from './forecaster.js';
-import type { ContractId } from './scorers/types.js';
+import type { MarketMakerOutput } from './market-maker.js';
+import type { FillContractId } from './scorers/types.js';
 
 const BENCHMARK_ROUNDS = 3;
 
@@ -26,7 +26,7 @@ interface RoundScore {
 }
 
 async function main(): Promise<void> {
-  console.log('agent_003 Benchmark');
+  console.log('agent_004 Benchmark');
   console.log('===================\n');
 
   const symbolId = process.env['SYMBOL_ID'];
@@ -56,8 +56,10 @@ async function main(): Promise<void> {
     const charts = await getForecastingCharts(symbolId, clockState.currentTime);
     const orderbook = await getOrderbookSnapshot(symbolId, clockState.currentTime);
     const orderbookData = formatOrderbookForPrompt(orderbook);
+    const { bestBid, bestAsk } = getBestBidAsk(orderbook);
 
-    setForecastContext({
+    // Set context (bestBid/bestAsk included in orderbookData string)
+    setMarketMakerContext({
       chart4h5mUrl: charts.chart4h5m,
       chart24h15mUrl: charts.chart24h15m,
       orderbookData,
@@ -65,21 +67,29 @@ async function main(): Promise<void> {
       symbolId,
     });
 
-    const result = await runRound(forecaster);
-    clearForecastContext();
+    const result = await runRound(marketMaker);
+    clearMarketMakerContext();
 
-    const output = result.output as ForecastOutput;
-    const predictionWindow = getPredictionWindow();
+    const output = result.output as MarketMakerOutput;
 
-    const groundTruth = await getGroundTruthBatch(
-      symbolId,
-      predictionWindow.from,
-      predictionWindow.to
+    // Fetch trades from prediction time to +15 minutes (covers all horizons)
+    const predictionTime = clockState.currentTime;
+    const horizonEnd = new Date(predictionTime.getTime() + 15 * 60 * 1000);
+
+    // Fetch trades in window
+    const trades = await getTrades(symbolId, predictionTime, horizonEnd);
+
+    // Compute fill ground truth using best bid/ask from orderbook
+    const groundTruth = computeFillGroundTruth(
+      trades,
+      bestBid,
+      bestAsk,
+      predictionTime
     );
 
     const scoreResult = await forecastScorer.score({
-      predictions: output.predictions as Record<ContractId, number>,
-      actuals: groundTruth as Record<ContractId, boolean>,
+      predictions: output.predictions as Record<FillContractId, number>,
+      actuals: groundTruth as Record<FillContractId, boolean>,
       predictionTime: clockState.currentTime,
       symbolId,
     });

@@ -311,7 +311,9 @@ describe('Replay Lab Orderbook', () => {
 
       const formatted = formatOrderbookForPrompt(snapshot);
 
-      expect(formatted).toContain('$3500.50');
+      // mid_price=3500.5, spread=0.5 => bestBid=3500.25, bestAsk=3500.75
+      expect(formatted).toContain('$3500.25');
+      expect(formatted).toContain('$3500.75');
       expect(formatted).toContain('1.43 bps');
     });
 
@@ -366,20 +368,17 @@ describe('Replay Lab Annotations', () => {
   });
 
   describe('CONTRACT_IDS', () => {
-    it('should have exactly 9 contract IDs', () => {
-      expect(CONTRACT_IDS).toHaveLength(9);
+    it('should have exactly 6 fill probability contract IDs', () => {
+      expect(CONTRACT_IDS).toHaveLength(6);
     });
 
-    it('should include expected contract IDs', () => {
-      expect(CONTRACT_IDS).toContain('dump-simple-15m-1pct');
-      expect(CONTRACT_IDS).toContain('dump-simple-15m-3pct');
-      expect(CONTRACT_IDS).toContain('dump-simple-15m-5pct');
-      expect(CONTRACT_IDS).toContain('dump-simple-1h-0.5pct');
-      expect(CONTRACT_IDS).toContain('dump-simple-1h-1pct');
-      expect(CONTRACT_IDS).toContain('dump-vol-adjusted-15m-z2');
-      expect(CONTRACT_IDS).toContain('dump-vol-adjusted-1h-z2');
-      expect(CONTRACT_IDS).toContain('dump-drawdown-1pct');
-      expect(CONTRACT_IDS).toContain('dump-drawdown-3pct');
+    it('should include expected fill contract IDs', () => {
+      expect(CONTRACT_IDS).toContain('bid-fill-1m');
+      expect(CONTRACT_IDS).toContain('bid-fill-5m');
+      expect(CONTRACT_IDS).toContain('bid-fill-15m');
+      expect(CONTRACT_IDS).toContain('ask-fill-1m');
+      expect(CONTRACT_IDS).toContain('ask-fill-5m');
+      expect(CONTRACT_IDS).toContain('ask-fill-15m');
     });
   });
 
@@ -417,8 +416,8 @@ describe('Replay Lab Annotations', () => {
           ok: true,
           json: async () => ({
             symbol_id: 'COINBASE_SPOT_ETH_USD',
-            annotations: contractId === 'dump-simple-15m-1pct'
-              ? [{ id: '123', time_start: '2025-12-22T14:30:00Z', type: 'dump_event', source: contractId }]
+            annotations: contractId === 'bid-fill-1m'
+              ? [{ id: '123', time_start: '2025-12-22T14:00:30Z', type: 'fill_event', source: contractId }]
               : [],
           }),
         });
@@ -430,8 +429,8 @@ describe('Replay Lab Annotations', () => {
         predictionEndTime
       );
 
-      expect(result['dump-simple-15m-1pct']).toBe(true);
-      expect(result['dump-simple-15m-3pct']).toBe(false);
+      expect(result['bid-fill-1m']).toBe(true);
+      expect(result['bid-fill-5m']).toBe(false);
     });
 
     it('should use source filter for each contract', async () => {

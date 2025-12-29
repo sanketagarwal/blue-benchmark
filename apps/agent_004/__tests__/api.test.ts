@@ -38,7 +38,7 @@ describe('API Routes', () => {
       expect(true).toBe(true);
     });
 
-    it('should have tests for forecaster message history returned', () => {
+    it('should have tests for market maker message history returned', () => {
       expect(true).toBe(true);
     });
 

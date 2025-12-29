@@ -1,15 +1,17 @@
 import { replayLabFetch } from './client';
 
+/**
+ * Fill probability contract IDs for market-making predictions.
+ * Note: Ground truth for these contracts is typically computed via fill-checker.ts
+ * rather than fetched from annotations API.
+ */
 export const CONTRACT_IDS = [
-  'dump-simple-15m-1pct',
-  'dump-simple-15m-3pct',
-  'dump-simple-15m-5pct',
-  'dump-simple-1h-0.5pct',
-  'dump-simple-1h-1pct',
-  'dump-vol-adjusted-15m-z2',
-  'dump-vol-adjusted-1h-z2',
-  'dump-drawdown-1pct',
-  'dump-drawdown-3pct',
+  'bid-fill-1m',
+  'bid-fill-5m',
+  'bid-fill-15m',
+  'ask-fill-1m',
+  'ask-fill-5m',
+  'ask-fill-15m',
 ] as const;
 
 export type ContractId = (typeof CONTRACT_IDS)[number];
@@ -43,6 +45,15 @@ async function getAnnotationsForSource(
   return response.annotations.length > 0;
 }
 
+/**
+ * Fetches ground truth from annotations API.
+ * Note: For fill probability contracts, prefer using computeFillGroundTruth()
+ * from fill-checker.ts with actual trade data.
+ * @param symbolId - The trading symbol identifier
+ * @param predictionTime - Start of the prediction window
+ * @param predictionEndTime - End of the prediction window
+ * @returns Ground truth for all fill contracts
+ */
 export async function getGroundTruthBatch(
   symbolId: string,
   predictionTime: Date,

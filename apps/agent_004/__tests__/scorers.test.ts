@@ -3,7 +3,8 @@ import { brierScore, meanBrierScore, brierSkillScore } from '../src/scorers/brie
 import { logLoss, meanLogLoss } from '../src/scorers/log-loss-scorer';
 import { checkMonotonicity, countViolations } from '../src/scorers/monotonicity-scorer';
 import { forecastScorer, updateRunningTally, createEmptyRunningTally, CONTRACT_IDS } from '../src/scorers/aggregate-scorer';
-import type { ContractId, ForecastScorerInput } from '../src/scorers/types';
+import type { ContractId, ForecastScorerInput, FillContractId } from '../src/scorers/types';
+import { FILL_MONOTONICITY_RULES } from '../src/scorers/types';
 
 describe('Brier Score', () => {
   describe('brierScore', () => {
@@ -121,96 +122,162 @@ describe('Log Loss', () => {
 });
 
 describe('Monotonicity Checker', () => {
-  const createPredictions = (overrides: Partial<Record<ContractId, number>>): Record<ContractId, number> => {
+  /**
+   * Helper to create fill predictions with sensible defaults
+   * Default: monotonically increasing probabilities (valid)
+   * bid: 1m=0.3, 5m=0.5, 15m=0.7
+   * ask: 1m=0.3, 5m=0.5, 15m=0.7
+   */
+  const createFillPredictions = (overrides: Partial<Record<FillContractId, number>>): Record<FillContractId, number> => {
     return {
-      'dump-simple-15m-1pct': 0.15,
-      'dump-simple-15m-3pct': 0.25,
-      'dump-simple-15m-5pct': 0.35,
-      'dump-simple-1h-0.5pct': 0.1,
-      'dump-simple-1h-1pct': 0.2,
-      'dump-vol-adjusted-15m-z2': 0.25,
-      'dump-vol-adjusted-1h-z2': 0.3,
-      'dump-drawdown-1pct': 0.1,
-      'dump-drawdown-3pct': 0.2,
+      'bid-fill-1m': 0.3,
+      'bid-fill-5m': 0.5,
+      'bid-fill-15m': 0.7,
+      'ask-fill-1m': 0.3,
+      'ask-fill-5m': 0.5,
+      'ask-fill-15m': 0.7,
       ...overrides,
     };
   };
 
   describe('checkMonotonicity', () => {
-    it('returns empty array for valid predictions', () => {
-      const predictions = createPredictions({});
+    it('returns empty array for valid fill predictions (longer time = higher probability)', () => {
+      const predictions = createFillPredictions({});
       expect(checkMonotonicity(predictions)).toEqual([]);
     });
 
-    it('detects threshold violation (5% < 3%)', () => {
-      const predictions = createPredictions({
-        'dump-simple-15m-5pct': 0.15,
-        'dump-simple-15m-3pct': 0.2,
+    it('accepts equal probabilities across horizons (no violation)', () => {
+      const predictions = createFillPredictions({
+        'bid-fill-1m': 0.5,
+        'bid-fill-5m': 0.5,
+        'bid-fill-15m': 0.5,
       });
-      const violations = checkMonotonicity(predictions);
-      expect(violations.length).toBeGreaterThan(0);
-      const violation = violations.find(
-        (v) => v.contract1 === 'dump-simple-15m-5pct' && v.contract2 === 'dump-simple-15m-3pct'
-      );
-      expect(violation).toBeDefined();
-      expect(violation?.type).toBe('threshold');
-      expect(violation?.expected).toBe('p1 >= p2');
+      expect(checkMonotonicity(predictions)).toEqual([]);
     });
 
-    it('detects threshold violation (3% < 1%)', () => {
-      const predictions = createPredictions({
-        'dump-simple-15m-3pct': 0.05,
-        'dump-simple-15m-1pct': 0.1,
+    it('detects bid horizon violation (5m < 1m)', () => {
+      const predictions = createFillPredictions({
+        'bid-fill-1m': 0.6,
+        'bid-fill-5m': 0.4, // Violation: 5m should be >= 1m
       });
       const violations = checkMonotonicity(predictions);
       expect(violations.length).toBeGreaterThan(0);
       const violation = violations.find(
-        (v) => v.contract1 === 'dump-simple-15m-3pct' && v.contract2 === 'dump-simple-15m-1pct'
-      );
-      expect(violation).toBeDefined();
-      expect(violation?.type).toBe('threshold');
-    });
-
-    it('detects horizon violation (1h < 15m)', () => {
-      const predictions = createPredictions({
-        'dump-simple-15m-1pct': 0.3,
-        'dump-simple-1h-1pct': 0.15,
-      });
-      const violations = checkMonotonicity(predictions);
-      expect(violations.length).toBeGreaterThan(0);
-      const violation = violations.find(
-        (v) => v.contract1 === 'dump-simple-15m-1pct' && v.contract2 === 'dump-simple-1h-1pct'
+        (v) => v.contract1 === 'bid-fill-1m' && v.contract2 === 'bid-fill-5m'
       );
       expect(violation).toBeDefined();
       expect(violation?.type).toBe('horizon');
       expect(violation?.expected).toBe('p1 <= p2');
     });
 
-    it('detects multiple violations', () => {
-      const predictions = createPredictions({
-        'dump-simple-15m-5pct': 0.1,
-        'dump-simple-15m-3pct': 0.2,
-        'dump-simple-15m-1pct': 0.3,
-        'dump-simple-1h-1pct': 0.05,
+    it('detects bid horizon violation (15m < 5m)', () => {
+      const predictions = createFillPredictions({
+        'bid-fill-5m': 0.7,
+        'bid-fill-15m': 0.5, // Violation: 15m should be >= 5m
       });
       const violations = checkMonotonicity(predictions);
-      expect(violations.length).toBeGreaterThan(1);
+      expect(violations.length).toBeGreaterThan(0);
+      const violation = violations.find(
+        (v) => v.contract1 === 'bid-fill-5m' && v.contract2 === 'bid-fill-15m'
+      );
+      expect(violation).toBeDefined();
+      expect(violation?.type).toBe('horizon');
+    });
+
+    it('detects ask horizon violation (5m < 1m)', () => {
+      const predictions = createFillPredictions({
+        'ask-fill-1m': 0.6,
+        'ask-fill-5m': 0.4, // Violation: 5m should be >= 1m
+      });
+      const violations = checkMonotonicity(predictions);
+      expect(violations.length).toBeGreaterThan(0);
+      const violation = violations.find(
+        (v) => v.contract1 === 'ask-fill-1m' && v.contract2 === 'ask-fill-5m'
+      );
+      expect(violation).toBeDefined();
+      expect(violation?.type).toBe('horizon');
+    });
+
+    it('detects ask horizon violation (15m < 5m)', () => {
+      const predictions = createFillPredictions({
+        'ask-fill-5m': 0.8,
+        'ask-fill-15m': 0.6, // Violation: 15m should be >= 5m
+      });
+      const violations = checkMonotonicity(predictions);
+      expect(violations.length).toBeGreaterThan(0);
+      const violation = violations.find(
+        (v) => v.contract1 === 'ask-fill-5m' && v.contract2 === 'ask-fill-15m'
+      );
+      expect(violation).toBeDefined();
+      expect(violation?.type).toBe('horizon');
+    });
+
+    it('detects multiple violations across bid and ask', () => {
+      const predictions = createFillPredictions({
+        'bid-fill-1m': 0.8,
+        'bid-fill-5m': 0.5, // Violation
+        'bid-fill-15m': 0.3, // Violation
+        'ask-fill-1m': 0.9,
+        'ask-fill-5m': 0.6, // Violation
+      });
+      const violations = checkMonotonicity(predictions);
+      expect(violations.length).toBe(3);
+    });
+
+    it('detects chain violation (15m < 5m < 1m)', () => {
+      const predictions = createFillPredictions({
+        'bid-fill-1m': 0.9,
+        'bid-fill-5m': 0.6,
+        'bid-fill-15m': 0.3,
+      });
+      const violations = checkMonotonicity(predictions);
+      // Should detect both: 5m < 1m AND 15m < 5m
+      expect(violations.length).toBe(2);
     });
   });
 
   describe('countViolations', () => {
-    it('returns 0 for valid predictions', () => {
-      const predictions = createPredictions({});
+    it('returns 0 for valid fill predictions', () => {
+      const predictions = createFillPredictions({});
       expect(countViolations(predictions)).toBe(0);
     });
 
-    it('counts violations correctly', () => {
-      const predictions = createPredictions({
-        'dump-simple-15m-5pct': 0.1,
-        'dump-simple-15m-3pct': 0.2,
-        'dump-simple-1h-1pct': 0.05,
+    it('counts all violations correctly', () => {
+      const predictions = createFillPredictions({
+        'bid-fill-1m': 0.8,
+        'bid-fill-5m': 0.5, // Violation 1: bid 5m < bid 1m
+        'ask-fill-5m': 0.2,
+        'ask-fill-15m': 0.1, // Violation 2: ask 15m < ask 5m
+        // Note: ask-fill-5m (0.2) < ask-fill-1m (0.3 default) = Violation 3
       });
-      expect(countViolations(predictions)).toBeGreaterThan(0);
+      expect(countViolations(predictions)).toBe(3);
+    });
+  });
+
+  describe('FILL_MONOTONICITY_RULES', () => {
+    it('has 4 rules (2 bid, 2 ask)', () => {
+      expect(FILL_MONOTONICITY_RULES.length).toBe(4);
+    });
+
+    it('contains bid fill rules', () => {
+      const bidRules = FILL_MONOTONICITY_RULES.filter(([a]) => a.startsWith('bid-'));
+      expect(bidRules.length).toBe(2);
+    });
+
+    it('contains ask fill rules', () => {
+      const askRules = FILL_MONOTONICITY_RULES.filter(([a]) => a.startsWith('ask-'));
+      expect(askRules.length).toBe(2);
+    });
+
+    it('rules follow shorter-to-longer pattern', () => {
+      for (const [shorter, longer] of FILL_MONOTONICITY_RULES) {
+        // Extract timeframes
+        const shorterTime = shorter.split('-').pop();
+        const longerTime = longer.split('-').pop();
+        // 1m < 5m < 15m
+        const timeOrder = ['1m', '5m', '15m'];
+        expect(timeOrder.indexOf(shorterTime!)).toBeLessThan(timeOrder.indexOf(longerTime!));
+      }
     });
   });
 });
@@ -220,27 +287,22 @@ describe('Aggregate Scorer', () => {
     predictions: Partial<Record<ContractId, number>>,
     actuals: Partial<Record<ContractId, boolean>>
   ): ForecastScorerInput => {
+    // Default fill predictions: monotonically increasing (valid)
     const defaultPredictions: Record<ContractId, number> = {
-      'dump-simple-15m-1pct': 0.15,
-      'dump-simple-15m-3pct': 0.25,
-      'dump-simple-15m-5pct': 0.35,
-      'dump-simple-1h-0.5pct': 0.1,
-      'dump-simple-1h-1pct': 0.2,
-      'dump-vol-adjusted-15m-z2': 0.25,
-      'dump-vol-adjusted-1h-z2': 0.3,
-      'dump-drawdown-1pct': 0.1,
-      'dump-drawdown-3pct': 0.2,
+      'bid-fill-1m': 0.3,
+      'bid-fill-5m': 0.5,
+      'bid-fill-15m': 0.7,
+      'ask-fill-1m': 0.3,
+      'ask-fill-5m': 0.5,
+      'ask-fill-15m': 0.7,
     };
     const defaultActuals: Record<ContractId, boolean> = {
-      'dump-simple-15m-1pct': false,
-      'dump-simple-15m-3pct': false,
-      'dump-simple-15m-5pct': false,
-      'dump-simple-1h-0.5pct': false,
-      'dump-simple-1h-1pct': false,
-      'dump-vol-adjusted-15m-z2': false,
-      'dump-vol-adjusted-1h-z2': false,
-      'dump-drawdown-1pct': false,
-      'dump-drawdown-3pct': false,
+      'bid-fill-1m': false,
+      'bid-fill-5m': false,
+      'bid-fill-15m': false,
+      'ask-fill-1m': false,
+      'ask-fill-5m': false,
+      'ask-fill-15m': false,
     };
     return {
       predictions: { ...defaultPredictions, ...predictions },
@@ -254,10 +316,10 @@ describe('Aggregate Scorer', () => {
     it('calculates correct mean Brier score', async () => {
       const input = createTestInput({}, {});
       const result = await forecastScorer.score(input);
-      // All predictions are low, all actuals are false
-      // Mean brier should be low (good predictions)
+      // Predictions vary (0.3-0.7), all actuals are false
+      // Mean brier should be moderate
       expect(result.aggregates.meanBrierScore).toBeGreaterThan(0);
-      expect(result.aggregates.meanBrierScore).toBeLessThan(0.2);
+      expect(result.aggregates.meanBrierScore).toBeLessThan(0.5);
     });
 
     it('calculates correct mean log loss', async () => {
@@ -270,52 +332,58 @@ describe('Aggregate Scorer', () => {
     it('calculates accuracy at 0.5 threshold', async () => {
       const input = createTestInput(
         {
-          'dump-simple-15m-1pct': 0.1, // < 0.5, actual false -> correct
-          'dump-simple-15m-3pct': 0.6, // >= 0.5, actual true -> correct
-          'dump-simple-15m-5pct': 0.7, // >= 0.5, actual false -> incorrect
+          'bid-fill-1m': 0.1, // < 0.5, actual false -> correct
+          'bid-fill-5m': 0.6, // >= 0.5, actual true -> correct
+          'bid-fill-15m': 0.7, // >= 0.5, actual false -> incorrect
+          'ask-fill-1m': 0.2, // < 0.5, actual false -> correct
+          'ask-fill-5m': 0.3, // < 0.5, actual false -> correct
+          'ask-fill-15m': 0.4, // < 0.5, actual false -> correct
         },
         {
-          'dump-simple-15m-1pct': false,
-          'dump-simple-15m-3pct': true,
-          'dump-simple-15m-5pct': false,
+          'bid-fill-1m': false,
+          'bid-fill-5m': true,
+          'bid-fill-15m': false,
+          'ask-fill-1m': false,
+          'ask-fill-5m': false,
+          'ask-fill-15m': false,
         }
       );
       const result = await forecastScorer.score(input);
-      // 9 total contracts, 8 correct (all defaults except 15m-5pct)
-      expect(result.aggregates.accuracy).toBeCloseTo(8 / 9);
+      // 6 total contracts, 5 correct (bid-fill-15m incorrect)
+      expect(result.aggregates.accuracy).toBeCloseTo(5 / 6);
     });
 
     it('counts events that occurred', async () => {
       const input = createTestInput(
         {},
         {
-          'dump-simple-15m-1pct': true,
-          'dump-simple-15m-3pct': true,
-          'dump-simple-1h-1pct': true,
+          'bid-fill-1m': true,
+          'bid-fill-5m': true,
+          'ask-fill-15m': true,
         }
       );
       const result = await forecastScorer.score(input);
       expect(result.aggregates.eventsOccurred).toBe(3);
     });
 
-    it('includes monotonicity violations', async () => {
+    it('includes monotonicity violations for fill predictions', async () => {
       const input = createTestInput(
         {
-          'dump-simple-15m-5pct': 0.1,
-          'dump-simple-15m-3pct': 0.2,
-          'dump-simple-15m-1pct': 0.3,
+          'bid-fill-1m': 0.8,
+          'bid-fill-5m': 0.5, // Violation: should be >= 1m
+          'bid-fill-15m': 0.3, // Violation: should be >= 5m
         },
         {}
       );
       const result = await forecastScorer.score(input);
-      expect(result.aggregates.monotonicityViolations).toBeGreaterThan(0);
-      expect(result.violations.length).toBeGreaterThan(0);
+      expect(result.aggregates.monotonicityViolations).toBe(2);
+      expect(result.violations.length).toBe(2);
     });
 
-    it('returns per-contract scores', async () => {
+    it('returns per-contract scores for all 6 fill contracts', async () => {
       const input = createTestInput({}, {});
       const result = await forecastScorer.score(input);
-      expect(result.perContract.length).toBe(9);
+      expect(result.perContract.length).toBe(6);
       for (const contractScore of result.perContract) {
         expect(CONTRACT_IDS).toContain(contractScore.contractId);
         expect(typeof contractScore.predicted).toBe('number');
@@ -335,9 +403,9 @@ describe('Aggregate Scorer', () => {
 
 describe('Running Tally', () => {
   describe('createEmptyRunningTally', () => {
-    it('creates tally with all contracts', () => {
+    it('creates tally with all 6 fill contracts', () => {
       const tally = createEmptyRunningTally();
-      expect(Object.keys(tally.perContract).length).toBe(9);
+      expect(Object.keys(tally.perContract).length).toBe(6);
       for (const contractId of CONTRACT_IDS) {
         expect(tally.perContract[contractId]).toBeDefined();
       }
@@ -439,15 +507,15 @@ describe('Running Tally', () => {
       expect(updated.cumulativeLogLoss).toBe(0.5);
     });
 
-    it('tracks per-contract stats', () => {
+    it('tracks per-contract stats for fill contracts', () => {
       const tally = createEmptyRunningTally();
       const scoreResult = createMockScoreResult();
       const predictions = createMockPredictions();
       const actuals = createMockActuals();
-      actuals['dump-simple-15m-1pct'] = true;
+      actuals['bid-fill-1m'] = true;
 
       const updated = updateRunningTally(tally, scoreResult, predictions, actuals);
-      const contract1Stats = updated.perContract['dump-simple-15m-1pct'];
+      const contract1Stats = updated.perContract['bid-fill-1m'];
       expect(contract1Stats?.totalPredictions).toBe(1);
       expect(contract1Stats?.timesEventOccurred).toBe(1);
       expect(contract1Stats?.totalBrierScore).toBeGreaterThan(0);

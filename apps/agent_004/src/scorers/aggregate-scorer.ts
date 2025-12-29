@@ -4,19 +4,19 @@ import { brierScore, meanBrierScore } from './brier-scorer';
 import { logLoss, meanLogLoss } from './log-loss-scorer';
 import { checkMonotonicity } from './monotonicity-scorer';
 
-import type { ContractId, ForecastScorerInput, ForecastScoreResult, ContractScore, RunningTally } from './types';
+import type { ContractId, ForecastScorerInput, ForecastScoreResult, ContractScore, RunningTally, FillContractId } from './types';
 
-// All 9 CONTRACT_IDS (15m and 1h timeframes only)
-export const CONTRACT_IDS: ContractId[] = [
-  'dump-simple-15m-1pct',
-  'dump-simple-15m-3pct',
-  'dump-simple-15m-5pct',
-  'dump-simple-1h-0.5pct',
-  'dump-simple-1h-1pct',
-  'dump-vol-adjusted-15m-z2',
-  'dump-vol-adjusted-1h-z2',
-  'dump-drawdown-1pct',
-  'dump-drawdown-3pct',
+/**
+ * All 6 fill prediction contract IDs
+ * Predicts probability that a limit order at best bid/ask fills within timeframe
+ */
+export const CONTRACT_IDS: FillContractId[] = [
+  'bid-fill-1m',
+  'bid-fill-5m',
+  'bid-fill-15m',
+  'ask-fill-1m',
+  'ask-fill-5m',
+  'ask-fill-15m',
 ];
 
 function scorePerContract(
