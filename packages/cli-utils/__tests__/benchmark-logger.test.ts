@@ -48,6 +48,24 @@ describe('BenchmarkLogger', () => {
       logger.logGameState('Current board state');
       expect(consoleSpy).not.toHaveBeenCalled();
     });
+
+    it('suppresses hint() when verbose=false', () => {
+      const logger = new BenchmarkLogger({ verbose: false });
+      logger.hint('This is a helpful tip');
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it('suppresses objective() when verbose=false', () => {
+      const logger = new BenchmarkLogger({ verbose: false });
+      logger.objective('Predict fill probabilities');
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it('suppresses explainMetrics() when verbose=false', () => {
+      const logger = new BenchmarkLogger({ verbose: false });
+      logger.explainMetrics();
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('verbose mode output', () => {
@@ -77,13 +95,50 @@ describe('BenchmarkLogger', () => {
       expect(calls).toContain('key2');
     });
 
-    it('outputs logGroundTruth() with predictions when provided', () => {
+    it('outputs logGroundTruth() with predictions and verdict when provided', () => {
       const logger = new BenchmarkLogger({ verbose: true });
       logger.logGroundTruth({ key1: true }, { key1: 0.75 });
       expect(consoleSpy).toHaveBeenCalled();
       const calls = consoleSpy.mock.calls.flat().join(' ');
-      expect(calls).toContain('predicted');
-      expect(calls).toContain('0.75');
+      expect(calls).toContain('pred=0.75');
+      expect(calls).toContain('correct'); // 0.75 >= 0.5 and outcome=true means correct
+    });
+
+    it('shows wrong verdict when prediction incorrect', () => {
+      const logger = new BenchmarkLogger({ verbose: true });
+      logger.logGroundTruth({ key1: true }, { key1: 0.25 }); // predicted < 0.5 but outcome=true
+      expect(consoleSpy).toHaveBeenCalled();
+      const calls = consoleSpy.mock.calls.flat().join(' ');
+      expect(calls).toContain('wrong');
+      expect(calls).toContain('needed ≥0.50');
+    });
+
+    it('outputs hint() when verbose=true', () => {
+      const logger = new BenchmarkLogger({ verbose: true });
+      logger.hint('This is a helpful tip');
+      expect(consoleSpy).toHaveBeenCalled();
+      const calls = consoleSpy.mock.calls.flat().join(' ');
+      expect(calls).toContain('This is a helpful tip');
+    });
+
+    it('outputs objective() when verbose=true', () => {
+      const logger = new BenchmarkLogger({ verbose: true });
+      logger.objective('Predict fill probabilities');
+      expect(consoleSpy).toHaveBeenCalled();
+      const calls = consoleSpy.mock.calls.flat().join(' ');
+      expect(calls).toContain('Objective');
+      expect(calls).toContain('Predict fill probabilities');
+    });
+
+    it('outputs explainMetrics() when verbose=true', () => {
+      const logger = new BenchmarkLogger({ verbose: true });
+      logger.explainMetrics();
+      expect(consoleSpy).toHaveBeenCalled();
+      const calls = consoleSpy.mock.calls.flat().join(' ');
+      expect(calls).toContain('Metric Guide');
+      expect(calls).toContain('Brier Score');
+      expect(calls).toContain('Log Loss');
+      expect(calls).toContain('Accuracy');
     });
 
     it('outputs logScores() when verbose=true', () => {

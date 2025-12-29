@@ -29,6 +29,8 @@ async function main(): Promise<void> {
   const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 
   logger.header('agent_004 Benchmark');
+  logger.objective('Predict fill probability for limit orders at best bid/ask prices');
+  logger.hint('Higher predictions for events that occur = better. Accuracy measures predictions ≥0.50 matching actual fills.');
 
   const symbolId = process.env['SYMBOL_ID'];
   if (symbolId === undefined || symbolId === '') {
@@ -121,6 +123,7 @@ async function main(): Promise<void> {
   const avgLogLoss = scores.map((s) => s.logLoss).reduce((sum, value) => sum + value, 0) / scores.length;
   const avgAccuracy = scores.map((s) => s.accuracy).reduce((sum, value) => sum + value, 0) / scores.length;
 
+  logger.explainMetrics();
   logger.summary({
     Model: modelId,
     'Average Brier Score': avgBrier,

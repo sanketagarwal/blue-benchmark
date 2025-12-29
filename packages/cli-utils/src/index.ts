@@ -83,23 +83,42 @@ export class BenchmarkLogger {
   }
 
   /**
-   * Log ground truth values (verbose only)
+   * Format a single ground truth entry with prediction verdict
+   */
+  private formatGroundTruthEntry(key: string, actual: boolean, prediction: number | undefined): string {
+    const outcomeIcon = actual ? chalk.blue('YES') : chalk.gray('NO ');
+
+    if (prediction === undefined) {
+      return '  ' + key.padEnd(20) + ' ' + outcomeIcon;
+    }
+
+    const predictedYes = prediction >= 0.5;
+    const correct = predictedYes === actual;
+    const verdictIcon = correct ? chalk.green('✓') : chalk.red('✗');
+    const verdictText = correct ? chalk.green('correct') : chalk.red('wrong');
+    const predictionString = prediction.toFixed(2);
+    const needed = actual ? '≥0.50' : '<0.50';
+    const neededLabel = chalk.dim('(needed ' + needed + ')');
+
+    return '  ' + key.padEnd(18) + ' ' + outcomeIcon + '  pred=' + predictionString + '  ' + verdictIcon + ' ' + verdictText + ' ' + neededLabel;
+  }
+
+  /**
+   * Log ground truth values with prediction accuracy (verbose only)
+   * Shows whether event occurred AND whether prediction was correct
    */
   logGroundTruth(actuals: Record<string, boolean>, predictions?: Record<string, number>): void {
     if (!this.verbose) {
       return;
     }
-    console.log(chalk.cyan('\nGround Truth:'));
+    console.log(chalk.cyan('\nGround Truth (outcome vs prediction):'));
     for (const [key, value] of Object.entries(actuals)) {
-      const icon = value ? chalk.green('\u2713') : chalk.red('\u2717');
-      const prediction = predictions?.[key];
-      const predictionString = prediction === undefined ? '' : chalk.gray(` (predicted ${prediction.toFixed(2)})`);
-      console.log(`  ${icon} ${key.padEnd(20)}${predictionString}`);
+      console.log(this.formatGroundTruthEntry(key, value, predictions?.[key]));
     }
   }
 
   /**
-   * Log scores (verbose only)
+   * Log scores with quality indicators (verbose only)
    */
   logScores(scores: { brier?: number; logLoss?: number; accuracy?: number }): void {
     if (!this.verbose) {
@@ -107,15 +126,58 @@ export class BenchmarkLogger {
     }
     const parts: string[] = [];
     if (scores.brier !== undefined) {
-      parts.push(`Brier=${scores.brier.toFixed(3)}`);
+      const quality = this.getScoreQuality(scores.brier, 0.25, 0.5, true);
+      const qualityLabel = chalk.dim('(' + quality + ')');
+      parts.push(`Brier=${scores.brier.toFixed(3)} ${qualityLabel}`);
     }
     if (scores.logLoss !== undefined) {
-      parts.push(`LogLoss=${scores.logLoss.toFixed(3)}`);
+      const quality = this.getScoreQuality(scores.logLoss, 0.5, 1, true);
+      const qualityLabel = chalk.dim('(' + quality + ')');
+      parts.push(`LogLoss=${scores.logLoss.toFixed(3)} ${qualityLabel}`);
     }
     if (scores.accuracy !== undefined) {
-      parts.push(`Accuracy=${(scores.accuracy * 100).toFixed(1)}%`);
+      const quality = this.getScoreQuality(scores.accuracy, 0.7, 0.5, false);
+      const qualityLabel = chalk.dim('(' + quality + ')');
+      parts.push(`Accuracy=${(scores.accuracy * 100).toFixed(1)}% ${qualityLabel}`);
     }
-    console.log(chalk.yellow(`\nScores: ${parts.join(', ')}`));
+    console.log(chalk.yellow('\nScores: ' + parts.join(', ')));
+  }
+
+  /**
+   * Get quality indicator for a score
+   * @param value - The score value
+   * @param goodThreshold - Threshold for "good" quality
+   * @param okThreshold - Threshold for "ok" quality
+   * @param lowerIsBetter - If true, lower values are better (Brier, LogLoss)
+   */
+  private getScoreQuality(value: number, goodThreshold: number, okThreshold: number, lowerIsBetter: boolean): string {
+    if (lowerIsBetter) {
+      if (value < goodThreshold) {
+        return chalk.green('good');
+      }
+      if (value < okThreshold) {
+        return chalk.yellow('ok');
+      }
+      return chalk.red('poor');
+    }
+    // Higher is better (accuracy)
+    if (value > goodThreshold) {
+      return chalk.green('good');
+    }
+    if (value > okThreshold) {
+      return chalk.yellow('ok');
+    }
+    return chalk.red('poor');
+  }
+
+  /**
+   * Log a hint/tip message (verbose only)
+   */
+  hint(message: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(chalk.dim(`\n💡 ${message}`));
   }
 
   /**
@@ -124,6 +186,32 @@ export class BenchmarkLogger {
   header(title: string): void {
     console.log(chalk.bold(title));
     console.log('='.repeat(title.length));
+  }
+
+  /**
+   * Output agent objective/context (verbose only)
+   */
+  objective(description: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(chalk.cyan(`\n📊 Objective: ${description}`));
+  }
+
+  /**
+   * Output metric explanations (verbose only)
+   */
+  explainMetrics(): void {
+    if (!this.verbose) {
+      return;
+    }
+    const separator = '───────────────────────────────────────';
+    console.log(chalk.dim('\n' + separator));
+    console.log(chalk.dim('📖 Metric Guide:'));
+    console.log(chalk.dim('   Brier Score: 0=perfect, 1=worst (measures probability calibration)'));
+    console.log(chalk.dim('   Log Loss: 0=perfect, ∞=worst (penalizes confident wrong predictions)'));
+    console.log(chalk.dim('   Accuracy: % correct at 0.5 threshold (did prediction match outcome?)'));
+    console.log(chalk.dim(separator));
   }
 
   /**
