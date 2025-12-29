@@ -1,17 +1,17 @@
 import { defineAgent } from '@nullagent/agent-core';
 import { z } from 'zod';
 
-import type { ModelId } from './matrix.js';
-import type { Agent } from '@nullagent/agent-core';
-
 export interface ForecastContext {
+  // Chart 1: 4-hour lookback with 5m candles (full indicators)
   chart4h5mUrl: string;
+  // Chart 2: 24-hour lookback with 15m candles (full indicators)
   chart24h15mUrl: string;
   orderbookData: string;
   currentTime: string;
   symbolId: string;
 }
 
+// Forecast context that changes per round
 let currentForecastContext: ForecastContext | undefined;
 
 export function setForecastContext(context: ForecastContext): void {
@@ -22,6 +22,7 @@ export function clearForecastContext(): void {
   currentForecastContext = undefined;
 }
 
+// Output schema: probability for each contract (9 contracts total)
 const PredictionSchema = z.object({
   'dump-simple-15m-1pct': z.number().min(0).max(1),
   'dump-simple-15m-3pct': z.number().min(0).max(1),
@@ -41,37 +42,30 @@ const OutputSchema = z.object({
 
 export type ForecastOutput = z.infer<typeof OutputSchema>;
 
-/**
- * Create a forecaster agent for a specific model.
- * Uses the modelId as the agentId for isolated message history.
- * @param modelId - The model identifier
- * @returns An agent definition for the forecaster
- */
-export function createForecaster(modelId: ModelId): Agent<ForecastOutput> {
-  return defineAgent({
-    // Use model ID as agent ID for isolated history per model
-    id: modelId,
+export const forecaster = defineAgent({
+  id: 'forecaster_001',
 
-    outputSchema: OutputSchema,
+  outputSchema: OutputSchema,
 
-    compactionTrigger: {
-      type: 'custom',
-      shouldCompact: (context) => context.roundNumber > 0 && context.roundNumber % 10 === 0,
-    },
+  // Compact every 10 rounds to learn from forecasting history
+  compactionTrigger: {
+    type: 'custom',
+    shouldCompact: (context) => context.roundNumber > 0 && context.roundNumber % 10 === 0,
+  },
 
-    buildRoundPrompt: (context) => {
-      if (currentForecastContext === undefined) {
-        throw new Error('Forecast context not set. Call setForecastContext() before runRound().');
-      }
+  buildRoundPrompt: (context) => {
+    if (currentForecastContext === undefined) {
+      throw new Error('Forecast context not set. Call setForecastContext() before runRound().');
+    }
 
-      const { chart4h5mUrl, chart24h15mUrl, orderbookData, currentTime, symbolId } = currentForecastContext;
+    const { chart4h5mUrl, chart24h15mUrl, orderbookData, currentTime, symbolId } = currentForecastContext;
 
-      const compactionSection =
-        context.compactionSummary !== undefined && context.compactionSummary !== ''
-          ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
-          : '';
+    const compactionSection =
+      context.compactionSummary !== undefined && context.compactionSummary !== ''
+        ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
+        : '';
 
-      return `Simulate a cryptocurrency price movement forecaster for ${symbolId}.
+    return `Simulate a cryptocurrency price movement forecaster for ${symbolId}.
 
 Current Time: ${currentTime}
 Orderbook: ${orderbookData}
@@ -99,6 +93,13 @@ Analyze the charts and orderbook data to forecast the probability of the followi
 - dump-drawdown-1pct: Price falls ≥1% from highest point in next hour
 - dump-drawdown-3pct: Price falls ≥3% from highest point in next hour
 
+**IMPORTANT: Monotonicity Constraints**
+Your predictions must respect the following logical relationships:
+- Larger movements are less likely: dump-simple-15m-1pct ≥ dump-simple-15m-3pct ≥ dump-simple-15m-5pct
+- Same logic applies to 1h timeframe: 0.5pct ≥ 1pct
+- Shorter timeframes for same magnitude are typically less likely: dump-simple-1h-1pct ≥ dump-simple-15m-1pct
+- Similar monotonicity applies to volatility-adjusted and drawdown contracts
+
 ${compactionSection}
 Respond with a JSON object containing:
 - "reasoning": brief explanation of your analysis
@@ -108,14 +109,14 @@ Example:
 {
   "reasoning": "Market showing bearish signals with declining volume...",
   "predictions": {
-    "dump-simple-15m-1pct": 0.15,
-    "dump-simple-15m-3pct": 0.05,
+    "dump-simple-1m-1pct": 0.15,
+    "dump-simple-1m-3pct": 0.05,
     ...
   }
 }`;
-    },
+  },
 
-    buildCompactionPrompt: (history) => `
+  buildCompactionPrompt: (history) => `
 You've completed ${String(history.length)} rounds of cryptocurrency price forecasting.
 
 Review your past predictions and the actual outcomes. Summarize:
@@ -125,5 +126,4 @@ Review your past predictions and the actual outcomes. Summarize:
 
 Keep it concise and actionable for future forecasting rounds.
 `,
-  });
-}
+});

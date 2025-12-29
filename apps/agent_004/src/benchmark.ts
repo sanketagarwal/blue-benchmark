@@ -7,92 +7,56 @@ import {
   getPredictionWindow,
   resetClockState,
 } from './clock-state.js';
-import { createForecaster, setForecastContext, clearForecastContext } from './forecaster.js';
-import { MODEL_MATRIX, BENCHMARK_ROUNDS } from './matrix.js';
+import { forecaster, setForecastContext, clearForecastContext } from './forecaster.js';
 import { getGroundTruthBatch } from './replay-lab/annotations.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 import { getOrderbookSnapshot, formatOrderbookForPrompt } from './replay-lab/orderbook.js';
-import { calculateModelSummary, findWinner } from './results.js';
 import { forecastScorer } from './scorers/aggregate-scorer.js';
-import { printResultsTable } from './table.js';
 
-import type { ModelId } from './matrix.js';
-import type { BenchmarkResults, ModelResults, RoundResult } from './results.js';
+import type { ForecastOutput } from './forecaster.js';
 import type { ContractId } from './scorers/types.js';
 
-async function runModelRound(
-  modelId: ModelId,
-  symbolId: string,
-  roundNumber: number
-): Promise<RoundResult> {
-  // eslint-disable-next-line turbo/no-undeclared-env-vars -- MODEL_ID is set dynamically per model in benchmark
-  process.env['MODEL_ID'] = modelId;
+const BENCHMARK_ROUNDS = 3;
 
-  const forecaster = createForecaster(modelId);
-  const result = await runRound(forecaster);
-  const output = result.output;
-
-  const predictionWindow = getPredictionWindow();
-  const groundTruth = await getGroundTruthBatch(
-    symbolId,
-    predictionWindow.from,
-    predictionWindow.to
-  );
-
-  const scoreResult = await forecastScorer.score({
-    predictions: output.predictions as Record<ContractId, number>,
-    actuals: groundTruth as Record<ContractId, boolean>,
-    predictionTime: predictionWindow.from,
-    symbolId,
-  });
-
-  console.log(
-    `  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`
-  );
-
-  return {
-    roundNumber,
-    score: scoreResult,
-  };
+interface RoundScore {
+  roundNumber: number;
+  brier: number;
+  logLoss: number;
+  accuracy: number;
 }
 
 async function main(): Promise<void> {
-  console.log('agent_004 Model Matrix Benchmark');
-  console.log('================================\n');
+  console.log('agent_003 Benchmark');
+  console.log('===================\n');
 
-  const startTime = new Date().toISOString();
-
-  // Get symbol from env
   const symbolId = process.env['SYMBOL_ID'];
   if (symbolId === undefined || symbolId === '') {
     throw new Error('SYMBOL_ID environment variable is required');
   }
 
-  // Initialize clock
+  // eslint-disable-next-line turbo/no-undeclared-env-vars -- MODEL_ID is set dynamically per benchmark run
+  const modelId = process.env['MODEL_ID'];
+  if (modelId === undefined || modelId === '') {
+    throw new Error('MODEL_ID environment variable is required');
+  }
+
   resetClockState();
   let clockState = initializeClock();
 
   console.log(`Symbol: ${symbolId}`);
+  console.log(`Model: ${modelId}`);
   console.log(`Start Time: ${clockState.currentTime.toISOString()}`);
-  console.log(`Models: ${MODEL_MATRIX.join(', ')}`);
   console.log(`Rounds: ${String(BENCHMARK_ROUNDS)}\n`);
 
-  // Initialize results tracking
-  const modelResults = new Map<ModelId, RoundResult[]>();
-  for (const modelId of MODEL_MATRIX) {
-    modelResults.set(modelId, []);
-  }
+  const scores: RoundScore[] = [];
 
-  // Run benchmark rounds
   for (let round = 1; round <= BENCHMARK_ROUNDS; round++) {
     console.log(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} (${clockState.currentTime.toISOString()})`);
 
-    // Fetch data once for this round
     const charts = await getForecastingCharts(symbolId, clockState.currentTime);
     const orderbook = await getOrderbookSnapshot(symbolId, clockState.currentTime);
     const orderbookData = formatOrderbookForPrompt(orderbook);
 
-    // Set context for all models
     setForecastContext({
       chart4h5mUrl: charts.chart4h5m,
       chart24h15mUrl: charts.chart24h15m,
@@ -101,43 +65,52 @@ async function main(): Promise<void> {
       symbolId,
     });
 
-    // Run each model sequentially
-    for (const modelId of MODEL_MATRIX) {
-      const roundResult = await runModelRound(modelId, symbolId, round);
-      modelResults.get(modelId)?.push(roundResult);
-    }
-
-    // Clear context
+    const result = await runRound(forecaster);
     clearForecastContext();
 
-    // Advance clock for next round
+    const output = result.output as ForecastOutput;
+    const predictionWindow = getPredictionWindow();
+
+    const groundTruth = await getGroundTruthBatch(
+      symbolId,
+      predictionWindow.from,
+      predictionWindow.to
+    );
+
+    const scoreResult = await forecastScorer.score({
+      predictions: output.predictions as Record<ContractId, number>,
+      actuals: groundTruth as Record<ContractId, boolean>,
+      predictionTime: clockState.currentTime,
+      symbolId,
+    });
+
+    scores.push({
+      roundNumber: round,
+      brier: scoreResult.aggregates.meanBrierScore,
+      logLoss: scoreResult.aggregates.meanLogLoss,
+      accuracy: scoreResult.aggregates.accuracy,
+    });
+
+    console.log(`  Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`);
+
     clockState = advanceClock();
     console.log('');
   }
 
-  const endTime = new Date().toISOString();
-
-  // Build results
-  const results: BenchmarkResults = {
-    startTime,
-    endTime,
-    totalRounds: BENCHMARK_ROUNDS,
-    models: MODEL_MATRIX.map((modelId): ModelResults => ({
-      modelId,
-      rounds: modelResults.get(modelId) ?? [],
-    })),
-  };
-
-  // Calculate summaries
-  const summaries = results.models.map((m) => calculateModelSummary(m));
-  const winner = findWinner(summaries);
+  // Calculate averages
+  const avgBrier = scores.map((s) => s.brier).reduce((sum, value) => sum + value, 0) / scores.length;
+  const avgLogLoss = scores.map((s) => s.logLoss).reduce((sum, value) => sum + value, 0) / scores.length;
+  const avgAccuracy = scores.map((s) => s.accuracy).reduce((sum, value) => sum + value, 0) / scores.length;
 
   // Print results table
-  console.log('');
-  printResultsTable(summaries, BENCHMARK_ROUNDS, winner);
+  console.log('Results');
+  console.log('-------');
+  console.log(`Model: ${modelId}`);
+  console.log(`Average Brier Score: ${avgBrier.toFixed(3)}`);
+  console.log(`Average Log Loss: ${avgLogLoss.toFixed(3)}`);
+  console.log(`Average Accuracy: ${(avgAccuracy * 100).toFixed(1)}%`);
 }
 
-// Use top-level await pattern for CLI
 await main()
   .then(() => {
     // eslint-disable-next-line unicorn/no-process-exit -- CLI must exit explicitly to close DB connections
