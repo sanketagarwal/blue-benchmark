@@ -842,6 +842,107 @@
           "orderbookCount",
           "symbols"
         ]
+      },
+      "TradeTick": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair identifier"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Trade timestamp (ISO 8601)"
+          },
+          "price": {
+            "type": "number",
+            "description": "Trade price"
+          },
+          "size": {
+            "type": "number",
+            "description": "Trade size"
+          },
+          "taker_side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "description": "Taker/aggressor side"
+          },
+          "uuid": {
+            "type": "string",
+            "description": "CoinAPI trade UUID"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "timestamp",
+          "price",
+          "size",
+          "taker_side",
+          "uuid"
+        ]
+      },
+      "TradesResponse": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair symbol"
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol_id": {
+                  "type": "string",
+                  "description": "Trading pair identifier"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Trade timestamp (ISO 8601)"
+                },
+                "price": {
+                  "type": "number",
+                  "description": "Trade price"
+                },
+                "size": {
+                  "type": "number",
+                  "description": "Trade size"
+                },
+                "taker_side": {
+                  "type": "string",
+                  "enum": [
+                    "BUY",
+                    "SELL"
+                  ],
+                  "description": "Taker/aggressor side"
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "CoinAPI trade UUID"
+                }
+              },
+              "required": [
+                "symbol_id",
+                "timestamp",
+                "price",
+                "size",
+                "taker_side",
+                "uuid"
+              ]
+            },
+            "description": "Trade ticks"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "trades"
+        ]
       }
     },
     "parameters": {}
@@ -849,7 +950,7 @@
   "info": {
     "title": "Replay Lab API",
     "version": "2.0.0",
-    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator and sweep-reclaim annotations\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20&annotations=sweep-reclaim-low-5bar\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
+    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator and fractal annotations\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20&annotations=fractal:3\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
   },
   "servers": [
     {
@@ -985,9 +1086,8 @@
           },
           {
             "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1000,
+              "type": "string",
+              "pattern": "^\\d+$",
               "default": 100,
               "description": "Max records (1-1000)",
               "example": 100
@@ -1119,6 +1219,238 @@
         }
       }
     },
+    "/api/trades/{symbolId}": {
+      "get": {
+        "summary": "Get tick-by-tick trades",
+        "description": "Returns raw trade data for a symbol in a time range.\n\n**Note:** CoinAPI requires `from` and `to` to be on the same UTC day.\n\nEach trade includes:\n- `timestamp`: When the trade executed\n- `price`: Trade price\n- `size`: Trade size\n- `taker_side`: BUY (buyer was aggressor) or SELL (seller was aggressor)\n- `uuid`: Unique trade identifier from CoinAPI\n",
+        "tags": [
+          "Market Data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start time (ISO 8601)",
+              "example": "2025-12-16T17:00:00Z"
+            },
+            "required": true,
+            "description": "Start time (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End time (ISO 8601)",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": true,
+            "description": "End time (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1000,
+              "description": "Max trades to return",
+              "example": 1000
+            },
+            "required": false,
+            "description": "Max trades to return",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trades",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Trading pair symbol"
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol_id": {
+                            "type": "string",
+                            "description": "Trading pair identifier"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Trade timestamp (ISO 8601)"
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Trade price"
+                          },
+                          "size": {
+                            "type": "number",
+                            "description": "Trade size"
+                          },
+                          "taker_side": {
+                            "type": "string",
+                            "enum": [
+                              "BUY",
+                              "SELL"
+                            ],
+                            "description": "Taker/aggressor side"
+                          },
+                          "uuid": {
+                            "type": "string",
+                            "description": "CoinAPI trade UUID"
+                          }
+                        },
+                        "required": [
+                          "symbol_id",
+                          "timestamp",
+                          "price",
+                          "size",
+                          "taker_side",
+                          "uuid"
+                        ]
+                      },
+                      "description": "Trade ticks"
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "trades"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No trades found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/charts/{symbolId}/image": {
       "get": {
         "summary": "Generate chart image",
@@ -1176,11 +1508,10 @@
             "schema": {
               "type": "string",
               "format": "date-time",
-              "description": "Start time (ISO 8601). If omitted, computed from lookback.",
-              "example": "2025-12-18T00:00:00Z"
+              "description": "Start time (ISO 8601). Use with `to` for historical charts. When omitted, computed from lookback."
             },
             "required": false,
-            "description": "Start time (ISO 8601). If omitted, computed from lookback.",
+            "description": "Start time (ISO 8601). Use with `to` for historical charts. When omitted, computed from lookback.",
             "name": "from",
             "in": "query"
           },
@@ -1188,11 +1519,10 @@
             "schema": {
               "type": "string",
               "format": "date-time",
-              "description": "End time (ISO 8601). If omitted, uses current time bucket.",
-              "example": "2025-12-18T21:00:00Z"
+              "description": "End time (ISO 8601). Use with `from` for historical charts. When omitted, uses current time bucket."
             },
             "required": false,
-            "description": "End time (ISO 8601). If omitted, uses current time bucket.",
+            "description": "End time (ISO 8601). Use with `from` for historical charts. When omitted, uses current time bucket.",
             "name": "to",
             "in": "query"
           },
@@ -1202,10 +1532,10 @@
               "minimum": 1,
               "maximum": 1000,
               "default": 60,
-              "description": "Number of bars to include (used when from/to omitted)"
+              "description": "Number of bars to include when from/to omitted."
             },
             "required": false,
-            "description": "Number of bars to include (used when from/to omitted)",
+            "description": "Number of bars to include when from/to omitted.",
             "name": "lookback",
             "in": "query"
           },
@@ -1341,10 +1671,12 @@
           {
             "schema": {
               "type": "string",
-              "description": "Comma-separated annotation sources to overlay on chart"
+              "default": "fractal:3",
+              "description": "Comma-separated annotation types with optional parameters. Use \"none\" to disable.",
+              "example": "fractal:3"
             },
             "required": false,
-            "description": "Comma-separated annotation sources to overlay on chart",
+            "description": "Comma-separated annotation types with optional parameters. Use \"none\" to disable.",
             "name": "annotations",
             "in": "query"
           }
@@ -1467,9 +1799,8 @@
           },
           {
             "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1000,
+              "type": "string",
+              "pattern": "^\\d+$",
               "default": 100,
               "description": "Max snapshots (1-1000)",
               "example": 100
@@ -2162,47 +2493,16 @@
             "schema": {
               "type": "string",
               "enum": [
-                "dump-simple-1m-1pct",
-                "dump-simple-1m-3pct",
-                "dump-simple-1m-5pct",
-                "dump-simple-15m-1pct",
-                "dump-simple-15m-3pct",
-                "dump-simple-15m-5pct",
-                "dump-simple-1h-0.5pct",
-                "dump-simple-1h-1pct",
-                "dump-vol-adjusted-1m-z2",
-                "dump-vol-adjusted-15m-z2",
-                "dump-vol-adjusted-1h-z2",
-                "dump-drawdown-1pct",
-                "dump-drawdown-3pct",
-                "pump-simple-1m-1pct",
-                "pump-simple-1m-3pct",
-                "pump-simple-1m-5pct",
-                "pump-simple-15m-1pct",
-                "pump-simple-15m-3pct",
-                "pump-simple-15m-5pct",
-                "pump-simple-1h-0.5pct",
-                "pump-simple-1h-1pct",
-                "pump-vol-adjusted-1m-z2",
-                "pump-vol-adjusted-1m-z3",
-                "pump-vol-adjusted-15m-z2",
-                "pump-vol-adjusted-15m-z3",
-                "pump-vol-adjusted-1h-z2",
-                "pump-drawup-1pct",
-                "pump-drawup-3pct",
-                "local-extrema-fractal-1m-L5",
-                "local-extrema-fractal-1m-L10",
-                "local-extrema-fractal-15m-L5",
-                "local-extrema-fractal-15m-L10",
-                "local-extrema-zigzag-1m-1pct",
-                "local-extrema-zigzag-1m-3pct",
-                "local-extrema-zigzag-1m-5pct",
-                "local-extrema-zigzag-15m-3pct",
-                "local-extrema-zigzag-15m-5pct",
-                "sweep-reclaim-low-5bar",
-                "sweep-reclaim-high-5bar",
-                "sweep-reclaim-low-10bar",
-                "sweep-reclaim-high-10bar"
+                "sweep-reclaim-low",
+                "sweep-reclaim-high",
+                "dump-simple",
+                "dump-vol-adjusted",
+                "dump-drawdown",
+                "pump-simple",
+                "pump-vol-adjusted",
+                "pump-drawup",
+                "fractal",
+                "zigzag"
               ],
               "description": "Filter by specific annotator/detector",
               "example": "dump-simple-1h-0.5pct"
