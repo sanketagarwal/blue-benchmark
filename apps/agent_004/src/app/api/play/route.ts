@@ -6,24 +6,24 @@ import {
   getClockState,
   initializeClock,
   resetClockState,
-} from '../../../clock-state.js';
-import { computeFillGroundTruth } from '../../../ground-truth/fill-checker.js';
+} from '@/clock-state';
+import { computeFillGroundTruth } from '@/ground-truth/fill-checker';
 import {
   clearMarketMakerContext,
   marketMaker,
   setMarketMakerContext,
-} from '../../../market-maker.js';
-import { getForecastingCharts } from '../../../replay-lab/charts.js';
+} from '@/market-maker';
+import { getForecastingCharts } from '@/replay-lab/charts';
 import {
   formatOrderbookForPrompt,
   getBestBidAsk,
   getOrderbookSnapshot,
-} from '../../../replay-lab/orderbook.js';
-import { getTrades } from '../../../replay-lab/trades.js';
-import { forecastScorer } from '../../../scorers/aggregate-scorer.js';
+} from '@/replay-lab/orderbook';
+import { getTrades } from '@/replay-lab/trades';
+import { forecastScorer } from '@/scorers/aggregate-scorer';
 
-import type { MarketMakerOutput } from '../../../market-maker.js';
-import type { FillContractId } from '../../../scorers/types.js';
+import type { MarketMakerOutput } from '@/market-maker';
+import type { FillContractId } from '@/scorers/types';
 
 export const dynamic = 'force-dynamic';
 
