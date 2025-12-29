@@ -1,5 +1,5 @@
-/* eslint-disable no-console -- CLI benchmark tool requires console output for user feedback */
 import { runRound } from '@nullagent/agent-core';
+import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
 import {
   startNewGame,
@@ -19,6 +19,7 @@ import type { PuzzleOutput } from './puzzle-master.js';
 
 const BENCHMARK_GAMES = 1;
 const MAX_GUESSES = 26;
+const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 
 interface GameResult {
   gameNumber: number;
@@ -83,17 +84,19 @@ function getMoveStatus(state: GameState): string {
 }
 
 async function runGame(gameNumber: number): Promise<GameResult> {
-  console.log(`\nGame ${String(gameNumber)}/${String(BENCHMARK_GAMES)}`);
-  console.log('─'.repeat(40));
+  logger.log(`\nGame ${String(gameNumber)}/${String(BENCHMARK_GAMES)}`);
 
   resetGameState();
 
+  logger.startSpinner(`Game ${String(gameNumber)}: Creating puzzle...`);
   const puzzleResult = await runRound(puzzleMaster);
   const puzzleOutput = puzzleResult.output as PuzzleOutput;
 
   let gameState: GameState = startNewGame(puzzleOutput);
-  console.log(`Category: ${puzzleOutput.category}`);
-  console.log(`Board: ${getCurrentBoard(gameState)}`);
+  logger.succeedSpinner(`Game ${String(gameNumber)}: Puzzle created`);
+
+  logger.log(`Category: ${puzzleOutput.category}`);
+  logger.logGameState(`Board: ${getCurrentBoard(gameState)}`);
 
   let moves = 0;
   let totalScore = 0;
@@ -103,7 +106,9 @@ async function runGame(gameNumber: number): Promise<GameResult> {
 
     const boardBefore = getCurrentBoard(gameState);
 
+    logger.startSpinner(`Game ${String(gameNumber)}: Getting player move...`);
     const playerResult = await runRound(player);
+    logger.succeedSpinner(`Game ${String(gameNumber)}: Move received`);
     const playerOutput = playerResult.output as PlayerOutput;
 
     const { newState, moveResult } = processPlayerMove(gameState, playerOutput, boardBefore);
@@ -128,14 +133,13 @@ async function runGame(gameNumber: number): Promise<GameResult> {
     const guess = playerOutput.letter ?? playerOutput.guess ?? '?';
     const guessType = playerOutput.letter === undefined ? 'phrase' : 'letter';
     const status = getMoveStatus(gameState);
-    console.log(
-      `  Move ${String(moves)}: ${guessType} "${guess}" → score ${resolvedScore.score.toFixed(2)}${status}`,
-    );
+    logger.logMove(`${guessType} "${guess}"`, `score ${resolvedScore.score.toFixed(2)}${status}`);
+    logger.logGameState(`Board: ${getCurrentBoard(gameState)}`);
   }
 
   const won = gameState.solved;
-  console.log(`Result: ${won ? 'WON' : 'LOST'} in ${String(moves)} moves`);
-  console.log(`Phrase: ${gameState.puzzle.phrase}`);
+  logger.log(`Result: ${won ? 'WON' : 'LOST'} in ${String(moves)} moves`);
+  logger.log(`Phrase: ${gameState.puzzle.phrase}`);
 
   return {
     gameNumber,
@@ -147,8 +151,7 @@ async function runGame(gameNumber: number): Promise<GameResult> {
 }
 
 async function main(): Promise<void> {
-  console.log('agent_002 Benchmark (Puzzle Game with Scoring)');
-  console.log('==============================================');
+  logger.header('agent_002 Benchmark (Puzzle Game with Scoring)');
 
   const results: GameResult[] = [];
 
@@ -157,52 +160,18 @@ async function main(): Promise<void> {
     results.push(result);
   }
 
-  // Print summary table
-  console.log('\n');
-  console.log(
-    '┌─────────────────────────────────────────────────────────────┐',
-  );
-  const titleText = `agent_002 Benchmark Results (${String(BENCHMARK_GAMES)} game)`;
-  const titlePadding = 61 - titleText.length;
-  const titlePadLeft = Math.floor(titlePadding / 2);
-  const titlePadRight = titlePadding - titlePadLeft;
-  console.log(
-    `│${' '.repeat(titlePadLeft)}${titleText}${' '.repeat(titlePadRight)}│`,
-  );
-  console.log(
-    '├─────────┬────────────┬───────────┬─────────────────────────┤',
-  );
-  console.log(
-    '│  Game   │   Result   │   Moves   │         Phrase          │',
-  );
-  console.log(
-    '├─────────┼────────────┼───────────┼─────────────────────────┤',
-  );
-
-  for (const r of results) {
-    const result = r.won ? 'WON' : 'LOST';
-    const phrase =
-      r.phrase.length > 23 ? r.phrase.slice(0, 20) + '...' : r.phrase;
-    console.log(
-      `│    ${String(r.gameNumber)}    │    ${result.padEnd(6)} │    ${String(r.moves).padStart(2)}     │ ${phrase.padEnd(23)} │`,
-    );
-  }
-
-  console.log(
-    '├─────────┴────────────┴───────────┴─────────────────────────┤',
-  );
-
   const wins = results.filter((r) => r.won).length;
   const avgMoves = results.reduce((sum, r) => sum + r.moves, 0) / results.length;
   const avgScore =
     results.reduce((sum, r) => sum + r.totalScore, 0) / results.length;
+  const winRate = (wins / BENCHMARK_GAMES) * 100;
 
-  console.log(
-    `│ Summary: ${String(wins)}/${String(BENCHMARK_GAMES)} won (${((wins / BENCHMARK_GAMES) * 100).toFixed(1)}%), avg ${avgMoves.toFixed(1)} moves, avg score ${avgScore.toFixed(2)} │`,
-  );
-  console.log(
-    '└─────────────────────────────────────────────────────────────┘',
-  );
+  logger.summary({
+    'Games Played': BENCHMARK_GAMES,
+    'Win Rate': `${String(wins)}/${String(BENCHMARK_GAMES)} (${winRate.toFixed(1)}%)`,
+    'Average Moves': avgMoves.toFixed(1),
+    'Average Score': avgScore.toFixed(2),
+  });
 }
 
 await main()
@@ -211,9 +180,8 @@ await main()
     process.exit(0);
   })
   .catch((error: unknown) => {
+    // eslint-disable-next-line no-console -- Error logging for CLI must use console.error
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);
   });
-
-/* eslint-enable no-console -- end of CLI benchmark file */

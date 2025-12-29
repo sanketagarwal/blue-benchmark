@@ -1,5 +1,5 @@
-/* eslint-disable no-console -- CLI benchmark tool requires console output */
 import { runRound } from '@nullagent/agent-core';
+import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
 import {
   getCurrentBoard,
@@ -19,8 +19,7 @@ import type { PuzzleOutput } from './puzzle-master';
 
 const TOTAL_GAMES = 1;
 const MAX_MOVES_PER_GAME = 50;
-const BORDER_LINE = '+-----------------------------------------------------------------+';
-const HEADER_SEPARATOR = '+---------+------------+-----------+-----------------------------+';
+const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 
 interface GameResult {
   game: number;
@@ -48,9 +47,12 @@ function processPlayerMove(state: GameState, output: PlayerOutput): GameState {
 async function runSingleGame(gameNumber: number): Promise<GameResult> {
   // Reset and create new puzzle
   resetGameState();
+
+  logger.startSpinner(`Game ${String(gameNumber)}: Creating puzzle...`);
   const puzzleResult = await runRound(puzzleMaster);
   const puzzleOutput = puzzleResult.output as PuzzleOutput;
   startNewGame(puzzleOutput);
+  logger.succeedSpinner(`Game ${String(gameNumber)}: Puzzle created`);
 
   const phrase = puzzleOutput.phrase;
   let moves = 0;
@@ -60,11 +62,13 @@ async function runSingleGame(gameNumber: number): Promise<GameResult> {
     throw new Error('Game state should exist after puzzle creation');
   }
 
-  console.log(`\nGame ${String(gameNumber)}: "${phrase}" (${puzzleOutput.category})`);
-  console.log(`Board: ${getCurrentBoard(gameState)}`);
+  logger.log(`\nGame ${String(gameNumber)}: "${phrase}" (${puzzleOutput.category})`);
+  logger.logGameState(`Board: ${getCurrentBoard(gameState)}`);
 
   while (!gameState.solved && !gameState.failed && moves < MAX_MOVES_PER_GAME) {
+    logger.startSpinner(`Game ${String(gameNumber)}: Getting player move...`);
     const playerResult = await runRound(player);
+    logger.succeedSpinner(`Game ${String(gameNumber)}: Move received`);
     const playerOutput = playerResult.output as PlayerOutput;
     moves++;
 
@@ -77,17 +81,17 @@ async function runSingleGame(gameNumber: number): Promise<GameResult> {
       playerOutput.guess === undefined
         ? `tried "${playerOutput.letter ?? 'unknown'}"`
         : `guessed "${playerOutput.guess}"`;
-    console.log(`  Move ${String(moves)}: ${action} => ${board}`);
+    logger.logMove(action, board);
 
     if (gameState.solved) {
-      console.log(`  SOLVED in ${String(moves)} moves!`);
+      logger.log(`  SOLVED in ${String(moves)} moves!`);
     } else if (gameState.failed) {
-      console.log(`  FAILED - wrong phrase guess`);
+      logger.log(`  FAILED - wrong phrase guess`);
     }
   }
 
   if (!gameState.solved && !gameState.failed) {
-    console.log(`  TIMEOUT - exceeded ${String(MAX_MOVES_PER_GAME)} moves`);
+    logger.log(`  TIMEOUT - exceeded ${String(MAX_MOVES_PER_GAME)} moves`);
   }
 
   return {
@@ -98,46 +102,9 @@ async function runSingleGame(gameNumber: number): Promise<GameResult> {
   };
 }
 
-function padCenter(text: string, width: number): string {
-  const padding = width - text.length;
-  const padLeft = Math.floor(padding / 2);
-  const padRight = padding - padLeft;
-  return ' '.repeat(padLeft) + text + ' '.repeat(padRight);
-}
-
-function printResults(results: GameResult[]): void {
-  const wins = results.filter((result) => result.won).length;
-  const totalMoves = results.reduce((sum, result) => sum + result.moves, 0);
-  const averageMoves = totalMoves / results.length;
-  const winRate = (wins / results.length) * 100;
-
-  const titleText = `agent_001 Benchmark Results (${String(TOTAL_GAMES)} games)`;
-
-  console.log('\n');
-  console.log(BORDER_LINE);
-  console.log(`|${padCenter(titleText, 65)}|`);
-  console.log(HEADER_SEPARATOR);
-  console.log('|  Game   |   Result   |   Moves   |           Phrase            |');
-  console.log(HEADER_SEPARATOR);
-
-  for (const result of results) {
-    const gameString = padCenter(String(result.game), 7);
-    const resultString = padCenter(result.won ? 'WON' : 'LOST', 10);
-    const movesString = padCenter(String(result.moves), 9);
-    const phraseString =
-      result.phrase.length > 27 ? result.phrase.slice(0, 24) + '...' : result.phrase.padEnd(27);
-    console.log(`|${gameString}|${resultString}|${movesString}| ${phraseString}|`);
-  }
-
-  console.log(HEADER_SEPARATOR);
-  const summaryText = `Summary: ${String(wins)}/${String(results.length)} won (${winRate.toFixed(1)}%), avg ${averageMoves.toFixed(1)} moves`;
-  console.log(`| ${summaryText.padEnd(63)}|`);
-  console.log(BORDER_LINE);
-}
-
 async function main(): Promise<void> {
-  console.log('Starting agent_001 benchmark...');
-  console.log(`Running ${String(TOTAL_GAMES)} complete puzzle games\n`);
+  logger.header('agent_001 Benchmark');
+  logger.log(`Running ${String(TOTAL_GAMES)} complete puzzle games\n`);
 
   const results: GameResult[] = [];
 
@@ -146,23 +113,26 @@ async function main(): Promise<void> {
     results.push(result);
   }
 
-  printResults(results);
+  const wins = results.filter((result) => result.won).length;
+  const totalMoves = results.reduce((sum, result) => sum + result.moves, 0);
+  const averageMoves = totalMoves / results.length;
+  const winRate = (wins / results.length) * 100;
 
-  // eslint-disable-next-line unicorn/no-process-exit -- CLI benchmark must exit cleanly with status code
-  process.exit(0);
+  logger.summary({
+    'Games Played': TOTAL_GAMES,
+    'Win Rate': `${String(wins)}/${String(results.length)} (${winRate.toFixed(1)}%)`,
+    'Average Moves': averageMoves.toFixed(1),
+  });
 }
 
-async function run(): Promise<void> {
-  try {
-    await main();
-  } catch (error: unknown) {
+await main()
+  .then(() => {
+    // eslint-disable-next-line unicorn/no-process-exit -- CLI benchmark must exit cleanly with status code
+    process.exit(0);
+  })
+  .catch((error: unknown) => {
+    // eslint-disable-next-line no-console -- Error logging for CLI must use console.error
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI benchmark must exit with error code on failure
     process.exit(1);
-  }
-}
-
-// eslint-disable-next-line unicorn/prefer-top-level-await -- Entry point wrapper
-void run();
-
-/* eslint-enable no-console -- end of CLI benchmark file */
+  });

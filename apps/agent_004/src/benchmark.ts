@@ -1,5 +1,5 @@
-/* eslint-disable no-console -- CLI benchmark tool requires console output */
 import { runRound } from '@nullagent/agent-core';
+import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
 import {
   initializeClock,
@@ -26,8 +26,9 @@ interface RoundScore {
 }
 
 async function main(): Promise<void> {
-  console.log('agent_004 Benchmark');
-  console.log('===================\n');
+  const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
+
+  logger.header('agent_004 Benchmark');
 
   const symbolId = process.env['SYMBOL_ID'];
   if (symbolId === undefined || symbolId === '') {
@@ -43,16 +44,15 @@ async function main(): Promise<void> {
   resetClockState();
   let clockState = initializeClock();
 
-  console.log(`Symbol: ${symbolId}`);
-  console.log(`Model: ${modelId}`);
-  console.log(`Start Time: ${clockState.currentTime.toISOString()}`);
-  console.log(`Rounds: ${String(BENCHMARK_ROUNDS)}\n`);
+  logger.log(`Symbol: ${symbolId}`);
+  logger.log(`Model: ${modelId}`);
+  logger.log(`Start Time: ${clockState.currentTime.toISOString()}`);
+  logger.log(`Rounds: ${String(BENCHMARK_ROUNDS)}\n`);
 
   const scores: RoundScore[] = [];
 
   for (let round = 1; round <= BENCHMARK_ROUNDS; round++) {
-    console.log(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} (${clockState.currentTime.toISOString()})`);
-
+    logger.startSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: Fetching market data...`);
     const charts = await getForecastingCharts(symbolId, clockState.currentTime);
     const orderbook = await getOrderbookSnapshot(symbolId, clockState.currentTime);
     const orderbookData = formatOrderbookForPrompt(orderbook);
@@ -67,6 +67,7 @@ async function main(): Promise<void> {
       symbolId,
     });
 
+    logger.updateSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: Calling LLM...`);
     const result = await runRound(marketMaker);
     clearMarketMakerContext();
 
@@ -76,6 +77,7 @@ async function main(): Promise<void> {
     const predictionTime = clockState.currentTime;
     const horizonEnd = new Date(predictionTime.getTime() + 15 * 60 * 1000);
 
+    logger.updateSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: Scoring...`);
     // Fetch trades in window
     const trades = await getTrades(symbolId, predictionTime, horizonEnd);
 
@@ -94,6 +96,16 @@ async function main(): Promise<void> {
       symbolId,
     });
 
+    logger.succeedSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: Complete`);
+
+    logger.logPredictions(output.predictions);
+    logger.logGroundTruth(groundTruth as unknown as Record<string, boolean>, output.predictions);
+    logger.logScores({
+      brier: scoreResult.aggregates.meanBrierScore,
+      logLoss: scoreResult.aggregates.meanLogLoss,
+      accuracy: scoreResult.aggregates.accuracy,
+    });
+
     scores.push({
       roundNumber: round,
       brier: scoreResult.aggregates.meanBrierScore,
@@ -101,10 +113,7 @@ async function main(): Promise<void> {
       accuracy: scoreResult.aggregates.accuracy,
     });
 
-    console.log(`  Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`);
-
     clockState = advanceClock();
-    console.log('');
   }
 
   // Calculate averages
@@ -112,13 +121,12 @@ async function main(): Promise<void> {
   const avgLogLoss = scores.map((s) => s.logLoss).reduce((sum, value) => sum + value, 0) / scores.length;
   const avgAccuracy = scores.map((s) => s.accuracy).reduce((sum, value) => sum + value, 0) / scores.length;
 
-  // Print results table
-  console.log('Results');
-  console.log('-------');
-  console.log(`Model: ${modelId}`);
-  console.log(`Average Brier Score: ${avgBrier.toFixed(3)}`);
-  console.log(`Average Log Loss: ${avgLogLoss.toFixed(3)}`);
-  console.log(`Average Accuracy: ${(avgAccuracy * 100).toFixed(1)}%`);
+  logger.summary({
+    Model: modelId,
+    'Average Brier Score': avgBrier,
+    'Average Log Loss': avgLogLoss,
+    'Average Accuracy': `${(avgAccuracy * 100).toFixed(1)}%`,
+  });
 }
 
 await main()
@@ -127,8 +135,8 @@ await main()
     process.exit(0);
   })
   .catch((error: unknown) => {
+    // eslint-disable-next-line no-console -- CLI error output must use console
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);
   });
-/* eslint-enable no-console -- Re-enable console rule after CLI benchmark output */

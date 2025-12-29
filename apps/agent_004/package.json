@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@nullagent/agent-core": "workspace:*",
+    "@nullagent/cli-utils": "workspace:*",
     "@nullagent/database": "workspace:*",
     "@nullagent/scorers": "workspace:*",
     "next": "^15.0.0",
