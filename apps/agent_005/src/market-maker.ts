@@ -88,7 +88,7 @@ const PredictionSchema = z.object({
 });
 
 const OutputSchema = z.object({
-  reasoning: z.string().optional().describe('Brief explanation of your fill probability analysis'),
+  reasoning: z.string().max(500).optional().describe('1-2 sentence summary only'),
   predictions: PredictionSchema,
 });
 
@@ -188,12 +188,12 @@ Longer time horizons must have equal or higher fill probability (more time = mor
 
 ${compactionSection}
 Respond with a JSON object containing:
-- "reasoning": brief explanation of your fill probability and delta-mid analysis
+- "reasoning": ONE sentence only (max 100 chars) - keep this extremely brief
 - "predictions": an object with values for each contract ID
 
 Example:
 {
-  "reasoning": "High positive imbalance suggests buying pressure, making asks more likely to fill. Bid fills likely indicate downward momentum continuing...",
+  "reasoning": "Strong buying pressure, asks likely to fill.",
   "predictions": {
     "bid-fill-1m": 0.15,
     "bid-fill-5m": 0.35,
@@ -317,12 +317,12 @@ Longer time horizons must have equal or higher fill probability (more time = mor
 
 ${compactionSection}
 Respond with a JSON object containing:
-- "reasoning": brief explanation of your fill probability and delta-mid analysis
+- "reasoning": ONE sentence only (max 100 chars) - keep this extremely brief
 - "predictions": an object with values for each contract ID
 
 Example:
 {
-  "reasoning": "High positive imbalance suggests buying pressure, making asks more likely to fill. Bid fills likely indicate downward momentum continuing...",
+  "reasoning": "Strong buying pressure, asks likely to fill.",
   "predictions": {
     "bid-fill-1m": 0.15,
     "bid-fill-5m": 0.35,
