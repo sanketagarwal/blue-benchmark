@@ -21,6 +21,10 @@ export default defineConfig({
         '**/src/app/api/**',
         '**/src/benchmark.ts',
         '**/scripts/**',
+        // Benchmark CLI helper files (tested via integration)
+        '**/src/matrix.ts',
+        '**/src/results.ts',
+        '**/src/table.ts',
       ],
       thresholds: {
         lines: 90,

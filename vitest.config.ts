@@ -58,6 +58,16 @@ export default defineConfig({
         'apps/agent_000/src/game-state.ts',
         // agent_004 has no unit tests yet (matrix benchmark tool)
         'apps/agent_004/src/**/*.ts',
+        // agent_005 benchmark helper files (tested via integration)
+        'apps/agent_005/src/matrix.ts',
+        'apps/agent_005/src/results.ts',
+        'apps/agent_005/src/table.ts',
+        // Script files for generating chart URLs
+        'apps/**/scripts/**',
+        // Next.js API routes (tested via e2e)
+        'apps/**/src/app/api/**',
+        // Market maker agent template code (tested via benchmark)
+        'apps/agent_005/src/market-maker.ts',
       ],
     },
     include: [

@@ -16,6 +16,24 @@ export type ContractId = (typeof CONTRACT_IDS)[number];
 
 export type GroundTruth = Record<ContractId, boolean>;
 
+// Base API sources (API only accepts these, not full contract IDs)
+const BASE_SOURCE_DUMP_SIMPLE = 'dump-simple';
+const BASE_SOURCE_DUMP_VOL_ADJUSTED = 'dump-vol-adjusted';
+const BASE_SOURCE_DUMP_DRAWDOWN = 'dump-drawdown';
+
+// Map contract IDs to their base API source
+const CONTRACT_TO_BASE_SOURCE: Record<ContractId, string> = {
+  'dump-simple-15m-1pct': BASE_SOURCE_DUMP_SIMPLE,
+  'dump-simple-15m-3pct': BASE_SOURCE_DUMP_SIMPLE,
+  'dump-simple-15m-5pct': BASE_SOURCE_DUMP_SIMPLE,
+  'dump-simple-1h-0.5pct': BASE_SOURCE_DUMP_SIMPLE,
+  'dump-simple-1h-1pct': BASE_SOURCE_DUMP_SIMPLE,
+  'dump-vol-adjusted-15m-z2': BASE_SOURCE_DUMP_VOL_ADJUSTED,
+  'dump-vol-adjusted-1h-z2': BASE_SOURCE_DUMP_VOL_ADJUSTED,
+  'dump-drawdown-1pct': BASE_SOURCE_DUMP_DRAWDOWN,
+  'dump-drawdown-3pct': BASE_SOURCE_DUMP_DRAWDOWN,
+};
+
 interface Annotation {
   id: string;
   time_start: string;
@@ -31,16 +49,25 @@ interface AnnotationsResponse {
   annotations: Annotation[];
 }
 
-async function getAnnotationsForSource(
+// Check if annotation matches the specific contract ID
+// The API returns annotations for the base source, we filter by the full annotator name
+function annotationMatchesContract(annotation: Annotation, contractId: ContractId): boolean {
+  return annotation.source === contractId;
+}
+
+async function getAnnotationsForContract(
   symbolId: string,
-  source: string,
+  contractId: ContractId,
   from: string,
   to: string
 ): Promise<boolean> {
+  // eslint-disable-next-line security/detect-object-injection -- contractId is from CONTRACT_IDS constant
+  const baseSource = CONTRACT_TO_BASE_SOURCE[contractId];
   const response = await replayLabFetch<AnnotationsResponse>(
-    `/api/annotations/${symbolId}?source=${source}&from=${from}&to=${to}&limit=1`
+    `/api/annotations/${symbolId}?source=${baseSource}&from=${from}&to=${to}`
   );
-  return response.annotations.length > 0;
+  // Filter annotations to find one matching the specific contract
+  return response.annotations.some((annotation) => annotationMatchesContract(annotation, contractId));
 }
 
 export async function getGroundTruthBatch(
@@ -54,7 +81,7 @@ export async function getGroundTruthBatch(
   // Fetch all contract annotations in parallel
   const results = await Promise.all(
     CONTRACT_IDS.map(async (contractId) => {
-      const hasAnnotation = await getAnnotationsForSource(
+      const hasAnnotation = await getAnnotationsForContract(
         symbolId,
         contractId,
         fromTime,
