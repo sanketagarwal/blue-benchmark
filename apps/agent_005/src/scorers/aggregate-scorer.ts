@@ -129,10 +129,10 @@ function computeExtendedScores(
       }));
   }
 
-  // Optional: EV calculation
+  // Optional: EV calculation (with ATR-based delta-mid clipping)
   let expectedValueResultsRaw: ReturnType<typeof calculateAllEV> | undefined;
   if (deltaMidPredictions !== undefined && fillPrices !== undefined) {
-    expectedValueResultsRaw = calculateAllEV(predictions, deltaMidPredictions, fillPrices);
+    expectedValueResultsRaw = calculateAllEV(predictions, deltaMidPredictions, fillPrices, deltaMidATRs);
     result.evResults = aggregateEV(expectedValueResultsRaw);
 
     // Preserve raw EV results for quintile analysis

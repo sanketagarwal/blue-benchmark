@@ -4,6 +4,8 @@ import {
   calculateAllEV,
   aggregateEV,
   calculateEVPnLGap,
+  clipDeltaMid,
+  MAX_ATR_MULTIPLE,
 } from '../src/scorers/ev-calculator';
 import { FIXED_FEE } from '../src/scorers/types';
 import type { EVInput, EVResult, Side, Horizon } from '../src/scorers/ev-calculator';
@@ -393,6 +395,108 @@ describe('EV Calculator', () => {
       // Gaps: bid-1m: 0.5-0.1=0.4, ask-5m: 0.3-0.2=0.1
       // Mean gap = (0.4 + 0.1) / 2 = 0.25
       expect(result.gap).toBeCloseTo(0.25);
+    });
+  });
+
+  describe('clipDeltaMid', () => {
+    it('returns original value when ATR is undefined', () => {
+      expect(clipDeltaMid(100, undefined)).toBe(100);
+      expect(clipDeltaMid(-100, undefined)).toBe(-100);
+    });
+
+    it('returns original value when ATR is zero', () => {
+      expect(clipDeltaMid(100, 0)).toBe(100);
+      expect(clipDeltaMid(-100, 0)).toBe(-100);
+    });
+
+    it('returns original value when ATR is negative', () => {
+      expect(clipDeltaMid(100, -10)).toBe(100);
+    });
+
+    it('returns original value when within ATR bounds', () => {
+      const atr = 10;
+      const maxDelta = MAX_ATR_MULTIPLE * atr; // 30
+      expect(clipDeltaMid(15, atr)).toBe(15);
+      expect(clipDeltaMid(-15, atr)).toBe(-15);
+      expect(clipDeltaMid(0, atr)).toBe(0);
+    });
+
+    it('clips positive values exceeding MAX_ATR_MULTIPLE * ATR', () => {
+      const atr = 10;
+      const maxDelta = MAX_ATR_MULTIPLE * atr; // 30
+      expect(clipDeltaMid(50, atr)).toBe(maxDelta);
+      expect(clipDeltaMid(100, atr)).toBe(maxDelta);
+      expect(clipDeltaMid(30.001, atr)).toBeCloseTo(maxDelta);
+    });
+
+    it('clips negative values exceeding -MAX_ATR_MULTIPLE * ATR', () => {
+      const atr = 10;
+      const maxDelta = MAX_ATR_MULTIPLE * atr; // 30
+      expect(clipDeltaMid(-50, atr)).toBe(-maxDelta);
+      expect(clipDeltaMid(-100, atr)).toBe(-maxDelta);
+      expect(clipDeltaMid(-30.001, atr)).toBeCloseTo(-maxDelta);
+    });
+
+    it('does not clip values at exactly the boundary', () => {
+      const atr = 10;
+      const maxDelta = MAX_ATR_MULTIPLE * atr; // 30
+      expect(clipDeltaMid(maxDelta, atr)).toBe(maxDelta);
+      expect(clipDeltaMid(-maxDelta, atr)).toBe(-maxDelta);
+    });
+  });
+
+  describe('calculateAllEV with ATR clipping', () => {
+    const fillPredictions = {
+      'bid-fill-1m': 0.5,
+      'bid-fill-5m': 0.6,
+      'bid-fill-15m': 0.7,
+      'ask-fill-1m': 0.4,
+      'ask-fill-5m': 0.5,
+      'ask-fill-15m': 0.6,
+    };
+    const fillPrices = { bestBid: 100, bestAsk: 100 };
+
+    it('clips extreme delta-mid predictions when ATRs provided', () => {
+      const deltaMidPredictions = {
+        'bid-delta-mid-1m': 100, // Way too high
+        'bid-delta-mid-5m': -100, // Way too low
+        'bid-delta-mid-15m': 0.5,
+        'ask-delta-mid-1m': 100,
+        'ask-delta-mid-5m': -100,
+        'ask-delta-mid-15m': -0.5,
+      };
+      const deltaMidATRs = {
+        'bid-delta-mid-1m': 10,
+        'bid-delta-mid-5m': 10,
+        'bid-delta-mid-15m': 10,
+        'ask-delta-mid-1m': 10,
+        'ask-delta-mid-5m': 10,
+        'ask-delta-mid-15m': 10,
+      };
+
+      const results = calculateAllEV(fillPredictions, deltaMidPredictions, fillPrices, deltaMidATRs);
+
+      // bid-1m: deltaMid should be clipped from 100 to 30
+      const bid1m = results.find((r) => r.side === 'bid' && r.horizon === '1m');
+      // EV = fillProb * clippedDeltaMid - fee = 0.5 * 30 - (0.5 * 100 * 0.0001)
+      expect(bid1m?.ev).toBeCloseTo(0.5 * 30 - 0.5 * 100 * 0.0001);
+    });
+
+    it('does not clip when ATRs not provided', () => {
+      const deltaMidPredictions = {
+        'bid-delta-mid-1m': 100,
+        'bid-delta-mid-5m': 0.5,
+        'bid-delta-mid-15m': 0.5,
+        'ask-delta-mid-1m': -100,
+        'ask-delta-mid-5m': -0.5,
+        'ask-delta-mid-15m': -0.5,
+      };
+
+      const results = calculateAllEV(fillPredictions, deltaMidPredictions, fillPrices);
+
+      // Without ATRs, no clipping occurs
+      const bid1m = results.find((r) => r.side === 'bid' && r.horizon === '1m');
+      expect(bid1m?.ev).toBeCloseTo(0.5 * 100 - 0.5 * 100 * 0.0001);
     });
   });
 });

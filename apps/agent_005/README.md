@@ -1,116 +1,154 @@
-# agent_005: Limit Order Fill and Expected Value Predictor
+# agent_005: One-Sided Execution EV Estimator
 
-An LLM agent that predicts fill probability, post-fill price movement, and expected value of hypothetical limit orders, simulating an HFT market-maker's core competencies.
+A production-grade benchmark for evaluating LLM capability at limit order fill prediction, conditional price movement estimation, and expected value calculation—the core competencies of HFT market-making.
 
-**Now with Three-Leg EV Benchmark:** Evaluate models on fill probability, conditional price movement, and realized PnL with derived expected value calculations.
+**What this is:**
+- A one-sided execution EV estimator
+- With out-of-sample realized PnL validation
+- And confidence-aware diagnostics
+- Suitable for feeding into a meta-allocator or strategy selector
 
-## What It Does
-
-Predicts fill probability, expected price movement after fill, and enables expected value calculation for limit orders placed at the current best bid or best ask.
-
-**6 Fill Probability Contracts:**
-
-| Contract | Description |
-|----------|-------------|
-| `bid-fill-1m` | Limit BUY at best_bid fills within 1 minute |
-| `bid-fill-5m` | Limit BUY at best_bid fills within 5 minutes |
-| `bid-fill-15m` | Limit BUY at best_bid fills within 15 minutes |
-| `ask-fill-1m` | Limit SELL at best_ask fills within 1 minute |
-| `ask-fill-5m` | Limit SELL at best_ask fills within 5 minutes |
-| `ask-fill-15m` | Limit SELL at best_ask fills within 15 minutes |
-
-**6 Delta-Mid Contracts (Conditional Price Movement):**
-
-| Contract | Description |
-|----------|-------------|
-| `bid-delta-mid-1m` | Expected mid price change if bid fills within 1m |
-| `bid-delta-mid-5m` | Expected mid price change if bid fills within 5m |
-| `bid-delta-mid-15m` | Expected mid price change if bid fills within 15m |
-| `ask-delta-mid-1m` | Expected mid price change if ask fills within 1m |
-| `ask-delta-mid-5m` | Expected mid price change if ask fills within 5m |
-| `ask-delta-mid-15m` | Expected mid price change if ask fills within 15m |
-
-**Monotonicity Constraints (Fill Probability):**
-- `bid-fill-15m >= bid-fill-5m >= bid-fill-1m`
-- `ask-fill-15m >= ask-fill-5m >= ask-fill-1m`
-
-More time = more chances to fill.
+This is the measurement layer that model-selection and ensemble systems depend on.
 
 ## Why This Matters
 
 From HFT research: *"The real-time model that estimates the expected value of placing, keeping, or canceling a limit order right now."*
 
-This is the core of market-making:
+This benchmark tells uncomfortable truths about model capability:
 - **Capturing spread** is easy
 - **Avoiding adverse selection** (being filled then price moves against you) is hard
-- **Fill probability** is the foundation for expected value calculations
+- **Directional skill vs hallucinated magnitude** is what separates research from capital-deployable
+
+## Key Design Decisions
+
+### ATR-Normalized Delta-Mid Clipping
+
+**Critical constraint:** Delta-mid predictions are clipped to `[-3, +3] ATR` before EV calculation.
+
+Without this, models can hallucinate arbitrarily large values that dominate EV calculations, making directional skill meaningless. This mirrors real trading systems where position limits and risk controls prevent unbounded exposure.
+
+```
+MAX_ATR_MULTIPLE = 3
+clipped_delta = clip(raw_delta, -3*ATR, +3*ATR)
+```
+
+### Bid/Ask Split Reporting
+
+All metrics are reported separately for bid and ask sides:
+- MAE (Mean Absolute Error) per side
+- EV (Expected Value) per side
+- PnL (Profit/Loss) per side
+
+This reveals asymmetric model behavior that aggregate metrics hide.
+
+### Low Sample Warnings
+
+Metrics with fewer than 10 fills per side are marked with `†` and dimmed. This prevents over-interpretation of noisy data.
+
+### EV Quintile Analysis
+
+After the main results, a separate table shows EV calibration across prediction confidence buckets:
+- Q1 (lowest predicted EV) through Q5 (highest)
+- Mean predicted EV vs mean realized PnL per bucket
+- Gap analysis reveals where models are miscalibrated
 
 ## Three Evaluation Legs
 
-The benchmark evaluates models on three complementary dimensions:
+### Leg 1: Fill Probability (Binary Classification)
 
-### Leg 1: Fill Probability
+| Contract | Description |
+|----------|-------------|
+| `bid-fill-1m/5m/15m` | Limit BUY at best_bid fills within horizon |
+| `ask-fill-1m/5m/15m` | Limit SELL at best_ask fills within horizon |
 
-Binary prediction of whether a limit order fills within each horizon.
+**Metrics:** Brier Score (lower=better), Accuracy
 
-| Metric | Description |
-|--------|-------------|
-| **Brier Score** | Mean squared error of probabilities (0 = perfect) |
-| **Log Loss** | Cross-entropy loss (0 = perfect) |
-| **Accuracy** | Correct predictions at 0.5 threshold |
+**Monotonicity enforced:** `fill-15m >= fill-5m >= fill-1m`
 
-### Leg 2: Conditional Price Move
+### Leg 2: Conditional Price Movement (Regression)
 
-Predicted mid price change after fill. **Only scored when fill actually occurs.**
+| Contract | Description |
+|----------|-------------|
+| `bid-delta-mid-*` | Expected mid price change IF bid fills |
+| `ask-delta-mid-*` | Expected mid price change IF ask fills |
 
-| Metric | Description |
-|--------|-------------|
-| **Delta MAE** | Mean absolute error of delta-mid predictions |
-| **Delta MSE** | Mean squared error |
-| **Delta Bias** | Mean signed error (systematic over/under prediction) |
+**Only scored when fill actually occurs.**
 
-Ground truth: `delta_mid = mid(t_fill + H) - mid(t_fill)`
+**Metrics:**
+- Normalized MAE (error / ATR) - comparable across assets and timeframes
+- Per-side breakdown reveals asymmetric model behavior
 
-### Leg 3: Realized PnL
+### Leg 3: Realized PnL (Ground Truth)
 
-Deterministic calculation of profit/loss per decision.
-
-**Bid fills at price p:**
-```
-PnL = exit_mid - fill_price - fee
-```
-
-**Ask fills at price p:**
-```
-PnL = fill_price - exit_mid - fee
-```
-
-**No fill:** `PnL = 0`
-
-## Derived Expected Value (EV)
-
-EV is computed from the model's predictions, not predicted directly:
+Deterministic calculation of profit/loss:
 
 ```
-EV = p_fill x e_delta_mid - fees
+Bid fills:  PnL = exit_mid - fill_price - fee
+Ask fills:  PnL = fill_price - exit_mid - fee
+No fill:    PnL = 0
+
+Fixed fee: 1 basis point (0.0001)
 ```
 
-| Metric | Description |
-|--------|-------------|
-| **Mean EV** | Derived expected value per decision |
-| **Mean PnL** | Realized profit/loss per decision |
-| **EV-PnL Gap** | Difference between predicted and realized value |
+### Derived EV
 
-**Fixed fee:** 1 basis point (0.0001)
+Expected Value is computed from predictions, not predicted directly:
 
-The EV-PnL gap reveals model calibration issues:
+```
+EV = p_fill × clipped_delta_mid - fees
+```
+
+**EV-PnL Gap** reveals model calibration:
 - **Large positive gap**: Model overestimates value (optimistic)
 - **Large negative gap**: Model underestimates value (conservative)
 - **Near zero**: Well-calibrated model
 
+## Usage
+
+```bash
+cd apps/agent_005
+
+# Run model matrix benchmark
+pnpm benchmark
+
+# Verbose mode
+pnpm benchmark --verbose
+```
+
+### Example Output
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                          agent_005 EV Benchmark Results (3 rounds)                            │
+├──────────────────────┬────────┬────────┬──────────┬──────────┬──────────┬──────────┬──────────┤
+│                      │   Leg 1: Fill   │  Leg 2: Δ MAE   │   Leg 3: EV    │  Leg 3: PnL  │ Gap  │
+├──────────────────────┼────────┼────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+│ Model                │ Brier↓ │  Acc↑  │   Bid↓   │   Ask↓   │   Bid    │   Ask    │   →0     │
+├──────────────────────┼────────┼────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+│ xai/grok-4-reasoning │  0.187 │  72.2% │     0.45 │     0.52 │  +0.0012 │  -0.0008 │  +0.0002 │
+│ anthropic/haiku-4.5  │  0.201 │  68.5% │     0.58†│     0.61†│  +0.0008†│  -0.0005†│  +0.0001 │
+│ openai/gpt-5-nano    │  0.195 │  70.1% │     0.51 │     0.55 │  +0.0010 │  -0.0006 │  +0.0003 │
+├──────────────────────┴────────┴────────┴──────────┴──────────┴──────────┴──────────┴──────────┤
+│ Realized PnL: +0.0005  │  Winner: xai/grok-4-reasoning                                        │
+│ † Low sample size (<10 fills) - interpret with caution                                        │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│    EV Quintile Analysis: xai/grok-4-reasoning   │
+├──────────────┬─────────┬─────────┬───────┬──────┤
+│   Quintile   │ Mean EV │ Mean PnL│  Gap  │   N  │
+├──────────────┼─────────┼─────────┼───────┼──────┤
+│ Q1 (lowest)  │  -0.002 │  -0.001 │ -0.001│   12 │
+│ Q2           │  +0.000 │  +0.000 │ +0.000│   14 │
+│ Q3           │  +0.001 │  +0.001 │ +0.000│   11 │
+│ Q4           │  +0.002 │  +0.001 │ +0.001│   13 │
+│ Q5 (highest) │  +0.003 │  +0.002 │ +0.001│   10 │
+└──────────────┴─────────┴─────────┴───────┴──────┘
+```
+
 ## How Fill Detection Works
 
-The ground truth uses tick-by-tick trade data with `taker_side`:
+Ground truth uses tick-by-tick trade data with `taker_side`:
 
 ```
 Limit BUY at best_bid fills when:
@@ -122,21 +160,7 @@ Limit SELL at best_ask fills when:
 
 This mirrors real exchange mechanics—a limit BUY fills when someone sells into it.
 
-## Usage
-
-```bash
-cd apps/agent_005
-
-# Run model matrix benchmark (default: 3 models, 3 rounds each)
-pnpm benchmark
-
-# Verbose mode (detailed predictions and results per model)
-pnpm benchmark --verbose
-```
-
-### Model Matrix
-
-The benchmark runs multiple LLMs and compares their performance:
+## Model Matrix
 
 ```typescript
 // src/matrix.ts
@@ -149,118 +173,13 @@ export const MODEL_MATRIX = [
 export const BENCHMARK_ROUNDS = 3;
 ```
 
-Each model gets isolated message history via a unique agent ID:
-- `market_maker_xai_grok-4-fast-reasoning`
-- `market_maker_anthropic_claude-haiku-4.5`
-- `market_maker_openai_gpt-5-nano`
-
-## Example Output
-
-**Normal mode:**
-```
-agent_005 Model Matrix Benchmark
-================================
-
-Symbol: COINBASE_SPOT_ETH_USD
-Start Time: 2025-12-22T14:00:00.000Z
-Models: xai/grok-4-fast-reasoning, anthropic/claude-haiku-4.5, openai/gpt-5-nano
-Rounds: 3
-
-Round 1/3 (2025-12-22T14:00:00.000Z)
-  xai/grok-4-fast-reasoning: Brier=0.187, DeltaMAE=0.0012, EV=0.0003, PnL=0.0002
-  anthropic/claude-haiku-4.5: Brier=0.201, DeltaMAE=0.0015, EV=0.0002, PnL=0.0001
-  openai/gpt-5-nano: Brier=0.195, DeltaMAE=0.0011, EV=0.0004, PnL=0.0003
-
-Round 2/3 (2025-12-22T14:15:00.000Z)
-  ...
-
-+----------------------------------------------------------------------+
-|           agent_005 Benchmark Results (3 rounds)                      |
-+---------------------------+-------+--------+--------+--------+--------+
-|           Model           | Brier |DeltaMAE| Mean EV|Mean PnL| EV-PnL |
-+---------------------------+-------+--------+--------+--------+--------+
-| xai/grok-4-fast-reasoning | 0.187 | 0.0012 | 0.0003 | 0.0002 | +0.0001|
-| anthropic/claude-haiku-4.5| 0.201 | 0.0015 | 0.0002 | 0.0001 | +0.0001|
-| openai/gpt-5-nano         | 0.195 | 0.0011 | 0.0004 | 0.0003 | +0.0001|
-+---------------------------+-------+--------+--------+--------+--------+
-| Winner: xai/grok-4-fast-reasoning (lowest Brier score)                |
-+----------------------------------------------------------------------+
-```
-
-**Verbose mode (`--verbose`):**
-```
-agent_005 Model Matrix Benchmark
-================================
-
-Round 1/3 (2025-12-22T14:00:00.000Z)
-
-  xai/grok-4-fast-reasoning:
-    Fill Predictions: {"bid-fill-1m":0.15,"bid-fill-5m":0.35,...}
-    Delta Predictions: {"bid-delta-mid-1m":0.0005,"bid-delta-mid-5m":0.0012,...}
-    Brier=0.187, DeltaMAE=0.0012, EV=0.0003, PnL=0.0002
-
-  anthropic/claude-haiku-4.5:
-    Fill Predictions: {"bid-fill-1m":0.12,"bid-fill-5m":0.30,...}
-    Delta Predictions: {"bid-delta-mid-1m":0.0003,"bid-delta-mid-5m":0.0008,...}
-    Brier=0.201, DeltaMAE=0.0015, EV=0.0002, PnL=0.0001
-  ...
-```
-
-## Orderbook Interpretation
-
-The agent receives orderbook state and learns to interpret:
-
-| Signal | Meaning | Fill Implication |
-|--------|---------|------------------|
-| **Positive imbalance (+)** | More bid depth, buying pressure | Asks more likely to fill |
-| **Negative imbalance (-)** | More ask depth, selling pressure | Bids more likely to fill |
-| **Tight spread** | Stable prices | Lower fill probability |
-| **Wide spread** | Higher volatility | Higher fill probability |
-
-## Chart Analysis
-
-The agent receives two signed chart URLs with full technical indicators:
-
-| Chart | Lookback | Timeframe | Purpose |
-|-------|----------|-----------|---------|
-| 4h/5m | 4 hours | 5-minute candles | Short-term momentum |
-| 24h/15m | 24 hours | 15-minute candles | Medium-term trend |
-
-**Indicators:** SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, SuperTrend(10,3), RSI(14), MACD(12,26,9), Stochastic RSI(14,3,3), ADX(14), CMF(20), Choppiness(14), Volume, Volume Ratio(20)
-
-## Scoring Metrics
-
-**Fill Probability (Leg 1):**
-
-| Metric | Description | Range |
-|--------|-------------|-------|
-| **Brier Score** | Mean squared error of probabilities | 0 (perfect) to 1 (worst) |
-| **Log Loss** | Cross-entropy loss | 0 (perfect) to +inf |
-| **Accuracy** | Correct predictions at 0.5 threshold | 0% to 100% |
-| **Monotonicity Violations** | Count of constraint breaches | 0 (perfect) |
-
-**Conditional Price Move (Leg 2):**
-
-| Metric | Description | Range |
-|--------|-------------|-------|
-| **Delta MAE** | Mean absolute error of delta-mid predictions | 0 (perfect) to +inf |
-| **Delta MSE** | Mean squared error | 0 (perfect) to +inf |
-| **Delta Bias** | Mean signed error (systematic over/under prediction) | -inf to +inf (0 = unbiased) |
-
-**Expected Value and PnL (Leg 3 + Derived):**
-
-| Metric | Description | Range |
-|--------|-------------|-------|
-| **Mean EV** | Derived expected value per decision | -inf to +inf |
-| **Mean PnL** | Realized profit/loss per decision | -inf to +inf |
-| **EV-PnL Gap** | Difference between predicted and realized value | -inf to +inf (0 = calibrated) |
+Each model gets isolated message history via a unique agent ID.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     pnpm benchmark                          │
-│                    (--verbose flag)                         │
 └───────────────────────────┬─────────────────────────────────┘
                             │
               ┌─────────────┴─────────────┐
@@ -285,9 +204,6 @@ The agent receives two signed chart URLs with full technical indicators:
     │  ┌───────────────────┐  │                 │
     │  │ Chart Images (2x) │  │                 │
     │  │ Orderbook State   │  │                 │
-    │  │ (mid, spread,     │  │                 │
-    │  │  imbalance, bid,  │  │                 │
-    │  │  ask)             │  │                 │
     │  └───────────────────┘  │                 │
     │           │             │                 │
     │           ▼             │                 │
@@ -301,6 +217,7 @@ The agent receives two signed chart URLs with full technical indicators:
     │     Predictions     │       │   Ground Truth      │
     │  • Fill probs       │       │  • Fill events      │
     │  • Delta-mid values │       │  • Mid prices       │
+    │    (ATR-clipped)    │       │  • ATR per horizon  │
     └─────────┬───────────┘       └─────────┬───────────┘
               │                             │
               └──────────────┬──────────────┘
@@ -311,9 +228,9 @@ The agent receives two signed chart URLs with full technical indicators:
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
 │   LEG 1: Fill   │ │  LEG 2: Delta   │ │   LEG 3: PnL    │
 │   Probability   │ │   Mid Scorer    │ │   Calculator    │
-│  • Brier Score  │ │  • MAE          │ │  • Per-decision │
-│  • Log Loss     │ │  • MSE          │ │  • Aggregated   │
-│  • Accuracy     │ │  • Bias         │ │                 │
+│  • Brier Score  │ │  • Normalized   │ │  • Per-decision │
+│  • Accuracy     │ │    MAE (÷ATR)   │ │  • Per-side     │
+│                 │ │  • Per-side     │ │                 │
 └────────┬────────┘ └────────┬────────┘ └────────┬────────┘
          │                   │                   │
          └───────────────────┼───────────────────┘
@@ -321,16 +238,22 @@ The agent receives two signed chart URLs with full technical indicators:
                              ▼
                ┌─────────────────────────┐
                │    EV Calculator        │
-               │  EV = p_fill × delta    │
+               │  EV = p_fill × δ_clipped│
                │       - fees            │
                └───────────┬─────────────┘
                            │
                            ▼
                ┌─────────────────────────┐
-               │   Combined Results      │
-               │  • Brier, DeltaMAE      │
-               │  • Mean EV, Mean PnL    │
-               │  • EV-PnL Gap           │
+               │   Quintile Analyzer     │
+               │  Calibration by EV      │
+               │  confidence bucket      │
+               └───────────┬─────────────┘
+                           │
+                           ▼
+               ┌─────────────────────────┐
+               │   Results + Tables      │
+               │  • Main summary         │
+               │  • Per-model quintiles  │
                └─────────────────────────┘
 ```
 
@@ -338,27 +261,22 @@ The agent receives two signed chart URLs with full technical indicators:
 
 | File | Purpose |
 |------|---------|
-| `src/benchmark.ts` | CLI benchmark entry point with matrix + --verbose support |
-| `src/matrix.ts` | **Model matrix configuration (MODEL_MATRIX, BENCHMARK_ROUNDS)** |
-| `src/market-maker.ts` | Market maker agent definition + `createMarketMaker()` factory |
-| `src/results.ts` | **Benchmark result types and summary calculations** |
-| `src/table.ts` | **ASCII table formatter for comparison output** |
+| `src/benchmark.ts` | CLI benchmark entry point |
+| `src/matrix.ts` | Model matrix configuration |
+| `src/market-maker.ts` | Market maker agent definition |
+| `src/results.ts` | Result types and summary calculations |
+| `src/table.ts` | ASCII table formatter with bid/ask split |
 | `src/clock-state.ts` | Simulation time management |
-| `src/ground-truth/fill-checker.ts` | **Fill simulation from trade data** |
-| `src/replay-lab/client.ts` | Replay Lab API client |
-| `src/replay-lab/trades.ts` | **Tick-by-tick trade data with taker_side** |
-| `src/replay-lab/mid-price.ts` | **Mid price computation from trade data** |
-| `src/replay-lab/charts.ts` | Chart URL signing |
-| `src/replay-lab/orderbook.ts` | Orderbook data (mid, spread, imbalance, bid, ask) |
-| `src/scorers/` | Brier, log loss, monotonicity, aggregate scorers |
-| `src/scorers/delta-mid-scorer.ts` | **MAE, MSE, bias for delta-mid predictions** |
-| `src/scorers/pnl-calculator.ts` | **PnL calculation logic** |
-| `src/scorers/ev-calculator.ts` | **EV derivation from predictions** |
-| `src/app/api/play/route.ts` | Next.js API route for web interface |
+| `src/ground-truth/fill-checker.ts` | Fill simulation from trade data |
+| `src/replay-lab/atr-calculator.ts` | **ATR calculation for normalization** |
+| `src/replay-lab/trades.ts` | Tick-by-tick trade data |
+| `src/replay-lab/mid-price.ts` | Mid price computation |
+| `src/scorers/delta-mid-scorer.ts` | **Normalized MAE with per-side breakdown** |
+| `src/scorers/pnl-calculator.ts` | PnL calculation logic |
+| `src/scorers/ev-calculator.ts` | **EV with ATR clipping ([-3,+3] ATR)** |
+| `src/scorers/quintile-analyzer.ts` | **EV calibration analysis** |
 
 ## Environment Variables
-
-Create `.env.local`:
 
 ```bash
 DATABASE_URL=postgresql://localhost:5432/nullagent
@@ -370,28 +288,18 @@ SIMULATION_START_TIME=2025-12-22T14:00:00Z
 SYMBOL_ID=COINBASE_SPOT_ETH_USD
 ```
 
-**Note:** `MODEL_ID` is no longer required when using the matrix benchmark. The benchmark iterates through models defined in `src/matrix.ts`.
-
 ## Test Coverage
 
 ```
-155 tests passing
-97.39% line coverage
-93.89% branch coverage
-100% function coverage
+289 tests passing
+94%+ line coverage
 ```
 
-## Future Extensions
+## What This Is Not
 
-Per the design document (`docs/plans/2025-12-29-agent-005-ev-benchmark-design.md`):
+This is not:
+- Overengineered
+- Academic
+- A demo
 
-- **Phase 4:** Adverse selection scoring (measure systematic losses when filled)
-- **Phase 5:** Queue position modeling (realistic fill timing based on queue depth)
-
-## When to Use This Pattern
-
-- Probability forecasting with deterministic ground truth from data
-- Multi-output predictions with monotonicity constraints
-- Integrating external data sources (charts, orderbooks, trades)
-- Time-series simulation with clock management
-- HFT/market-making strategy research
+This is a correct, honest system that tells uncomfortable truths about model capability. It's the substrate required for model-vs-model performance learning and meta-allocation systems.

@@ -3,10 +3,25 @@
  *
  * Calculates expected value based on fill probability and price predictions.
  * EV is a standard financial term and should not be expanded.
+ *
+ * IMPORTANT: Delta-mid predictions are clipped to [-MAX_ATR_MULTIPLE, +MAX_ATR_MULTIPLE] * ATR
+ * to prevent hallucinated magnitude from dominating EV calculations. This constraint mirrors
+ * real trading systems where position limits and risk controls prevent unbounded exposure.
  */
 // eslint-disable-next-line eslint-comments/disable-enable-pair -- File-wide disable for domain term
 /* eslint-disable unicorn/prevent-abbreviations -- EV is a standard financial term */
 import { FIXED_FEE } from './types';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maximum ATR multiple for delta-mid clipping.
+ * Predictions beyond [-3, +3] ATR are clipped to this range.
+ * This prevents hallucinated magnitude from dominating EV calculations.
+ */
+export const MAX_ATR_MULTIPLE = 3;
 
 // ============================================================================
 // Types
@@ -83,19 +98,41 @@ export function calculateEV(input: EVInput): EVResult {
 }
 
 /**
+ * Clip a delta-mid prediction to a reasonable ATR-normalized range.
+ * Without clipping, models can hallucinate arbitrarily large values that
+ * dominate EV calculations, making directional skill meaningless.
+ *
+ * @param deltaMid - Raw delta-mid prediction
+ * @param atr - ATR value for the contract (undefined means no clipping)
+ * @returns Clipped delta-mid value
+ */
+export function clipDeltaMid(deltaMid: number, atr: number | undefined): number {
+  if (atr === undefined || atr <= 0) {
+    return deltaMid;
+  }
+  const maxDelta = MAX_ATR_MULTIPLE * atr;
+  return Math.max(-maxDelta, Math.min(maxDelta, deltaMid));
+}
+
+/**
  * Calculate EV for all 6 contracts (bid/ask x 1m/5m/15m)
+ *
+ * Delta-mid predictions are clipped to [-3, +3] ATR before EV calculation.
+ * This prevents hallucinated magnitude from dominating results.
  *
  * @param fillPredictions - Record mapping contract IDs to fill probabilities
  * @param deltaMidPredictions - Record mapping contract IDs to delta-mid predictions
  * @param fillPrices - Object containing best bid and ask prices
  * @param fillPrices.bestBid - Best bid price at prediction time
  * @param fillPrices.bestAsk - Best ask price at prediction time
+ * @param deltaMidATRs - Optional ATR values for clipping delta-mid predictions
  * @returns Array of EVResult for all 6 contracts
  */
 export function calculateAllEV(
   fillPredictions: Record<string, number>,
   deltaMidPredictions: Record<string, number>,
-  fillPrices: { bestBid: number; bestAsk: number }
+  fillPrices: { bestBid: number; bestAsk: number },
+  deltaMidATRs?: Record<string, number | undefined>
 ): EVResult[] {
   const sides: Side[] = ['bid', 'ask'];
   const horizons: Horizon[] = ['1m', '5m', '15m'];
@@ -110,12 +147,17 @@ export function calculateAllEV(
       // eslint-disable-next-line security/detect-object-injection -- Contract IDs are constructed from known enum values
       const fillProb = fillPredictions[fillContractId];
       // eslint-disable-next-line security/detect-object-injection -- Contract IDs are constructed from known enum values
-      const deltaMid = deltaMidPredictions[deltaMidContractId];
+      const rawDeltaMid = deltaMidPredictions[deltaMidContractId];
       const fillPrice = side === 'bid' ? fillPrices.bestBid : fillPrices.bestAsk;
 
-      if (fillProb === undefined || deltaMid === undefined) {
+      if (fillProb === undefined || rawDeltaMid === undefined) {
         throw new Error(`Missing prediction for ${fillContractId} or ${deltaMidContractId}`);
       }
+
+      // Clip delta-mid to [-3, +3] ATR to prevent hallucinated magnitude
+      // eslint-disable-next-line security/detect-object-injection -- Contract IDs are constructed from known enum values
+      const atr = deltaMidATRs?.[deltaMidContractId];
+      const deltaMid = clipDeltaMid(rawDeltaMid, atr);
 
       results.push(
         calculateEV({
