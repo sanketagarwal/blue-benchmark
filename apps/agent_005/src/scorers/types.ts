@@ -59,6 +59,7 @@ export interface ForecastScorerInput {
   // Optional extended inputs for delta-mid, PnL, and EV calculations
   deltaMidPredictions?: Record<string, number>;
   deltaMidActuals?: Record<string, number | undefined>;
+  deltaMidATRs?: Record<string, number | undefined>;
   fillDetails?: Record<string, { filled: boolean; fillPrice?: number }>;
   exitMids?: Record<string, number | undefined>;
   fillPrices?: { bestBid: number; bestAsk: number };
@@ -150,7 +151,7 @@ export interface ForecastScoreResult extends ScorerResult {
   perContract: ContractScore[];
   violations: MonotonicityViolation[];
   // Optional extended results
-  deltaMidScores?: DeltaMidScorerResult;
+  deltaMidScores?: ExtendedDeltaMidScorerResult;
   pnlResults?: AggregatedPnL;
   evResults?: EVAggregate;
   evPnlGap?: EVPnLGapResult;

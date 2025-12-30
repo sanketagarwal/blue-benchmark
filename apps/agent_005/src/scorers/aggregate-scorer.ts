@@ -1,7 +1,7 @@
 import { defineScorer } from '@nullagent/scorers';
 
 import { brierScore, meanBrierScore } from './brier-scorer';
-import { scoreDeltaMidPredictions } from './delta-mid-scorer';
+import { scoreNormalizedDeltaMidPredictions } from './delta-mid-scorer';
 import { calculateAllEV, aggregateEV, calculateEVPnLGap } from './ev-calculator';
 import { logLoss, meanLogLoss } from './log-loss-scorer';
 import { checkMonotonicity } from './monotonicity-scorer';
@@ -101,12 +101,16 @@ function computeExtendedScores(
   result: ForecastScoreResult,
   input: ForecastScorerInput
 ): void {
-  const { predictions, deltaMidPredictions, deltaMidActuals, fillDetails, exitMids, fillPrices } =
+  const { predictions, deltaMidPredictions, deltaMidActuals, deltaMidATRs, fillDetails, exitMids, fillPrices } =
     input;
 
-  // Optional: Delta-mid scoring
+  // Optional: Delta-mid scoring with ATR normalization
   if (deltaMidPredictions !== undefined && deltaMidActuals !== undefined) {
-    result.deltaMidScores = scoreDeltaMidPredictions(deltaMidPredictions, deltaMidActuals);
+    result.deltaMidScores = scoreNormalizedDeltaMidPredictions(
+      deltaMidPredictions,
+      deltaMidActuals,
+      deltaMidATRs ?? {}
+    );
   }
 
   // Optional: PnL calculation

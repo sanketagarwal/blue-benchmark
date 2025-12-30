@@ -9,6 +9,7 @@ import {
 import { computeExtendedFillGroundTruth } from './ground-truth/fill-checker.js';
 import { createMarketMaker, setMarketMakerContext, clearMarketMakerContext } from './market-maker.js';
 import { MODEL_MATRIX, BENCHMARK_ROUNDS } from './matrix.js';
+import { getATRForHorizon } from './replay-lab/atr-calculator.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 import { getMidPriceAtTime, getMidPriceChange } from './replay-lab/mid-price.js';
 import { getOrderbookSnapshot, formatOrderbookForPrompt, getBestBidAsk } from './replay-lab/orderbook.js';
@@ -117,6 +118,42 @@ function computeExitMids(
   return result as Record<FillContractId, number | undefined>;
 }
 
+/**
+ * Computes ATR values for each delta-mid contract.
+ * Uses trades leading up to fill time for each filled contract.
+ *
+ * @param trades - Array of trades to compute ATR from
+ * @param fillDetails - Fill details for each contract from extended ground truth
+ * @returns Record mapping delta-mid contract IDs to ATR values
+ */
+function computeATRs(
+  trades: Trade[],
+  fillDetails: Record<string, FillCheckResult>
+): Record<DeltaMidContractId, number | undefined> {
+  const result: Record<string, number | undefined> = {};
+
+  const sides: Side[] = ['bid', 'ask'];
+  const horizons: Horizon[] = ['1m', '5m', '15m'];
+
+  for (const side of sides) {
+    for (const horizon of horizons) {
+      const fillContractId = `${side}-fill-${horizon}` as FillContractId;
+      const deltaMidContractId = `${side}-delta-mid-${horizon}` as DeltaMidContractId;
+      // eslint-disable-next-line security/detect-object-injection -- fillContractId is constructed from controlled enum values
+      const fillDetail = fillDetails[fillContractId];
+      const fillTime = fillDetail?.fillTime;
+
+      // eslint-disable-next-line security/detect-object-injection -- deltaMidContractId is constructed from controlled enum values
+      result[deltaMidContractId] =
+        fillDetail !== undefined && fillDetail.filled && fillTime !== undefined
+          ? getATRForHorizon(trades, fillTime, horizon)
+          : undefined;
+    }
+  }
+
+  return result as Record<DeltaMidContractId, number | undefined>;
+}
+
 async function runModelRound(
   modelId: ModelId,
   symbolId: string,
@@ -150,6 +187,9 @@ async function runModelRound(
   // Compute delta-mid ground truth for contracts where fill occurred
   const deltaMidActuals = computeDeltaMidActuals(trades, extendedGroundTruth.details);
 
+  // Compute ATR values for normalization
+  const deltaMidATRs = computeATRs(trades, extendedGroundTruth.details);
+
   // Compute exit mids for PnL calculation
   const exitMids = computeExitMids(trades, extendedGroundTruth.details);
 
@@ -161,6 +201,7 @@ async function runModelRound(
     // Extended inputs for delta-mid, PnL, and EV calculations
     deltaMidPredictions: output.predictions as Record<string, number>,
     deltaMidActuals: deltaMidActuals as Record<string, number | undefined>,
+    deltaMidATRs: deltaMidATRs as Record<string, number | undefined>,
     fillDetails: extendedGroundTruth.details as Record<string, { filled: boolean; fillPrice?: number }>,
     exitMids: exitMids as Record<string, number | undefined>,
     fillPrices: { bestBid, bestAsk },
