@@ -25,7 +25,6 @@ interface BestValues {
   brier: number;
   accuracy: number;
   deltaMAE: number | undefined;
-  meanPnL: number | undefined;
   meanEV: number | undefined;
   evPnLGap: number | undefined;
 }
@@ -80,14 +79,12 @@ function formatSigned(value: number, places = 4): string {
 function findBestValues(summaries: ModelSummary[]): BestValues {
   const definedDeltaMAE = summaries.map((s) => s.meanDeltaMAE).filter((v): v is number => v !== undefined);
   const definedMeanEV = summaries.map((s) => s.meanEV).filter((v): v is number => v !== undefined);
-  const definedMeanPnL = summaries.map((s) => s.meanPnL).filter((v): v is number => v !== undefined);
   const definedGap = summaries.map((s) => s.evPnLGap).filter((v): v is number => v !== undefined);
 
   return {
     brier: Math.min(...summaries.map((s) => s.meanBrier)),
     accuracy: Math.max(...summaries.map((s) => s.meanAccuracy)),
     deltaMAE: definedDeltaMAE.length > 0 ? Math.min(...definedDeltaMAE) : undefined,
-    meanPnL: definedMeanPnL.length > 0 ? Math.max(...definedMeanPnL) : undefined,
     meanEV: definedMeanEV.length > 0 ? Math.max(...definedMeanEV) : undefined,
     evPnLGap: definedGap.length > 0 ? definedGap.reduce((best, v) => (Math.abs(v) < Math.abs(best) ? v : best)) : undefined,
   };
@@ -111,7 +108,7 @@ function formatDeltaMAE(value: number | undefined, best: number | undefined): st
   return colorize(formatDecimal(value, 4), quality, value === best);
 }
 
-function formatMoneyMetric(value: number | undefined, best: number | undefined): string {
+function formatEV(value: number | undefined, best: number | undefined): string {
   if (value === undefined) {
     return chalk.dim('-');
   }
@@ -152,6 +149,9 @@ function printEVTable(
   winner: ModelSummary | undefined,
   best: BestValues
 ): void {
+  // Get the shared PnL baseline (same for all models)
+  const baselinePnL = summaries.find((s) => s.meanPnL !== undefined)?.meanPnL;
+
   const table = new Table({
     chars: {
       'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
@@ -159,14 +159,14 @@ function printEVTable(
       'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
       'right': '│', 'right-mid': '┤', 'middle': '│'
     },
-    colWidths: [28, 9, 9, 12, 12, 12, 12],
+    colWidths: [26, 9, 9, 12, 12, 12],
     wordWrap: true,
     style: { head: [], border: [] }
   });
 
   // Title row
   table.push([{
-    colSpan: 7,
+    colSpan: 6,
     content: chalk.bold(`agent_005 EV Benchmark Results (${String(totalRounds)} rounds)`),
     hAlign: 'center'
   }]);
@@ -175,9 +175,8 @@ function printEVTable(
   table.push([
     { content: '', hAlign: 'center' },
     { colSpan: 2, content: chalk.cyan.bold('Leg 1: Fill'), hAlign: 'center' },
-    { content: chalk.cyan.bold('Leg 2'), hAlign: 'center' },
-    { content: chalk.cyan.bold('Leg 3'), hAlign: 'center' },
-    { colSpan: 2, content: chalk.cyan.bold('Composite'), hAlign: 'center' },
+    { content: chalk.cyan.bold('Leg 2: Δ'), hAlign: 'center' },
+    { colSpan: 2, content: chalk.cyan.bold('Leg 3: Value'), hAlign: 'center' },
   ]);
 
   // Column header row
@@ -185,9 +184,8 @@ function printEVTable(
     { content: chalk.dim('Model'), hAlign: 'center' },
     { content: chalk.dim('Brier↓'), hAlign: 'center' },
     { content: chalk.dim('Acc↑'), hAlign: 'center' },
-    { content: chalk.dim('ΔMAE↓'), hAlign: 'center' },
-    { content: chalk.dim('PnL↑'), hAlign: 'center' },
-    { content: chalk.dim('EV↑'), hAlign: 'center' },
+    { content: chalk.dim('MAE↓'), hAlign: 'center' },
+    { content: chalk.dim('EV'), hAlign: 'center' },
     { content: chalk.dim('Gap→0'), hAlign: 'center' },
   ]);
 
@@ -201,17 +199,23 @@ function printEVTable(
       { content: formatBrier(s.meanBrier, best.brier), hAlign: 'right' },
       { content: formatAccuracy(s.meanAccuracy, best.accuracy), hAlign: 'right' },
       { content: formatDeltaMAE(s.meanDeltaMAE, best.deltaMAE), hAlign: 'right' },
-      { content: formatMoneyMetric(s.meanPnL, best.meanPnL), hAlign: 'right' },
-      { content: formatMoneyMetric(s.meanEV, best.meanEV), hAlign: 'right' },
+      { content: formatEV(s.meanEV, best.meanEV), hAlign: 'right' },
       { content: formatGap(s.evPnLGap, best.evPnLGap), hAlign: 'right' },
     ]);
   }
 
-  // Winner row
+  // Footer with baseline PnL and winner
+  const pnlText = baselinePnL === undefined
+    ? 'Realized PnL: -'
+    : `Realized PnL: ${formatSigned(baselinePnL)}`;
   const winnerText = winner === undefined
     ? NO_WINNER_TEXT
-    : `Winner: ${chalk.bold.green(winner.modelId)} (lowest Brier score)`;
-  table.push([{ colSpan: 7, content: winnerText, hAlign: 'left' }]);
+    : `Winner: ${chalk.bold.green(winner.modelId)}`;
+  table.push([{
+    colSpan: 6,
+    content: `${chalk.dim(pnlText)}  │  ${winnerText}`,
+    hAlign: 'left'
+  }]);
 
   // eslint-disable-next-line no-console -- CLI table output
   console.log(table.toString());

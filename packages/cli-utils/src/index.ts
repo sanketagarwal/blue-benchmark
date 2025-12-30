@@ -378,7 +378,7 @@ export class BenchmarkLogger {
     if (!this.verbose) {
       return;
     }
-    console.log(chalk.cyan(`\n  ${modelId}:`));
+    console.log(chalk.cyan(`  ${modelId}:`));
     console.log(chalk.gray(`    Predictions: ${JSON.stringify(predictions)}`));
   }
 
