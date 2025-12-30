@@ -65,5 +65,23 @@ describe('bottom-caller', () => {
       expect(prompt).toContain('bottom-24h');
       expect(prompt).toContain('bottom-7d');
     });
+
+    it('builds compaction prompt with round count', () => {
+      const agent = createBottomCaller('anthropic/claude-haiku-4.5');
+      const mockHistory = [{ role: 'user', content: 'test' }, { role: 'assistant', content: 'response' }];
+      const prompt = agent.definition.buildCompactionPrompt(mockHistory);
+      expect(prompt).toContain('2 rounds');
+      expect(prompt).toContain('learnings');
+    });
+
+    it('includes compaction summary in prompt when provided', () => {
+      const agent = createBottomCaller('anthropic/claude-haiku-4.5');
+      const prompt = agent.definition.buildRoundPrompt({
+        roundNumber: 10,
+        compactionSummary: 'Previous learnings: momentum divergence works well',
+      });
+      expect(prompt).toContain('Your past learnings:');
+      expect(prompt).toContain('momentum divergence works well');
+    });
   });
 });
