@@ -22,15 +22,44 @@ const CROSS = '+';
 const VERTICAL = '|';
 
 /**
- * Centers text within a given width
+ * Strips ANSI escape codes from text to get visual length
+ * @param text
+ */
+function stripAnsiCodes(text: string): string {
+  // eslint-disable-next-line no-control-regex -- ANSI escape code pattern
+  return text.replaceAll(/\u001B\[[\d;]*m/g, '');
+}
+
+/**
+ * Gets visual length of text (excluding ANSI codes)
+ * @param text
+ */
+function visualLength(text: string): number {
+  return stripAnsiCodes(text).length;
+}
+
+/**
+ * Right-pads text to width (accounting for ANSI codes)
+ * @param text
+ * @param width
+ */
+function padEndVisual(text: string, width: number): string {
+  const textWidth = visualLength(text);
+  const padding = width - textWidth;
+  return text + ' '.repeat(Math.max(0, padding));
+}
+
+/**
+ * Centers text within a given width (accounting for ANSI codes)
  * @param text
  * @param width
  */
 function padCenter(text: string, width: number): string {
-  const padding = width - text.length;
+  const textWidth = visualLength(text);
+  const padding = width - textWidth;
   const left = Math.floor(padding / 2);
   const right = padding - left;
-  return ' '.repeat(left) + text + ' '.repeat(right);
+  return ' '.repeat(Math.max(0, left)) + text + ' '.repeat(Math.max(0, right));
 }
 
 /**
@@ -223,7 +252,7 @@ export function printResultsTable(
 
   // Title
   const title = `agent_005 Benchmark Results (${String(totalRounds)} rounds)`;
-  const titleLine = VERTICAL + padCenter(chalk.bold(title), totalWidth - 2 + 8) + VERTICAL;
+  const titleLine = VERTICAL + padCenter(chalk.bold(title), totalWidth - 2) + VERTICAL;
 
   // Build layout based on mode
   const layout = hasExpectedValueMetrics
@@ -240,7 +269,7 @@ export function printResultsTable(
     winner === undefined
       ? 'No winner determined'
       : `Winner: ${chalk.bold.green(winner.modelId)} (lowest Brier score)`;
-  const winnerLine = VERTICAL + ' ' + winnerText.padEnd(totalWidth - 3 + 16) + VERTICAL;
+  const winnerLine = VERTICAL + ' ' + padEndVisual(winnerText, totalWidth - 4) + VERTICAL;
 
   // Print table
   /* eslint-disable no-console -- CLI table output */
@@ -288,17 +317,17 @@ function buildEVLayout(totalWidth: number): TableLayout {
 
   const header =
     VERTICAL +
-    padCenter(chalk.dim('Model'), COL_WIDTH_MODEL + 8) +
+    padCenter(chalk.dim('Model'), COL_WIDTH_MODEL) +
     VERTICAL +
-    padCenter(chalk.dim('Brier'), COL_WIDTH_METRIC + 8) +
+    padCenter(chalk.dim('Brier'), COL_WIDTH_METRIC) +
     VERTICAL +
-    padCenter(chalk.dim('DeltaMAE'), COL_WIDTH_EV_METRIC + 8) +
+    padCenter(chalk.dim('DeltaMAE'), COL_WIDTH_EV_METRIC) +
     VERTICAL +
-    padCenter(chalk.dim('Mean EV'), COL_WIDTH_EV_METRIC + 8) +
+    padCenter(chalk.dim('Mean EV'), COL_WIDTH_EV_METRIC) +
     VERTICAL +
-    padCenter(chalk.dim('Mean PnL'), COL_WIDTH_EV_METRIC + 8) +
+    padCenter(chalk.dim('Mean PnL'), COL_WIDTH_EV_METRIC) +
     VERTICAL +
-    padCenter(chalk.dim('EV-PnL'), COL_WIDTH_EV_METRIC + 8) +
+    padCenter(chalk.dim('EV-PnL'), COL_WIDTH_EV_METRIC) +
     VERTICAL;
 
   const headerSeparator =
@@ -353,13 +382,13 @@ function buildBasicLayout(totalWidth: number): TableLayout {
 
   const header =
     VERTICAL +
-    padCenter(chalk.dim('Model'), COL_WIDTH_MODEL + 8) +
+    padCenter(chalk.dim('Model'), COL_WIDTH_MODEL) +
     VERTICAL +
-    padCenter(chalk.dim('Brier'), COL_WIDTH_METRIC + 8) +
+    padCenter(chalk.dim('Brier'), COL_WIDTH_METRIC) +
     VERTICAL +
-    padCenter(chalk.dim('LogLoss'), COL_WIDTH_METRIC + 8) +
+    padCenter(chalk.dim('LogLoss'), COL_WIDTH_METRIC) +
     VERTICAL +
-    padCenter(chalk.dim('Accuracy'), COL_WIDTH_METRIC + 8) +
+    padCenter(chalk.dim('Accuracy'), COL_WIDTH_METRIC) +
     VERTICAL;
 
   const headerSeparator =
@@ -401,7 +430,7 @@ function buildEVDataRows(
   return summaries.map((s) => {
     const isWinner = winner !== undefined && s.modelId === winner.modelId;
     const modelName = isWinner ? chalk.bold.cyan(s.modelId) : chalk.cyan(s.modelId);
-    const modelCell = ' ' + modelName.padEnd(COL_WIDTH_MODEL - 1 + (isWinner ? 16 : 8));
+    const modelCell = ' ' + padEndVisual(modelName, COL_WIDTH_MODEL - 2);
 
     const brierCell = formatColoredCell(
       formatBrierWithColor(s.meanBrier, s.meanBrier === best.brier),
@@ -458,7 +487,7 @@ function buildBasicDataRows(
   return summaries.map((s) => {
     const isWinner = winner !== undefined && s.modelId === winner.modelId;
     const modelName = isWinner ? chalk.bold.cyan(s.modelId) : chalk.cyan(s.modelId);
-    const modelCell = ' ' + modelName.padEnd(COL_WIDTH_MODEL - 1 + (isWinner ? 16 : 8));
+    const modelCell = ' ' + padEndVisual(modelName, COL_WIDTH_MODEL - 2);
 
     const brierColored = formatBrierWithColor(s.meanBrier, s.meanBrier === best.brier);
     const logLossFormatted = formatDecimal(s.meanLogLoss);
@@ -489,14 +518,8 @@ function buildBasicDataRows(
  * @param width
  */
 function formatColoredCell(coloredText: string, width: number): string {
-  // Strip ANSI codes to get actual text length
-  const stripAnsi = coloredText.replaceAll(
-    // eslint-disable-next-line no-control-regex -- ANSI escape code pattern
-    /\u001B\[[\d;]*m/g,
-    ''
-  );
-  const textLength = stripAnsi.length;
-  const padding = width - 1 - textLength;
+  const textWidth = visualLength(coloredText);
+  const padding = width - 1 - textWidth;
   return ' '.repeat(Math.max(0, padding)) + coloredText + ' ';
 }
 /* eslint-enable no-restricted-syntax, jsdoc/require-returns, jsdoc/require-param-description, @typescript-eslint/no-use-before-define, unicorn/no-array-reduce -- Re-enable after CLI table output */
