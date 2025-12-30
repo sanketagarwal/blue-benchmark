@@ -132,9 +132,12 @@ async function runModelRound(
   const result = await runRound(marketMaker);
   const output = result.output;
 
-  // Fetch trades from prediction time to +15 minutes (covers all horizons)
-  const horizonEnd = new Date(predictionTime.getTime() + 15 * 60 * 1000);
-  const trades = await getTrades(symbolId, predictionTime, horizonEnd);
+  // Fetch trades from prediction time to +30 minutes
+  // This covers: max fill horizon (15m) + max exit horizon (15m) = 30m total
+  // Exit mid is computed at fillTime + horizon, so a fill at minute 14 with 15m horizon
+  // needs trade data at minute 29
+  const tradeWindowEnd = new Date(predictionTime.getTime() + 30 * 60 * 1000);
+  const trades = await getTrades(symbolId, predictionTime, tradeWindowEnd);
 
   // Compute extended fill ground truth using best bid/ask from orderbook
   const extendedGroundTruth = computeExtendedFillGroundTruth(

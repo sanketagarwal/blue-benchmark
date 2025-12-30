@@ -149,6 +149,17 @@ export function calculateAllPnL(
     // eslint-disable-next-line security/detect-object-injection -- contractId is from controlled CONTRACT_MAPPING
     const exitMid = exitMids[contractId];
 
+    // If filled but missing exit data, treat as unfilled for PnL purposes
+    // This can happen when trade data is sparse at exit time
+    if (filled && (fillPrice === undefined || exitMid === undefined)) {
+      return {
+        side,
+        horizon,
+        filled: false,
+        pnl: 0,
+      };
+    }
+
     // Handle the case where fillPrice might be undefined
     const input: PnLInput = {
       side,
