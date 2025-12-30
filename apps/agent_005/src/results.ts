@@ -18,16 +18,31 @@ export interface BenchmarkResults {
   models: ModelResults[];
 }
 
+export interface PerSideMetrics {
+  meanNormalizedMAE: number;
+  meanEV: number;
+  meanPnL: number;
+  fillCount: number;
+}
+
 export interface ModelSummary {
   modelId: ModelId;
   meanBrier: number;
   meanLogLoss: number;
   meanAccuracy: number;
-  // EV benchmark metrics (optional - only present if ExtendedForecastScoreResult used)
-  meanDeltaMAE?: number;
+  // EV benchmark metrics (optional)
+  meanNormalizedDeltaMAE?: number; // Renamed from meanDeltaMAE
   meanEV?: number;
   meanPnL?: number;
   evPnLGap?: number;
+  // Per-side breakdown
+  bidMetrics?: PerSideMetrics;
+  askMetrics?: PerSideMetrics;
+  // Fill counts for low-sample warnings
+  fillCounts?: {
+    bid: Record<'1m' | '5m' | '15m', number>;
+    ask: Record<'1m' | '5m' | '15m', number>;
+  };
 }
 
 /**
@@ -48,11 +63,31 @@ function hasExtendedMetrics(score: ForecastScoreResult): boolean {
  * Aggregates extended EV metrics from a single round's score
  */
 interface ExtendedMetricsTotals {
-  totalDeltaMAE: number;
+  totalNormalizedDeltaMAE: number; // Renamed from totalDeltaMAE
   totalExpectedValue: number;
   totalPnL: number;
   totalExpectedValuePnLGap: number;
   extendedRoundsCount: number;
+  // Per-side totals
+  bidTotals: {
+    normalizedMAE: number;
+    ev: number;
+    pnl: number;
+    fills: number;
+    rounds: number;
+  };
+  askTotals: {
+    normalizedMAE: number;
+    ev: number;
+    pnl: number;
+    fills: number;
+    rounds: number;
+  };
+  // Fill counts by side and horizon (accumulated across rounds)
+  fillCounts: {
+    bid: Record<'1m' | '5m' | '15m', number>;
+    ask: Record<'1m' | '5m' | '15m', number>;
+  };
 }
 
 /**
@@ -64,7 +99,6 @@ function aggregateExtendedMetrics(
   score: ForecastScoreResult,
   totals: ExtendedMetricsTotals
 ): void {
-  // These are guaranteed to be defined due to hasExtendedMetrics check
   if (
     score.deltaMidScores === undefined ||
     score.evResults === undefined ||
@@ -74,15 +108,53 @@ function aggregateExtendedMetrics(
     return;
   }
 
-  totals.totalDeltaMAE += score.deltaMidScores.aggregates.meanMAE;
+  // Aggregate normalized delta-mid MAE (changed from raw meanMAE)
+  totals.totalNormalizedDeltaMAE += score.deltaMidScores.aggregates.meanNormalizedMAE;
   totals.totalExpectedValuePnLGap += score.evPnlGap.gap;
   totals.extendedRoundsCount++;
 
-  // Use pre-aggregated mean EV
   totals.totalExpectedValue += score.evResults.meanEV;
-
-  // Use pre-aggregated mean PnL
   totals.totalPnL += score.pnlResults.meanPnL;
+
+  // Per-side delta-mid
+  const bidDelta = score.deltaMidScores.aggregates.bySide.bid;
+  const askDelta = score.deltaMidScores.aggregates.bySide.ask;
+
+  if (bidDelta.sampleCount > 0) {
+    totals.bidTotals.normalizedMAE += bidDelta.meanNormalizedMAE;
+    totals.bidTotals.rounds++;
+  }
+  if (askDelta.sampleCount > 0) {
+    totals.askTotals.normalizedMAE += askDelta.meanNormalizedMAE;
+    totals.askTotals.rounds++;
+  }
+
+  // Per-side EV
+  totals.bidTotals.ev += score.evResults.evBySide.bid;
+  totals.askTotals.ev += score.evResults.evBySide.ask;
+
+  // Per-side PnL
+  totals.bidTotals.pnl += score.pnlResults.pnlBySide.bid;
+  totals.askTotals.pnl += score.pnlResults.pnlBySide.ask;
+
+  // Fill counts by side and horizon
+  totals.bidTotals.fills += bidDelta.sampleCount;
+  totals.askTotals.fills += askDelta.sampleCount;
+
+  // Accumulate per-horizon fill counts from deltaMidScores
+  for (const scoreItem of score.deltaMidScores.scores) {
+    const contractId = scoreItem.contractId;
+    const isBid = contractId.startsWith('bid');
+    const sideCounters = isBid ? totals.fillCounts.bid : totals.fillCounts.ask;
+
+    if (contractId.endsWith('-1m')) {
+      sideCounters['1m']++;
+    } else if (contractId.endsWith('-5m')) {
+      sideCounters['5m']++;
+    } else if (contractId.endsWith('-15m')) {
+      sideCounters['15m']++;
+    }
+  }
 }
 
 export function calculateModelSummary(results: ModelResults): ModelSummary {
@@ -101,13 +173,18 @@ export function calculateModelSummary(results: ModelResults): ModelSummary {
   let totalLogLoss = 0;
   let totalAccuracy = 0;
 
-  // EV metrics accumulators
   const extendedTotals: ExtendedMetricsTotals = {
-    totalDeltaMAE: 0,
+    totalNormalizedDeltaMAE: 0,
     totalExpectedValue: 0,
     totalPnL: 0,
     totalExpectedValuePnLGap: 0,
     extendedRoundsCount: 0,
+    bidTotals: { normalizedMAE: 0, ev: 0, pnl: 0, fills: 0, rounds: 0 },
+    askTotals: { normalizedMAE: 0, ev: 0, pnl: 0, fills: 0, rounds: 0 },
+    fillCounts: {
+      bid: { '1m': 0, '5m': 0, '15m': 0 },
+      ask: { '1m': 0, '5m': 0, '15m': 0 },
+    },
   };
 
   for (const round of rounds) {
@@ -115,7 +192,6 @@ export function calculateModelSummary(results: ModelResults): ModelSummary {
     totalLogLoss += round.score.aggregates.meanLogLoss;
     totalAccuracy += round.score.aggregates.accuracy;
 
-    // Aggregate EV metrics if present
     if (hasExtendedMetrics(round.score)) {
       aggregateExtendedMetrics(round.score, extendedTotals);
     }
@@ -128,13 +204,35 @@ export function calculateModelSummary(results: ModelResults): ModelSummary {
     meanAccuracy: totalAccuracy / rounds.length,
   };
 
-  // Add EV metrics if any rounds had them
   if (extendedTotals.extendedRoundsCount > 0) {
     const count = extendedTotals.extendedRoundsCount;
-    baseSummary.meanDeltaMAE = extendedTotals.totalDeltaMAE / count;
+    baseSummary.meanNormalizedDeltaMAE = extendedTotals.totalNormalizedDeltaMAE / count;
     baseSummary.meanEV = extendedTotals.totalExpectedValue / count;
     baseSummary.meanPnL = extendedTotals.totalPnL / count;
     baseSummary.evPnLGap = extendedTotals.totalExpectedValuePnLGap / count;
+
+    // Per-side metrics
+    baseSummary.bidMetrics = {
+      meanNormalizedMAE:
+        extendedTotals.bidTotals.rounds > 0
+          ? extendedTotals.bidTotals.normalizedMAE / extendedTotals.bidTotals.rounds
+          : 0,
+      meanEV: extendedTotals.bidTotals.ev / count,
+      meanPnL: extendedTotals.bidTotals.pnl / count,
+      fillCount: extendedTotals.bidTotals.fills,
+    };
+
+    baseSummary.askMetrics = {
+      meanNormalizedMAE:
+        extendedTotals.askTotals.rounds > 0
+          ? extendedTotals.askTotals.normalizedMAE / extendedTotals.askTotals.rounds
+          : 0,
+      meanEV: extendedTotals.askTotals.ev / count,
+      meanPnL: extendedTotals.askTotals.pnl / count,
+      fillCount: extendedTotals.askTotals.fills,
+    };
+
+    baseSummary.fillCounts = extendedTotals.fillCounts;
   }
 
   return baseSummary;

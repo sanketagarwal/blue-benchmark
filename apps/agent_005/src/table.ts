@@ -77,7 +77,7 @@ function formatSigned(value: number, places = 4): string {
 }
 
 function findBestValues(summaries: ModelSummary[]): BestValues {
-  const definedDeltaMAE = summaries.map((s) => s.meanDeltaMAE).filter((v): v is number => v !== undefined);
+  const definedDeltaMAE = summaries.map((s) => s.meanNormalizedDeltaMAE).filter((v): v is number => v !== undefined);
   const definedMeanEV = summaries.map((s) => s.meanEV).filter((v): v is number => v !== undefined);
   const definedGap = summaries.map((s) => s.evPnLGap).filter((v): v is number => v !== undefined);
 
@@ -130,7 +130,7 @@ export function printResultsTable(
   totalRounds: number,
   winner: ModelSummary | undefined
 ): void {
-  const hasEVMetrics = summaries.some((s) => s.meanDeltaMAE !== undefined);
+  const hasEVMetrics = summaries.some((s) => s.meanNormalizedDeltaMAE !== undefined);
   const best = findBestValues(summaries);
 
   // eslint-disable-next-line no-console -- CLI output
@@ -198,7 +198,7 @@ function printEVTable(
       { content: modelName, hAlign: 'left' },
       { content: formatBrier(s.meanBrier, best.brier), hAlign: 'right' },
       { content: formatAccuracy(s.meanAccuracy, best.accuracy), hAlign: 'right' },
-      { content: formatDeltaMAE(s.meanDeltaMAE, best.deltaMAE), hAlign: 'right' },
+      { content: formatDeltaMAE(s.meanNormalizedDeltaMAE, best.deltaMAE), hAlign: 'right' },
       { content: formatEV(s.meanEV, best.meanEV), hAlign: 'right' },
       { content: formatGap(s.evPnLGap, best.evPnLGap), hAlign: 'right' },
     ]);
