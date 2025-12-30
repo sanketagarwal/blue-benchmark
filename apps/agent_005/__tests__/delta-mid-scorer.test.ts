@@ -5,6 +5,7 @@ import {
   signedError,
   scoreDeltaMidPrediction,
   scoreDeltaMidPredictions,
+  scoreNormalizedDeltaMidPredictions,
 } from '../src/scorers/delta-mid-scorer';
 import type { DeltaMidContractId } from '../src/scorers/types';
 
@@ -211,6 +212,65 @@ describe('Delta-Mid Scorer', () => {
       const result = scoreDeltaMidPredictions(predictions, actuals);
 
       expect(result.aggregates.meanBias).toBe(-5);
+    });
+  });
+
+  describe('scoreNormalizedDeltaMidPredictions', () => {
+    it('normalizes errors by ATR', () => {
+      const predictions: Record<string, number> = {
+        'bid-delta-mid-1m': 10,
+      };
+      const actuals: Record<string, number | undefined> = {
+        'bid-delta-mid-1m': 5,
+      };
+      const atrs: Record<string, number | undefined> = {
+        'bid-delta-mid-1m': 10, // ATR = 10, so normalized error = 5/10 = 0.5
+      };
+
+      const result = scoreNormalizedDeltaMidPredictions(predictions, actuals, atrs);
+
+      expect(result.scores[0].normalizedError).toBe(0.5);
+      expect(result.scores[0].normalizedSignedError).toBe(0.5);
+      expect(result.aggregates.meanNormalizedMAE).toBe(0.5);
+    });
+
+    it('reports per-side metrics', () => {
+      const predictions: Record<string, number> = {
+        'bid-delta-mid-1m': 10,
+        'ask-delta-mid-1m': -10,
+      };
+      const actuals: Record<string, number | undefined> = {
+        'bid-delta-mid-1m': 5, // Error: 5
+        'ask-delta-mid-1m': -2, // Error: 8
+      };
+      const atrs: Record<string, number | undefined> = {
+        'bid-delta-mid-1m': 10,
+        'ask-delta-mid-1m': 10,
+      };
+
+      const result = scoreNormalizedDeltaMidPredictions(predictions, actuals, atrs);
+
+      expect(result.aggregates.bySide.bid.meanNormalizedMAE).toBe(0.5);
+      expect(result.aggregates.bySide.ask.meanNormalizedMAE).toBe(0.8);
+      expect(result.aggregates.bySide.bid.sampleCount).toBe(1);
+      expect(result.aggregates.bySide.ask.sampleCount).toBe(1);
+    });
+
+    it('handles missing ATR gracefully', () => {
+      const predictions: Record<string, number> = {
+        'bid-delta-mid-1m': 10,
+      };
+      const actuals: Record<string, number | undefined> = {
+        'bid-delta-mid-1m': 5,
+      };
+      const atrs: Record<string, number | undefined> = {
+        'bid-delta-mid-1m': undefined,
+      };
+
+      const result = scoreNormalizedDeltaMidPredictions(predictions, actuals, atrs);
+
+      expect(result.scores[0].normalizedError).toBeUndefined();
+      expect(result.aggregates.meanNormalizedMAE).toBe(0); // No valid normalized samples
     });
   });
 });

@@ -266,6 +266,37 @@ export interface DeltaMidContractScore {
 }
 
 /**
+ * Extended delta-mid contract score with normalization
+ */
+export interface ExtendedDeltaMidContractScore extends DeltaMidContractScore {
+  atr: number | undefined;
+  normalizedError: number | undefined; // absoluteError / ATR
+  normalizedSignedError: number | undefined; // signedError / ATR
+}
+
+/**
+ * Extended delta-mid aggregates with normalization and per-side breakdown
+ */
+export interface ExtendedDeltaMidAggregates extends DeltaMidAggregates {
+  // Normalized metrics (ATR-relative)
+  meanNormalizedMAE: number;
+  meanNormalizedBias: number;
+  // Per-side breakdown
+  bySide: {
+    bid: { meanNormalizedMAE: number; meanNormalizedBias: number; sampleCount: number };
+    ask: { meanNormalizedMAE: number; meanNormalizedBias: number; sampleCount: number };
+  };
+}
+
+/**
+ * Extended delta-mid scorer result
+ */
+export interface ExtendedDeltaMidScorerResult {
+  scores: ExtendedDeltaMidContractScore[];
+  aggregates: ExtendedDeltaMidAggregates;
+}
+
+/**
  * PnL result for a single trade
  */
 export interface PnLResult {
