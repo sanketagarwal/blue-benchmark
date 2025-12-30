@@ -152,7 +152,7 @@ export async function POST(request: Request): Promise<NextResponse<PlayResponse>
         success: true,
         clockState: formatClockState(newClockState),
         prediction: {
-          reasoning: output.reasoning,
+          reasoning: output.reasoning ?? '',
           predictions: output.predictions as Record<FillContractId, number>,
         },
         groundTruth: groundTruth as Record<FillContractId, boolean>,

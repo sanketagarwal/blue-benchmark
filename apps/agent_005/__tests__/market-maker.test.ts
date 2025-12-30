@@ -165,7 +165,7 @@ describe('marketMaker', () => {
       expect(result.success).toBe(false);
     });
 
-    test('output schema requires reasoning field', () => {
+    test('output schema accepts missing reasoning field (optional)', () => {
       const noReasoningOutput = {
         predictions: {
           'bid-fill-1m': 0.3,
@@ -184,7 +184,7 @@ describe('marketMaker', () => {
       };
 
       const result = marketMaker.definition.outputSchema.safeParse(noReasoningOutput);
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
   });
 

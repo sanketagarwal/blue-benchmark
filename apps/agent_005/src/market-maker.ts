@@ -88,7 +88,7 @@ const PredictionSchema = z.object({
 });
 
 const OutputSchema = z.object({
-  reasoning: z.string().describe('Brief explanation of your fill probability analysis'),
+  reasoning: z.string().optional().describe('Brief explanation of your fill probability analysis'),
   predictions: PredictionSchema,
 });
 
