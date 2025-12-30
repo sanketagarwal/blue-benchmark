@@ -1,3 +1,4 @@
+/* eslint-disable sonarjs/no-duplicate-string -- Interface property names match FillContractId literals and must be duplicated */
 import type { Trade } from '../replay-lab/trades.js';
 
 /**
@@ -12,6 +13,7 @@ export interface FillCheckResult {
 
 /**
  * Ground truth for all 6 fill contracts at different horizons.
+ * Uses string literal property names that match FillContractId type.
  */
 export interface FillGroundTruth {
   'bid-fill-1m': boolean;
@@ -20,6 +22,22 @@ export interface FillGroundTruth {
   'ask-fill-1m': boolean;
   'ask-fill-5m': boolean;
   'ask-fill-15m': boolean;
+}
+
+/**
+ * Extended ground truth with fill details for PnL/EV calculation.
+ * Uses string literal property names that match FillContractId type.
+ */
+export interface ExtendedFillGroundTruth {
+  fills: FillGroundTruth; // existing boolean ground truth
+  details: {
+    'bid-fill-1m': FillCheckResult;
+    'bid-fill-5m': FillCheckResult;
+    'bid-fill-15m': FillCheckResult;
+    'ask-fill-1m': FillCheckResult;
+    'ask-fill-5m': FillCheckResult;
+    'ask-fill-15m': FillCheckResult;
+  };
 }
 
 /**
@@ -163,3 +181,58 @@ export function computeFillGroundTruth(
     'ask-fill-15m': askFill15m.filled,
   };
 }
+
+/**
+ * Computes extended fill ground truth with fill details.
+ * Returns both the boolean fill indicators AND the detailed fill info
+ * (fillTime, fillPrice, fillSize) needed for PnL calculation.
+ *
+ * @param trades - Array of trades to check
+ * @param bidPrice - The bid price for limit BUY orders
+ * @param askPrice - The ask price for limit SELL orders
+ * @param predictionTime - The time from which to start checking fills
+ * @returns ExtendedFillGroundTruth with boolean values and detailed fill info
+ */
+export function computeExtendedFillGroundTruth(
+  trades: Trade[],
+  bidPrice: number,
+  askPrice: number,
+  predictionTime: Date
+): ExtendedFillGroundTruth {
+  const predictionMs = predictionTime.getTime();
+
+  // Calculate horizon timestamps
+  const horizon1m = new Date(predictionMs + 1 * 60 * 1000);
+  const horizon5m = new Date(predictionMs + 5 * 60 * 1000);
+  const horizon15m = new Date(predictionMs + 15 * 60 * 1000);
+
+  // Check bid fills at each horizon
+  const bidFill1m = checkBidFill(trades, bidPrice, predictionTime, horizon1m);
+  const bidFill5m = checkBidFill(trades, bidPrice, predictionTime, horizon5m);
+  const bidFill15m = checkBidFill(trades, bidPrice, predictionTime, horizon15m);
+
+  // Check ask fills at each horizon
+  const askFill1m = checkAskFill(trades, askPrice, predictionTime, horizon1m);
+  const askFill5m = checkAskFill(trades, askPrice, predictionTime, horizon5m);
+  const askFill15m = checkAskFill(trades, askPrice, predictionTime, horizon15m);
+
+  return {
+    fills: {
+      'bid-fill-1m': bidFill1m.filled,
+      'bid-fill-5m': bidFill5m.filled,
+      'bid-fill-15m': bidFill15m.filled,
+      'ask-fill-1m': askFill1m.filled,
+      'ask-fill-5m': askFill5m.filled,
+      'ask-fill-15m': askFill15m.filled,
+    },
+    details: {
+      'bid-fill-1m': bidFill1m,
+      'bid-fill-5m': bidFill5m,
+      'bid-fill-15m': bidFill15m,
+      'ask-fill-1m': askFill1m,
+      'ask-fill-5m': askFill5m,
+      'ask-fill-15m': askFill15m,
+    },
+  };
+}
+/* eslint-enable sonarjs/no-duplicate-string -- Re-enable after interface definitions */

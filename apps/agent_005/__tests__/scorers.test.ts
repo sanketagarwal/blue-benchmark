@@ -533,3 +533,282 @@ describe('Running Tally', () => {
     });
   });
 });
+
+describe('Aggregate Scorer - Extended Integration', () => {
+  const createExtendedTestInput = (options: {
+    predictions?: Partial<Record<ContractId, number>>;
+    actuals?: Partial<Record<ContractId, boolean>>;
+    deltaMidPredictions?: Record<string, number>;
+    deltaMidActuals?: Record<string, number | undefined>;
+    fillDetails?: Record<string, { filled: boolean; fillPrice?: number }>;
+    exitMids?: Record<string, number | undefined>;
+    fillPrices?: { bestBid: number; bestAsk: number };
+  }): ForecastScorerInput => {
+    // Default fill predictions: monotonically increasing (valid)
+    const defaultPredictions: Record<ContractId, number> = {
+      'bid-fill-1m': 0.3,
+      'bid-fill-5m': 0.5,
+      'bid-fill-15m': 0.7,
+      'ask-fill-1m': 0.3,
+      'ask-fill-5m': 0.5,
+      'ask-fill-15m': 0.7,
+    };
+    const defaultActuals: Record<ContractId, boolean> = {
+      'bid-fill-1m': false,
+      'bid-fill-5m': false,
+      'bid-fill-15m': false,
+      'ask-fill-1m': false,
+      'ask-fill-5m': false,
+      'ask-fill-15m': false,
+    };
+    return {
+      predictions: { ...defaultPredictions, ...options.predictions },
+      actuals: { ...defaultActuals, ...options.actuals },
+      predictionTime: new Date('2025-01-01T00:00:00Z'),
+      symbolId: 'BTC-USD',
+      deltaMidPredictions: options.deltaMidPredictions,
+      deltaMidActuals: options.deltaMidActuals,
+      fillDetails: options.fillDetails,
+      exitMids: options.exitMids,
+      fillPrices: options.fillPrices,
+    };
+  };
+
+  describe('delta-mid scoring integration', () => {
+    it('returns deltaMidScores when deltaMidPredictions and deltaMidActuals are provided', async () => {
+      const input = createExtendedTestInput({
+        deltaMidPredictions: {
+          'bid-delta-mid-1m': 5,
+          'bid-delta-mid-5m': 10,
+          'bid-delta-mid-15m': 15,
+          'ask-delta-mid-1m': -3,
+          'ask-delta-mid-5m': -6,
+          'ask-delta-mid-15m': -9,
+        },
+        deltaMidActuals: {
+          'bid-delta-mid-1m': 4,
+          'bid-delta-mid-5m': 12,
+          'bid-delta-mid-15m': undefined, // no fill
+          'ask-delta-mid-1m': -2,
+          'ask-delta-mid-5m': undefined, // no fill
+          'ask-delta-mid-15m': -10,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.deltaMidScores).toBeDefined();
+      expect(result.deltaMidScores?.scores.length).toBe(4); // 4 contracts had fills
+      expect(result.deltaMidScores?.aggregates.sampleCount).toBe(4);
+      expect(typeof result.deltaMidScores?.aggregates.meanMAE).toBe('number');
+      expect(typeof result.deltaMidScores?.aggregates.meanMSE).toBe('number');
+      expect(typeof result.deltaMidScores?.aggregates.meanBias).toBe('number');
+    });
+
+    it('returns undefined deltaMidScores when deltaMidPredictions not provided', async () => {
+      const input = createExtendedTestInput({});
+      const result = await forecastScorer.score(input);
+
+      expect(result.deltaMidScores).toBeUndefined();
+    });
+
+    it('returns undefined deltaMidScores when deltaMidActuals not provided', async () => {
+      const input = createExtendedTestInput({
+        deltaMidPredictions: {
+          'bid-delta-mid-1m': 5,
+          'bid-delta-mid-5m': 10,
+          'bid-delta-mid-15m': 15,
+          'ask-delta-mid-1m': -3,
+          'ask-delta-mid-5m': -6,
+          'ask-delta-mid-15m': -9,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.deltaMidScores).toBeUndefined();
+    });
+  });
+
+  describe('PnL calculation integration', () => {
+    it('returns pnlResults when fillDetails and exitMids are provided', async () => {
+      const input = createExtendedTestInput({
+        fillDetails: {
+          'bid-fill-1m': { filled: true, fillPrice: 100 },
+          'bid-fill-5m': { filled: true, fillPrice: 100 },
+          'bid-fill-15m': { filled: false },
+          'ask-fill-1m': { filled: true, fillPrice: 101 },
+          'ask-fill-5m': { filled: false },
+          'ask-fill-15m': { filled: false },
+        },
+        exitMids: {
+          'bid-fill-1m': 101,
+          'bid-fill-5m': 102,
+          'bid-fill-15m': undefined,
+          'ask-fill-1m': 100,
+          'ask-fill-5m': undefined,
+          'ask-fill-15m': undefined,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.pnlResults).toBeDefined();
+      expect(typeof result.pnlResults?.meanPnL).toBe('number');
+      expect(typeof result.pnlResults?.totalPnL).toBe('number');
+      expect(result.pnlResults?.filledCount).toBe(3);
+      expect(result.pnlResults?.pnlBySide).toBeDefined();
+      expect(result.pnlResults?.pnlByHorizon).toBeDefined();
+    });
+
+    it('returns undefined pnlResults when fillDetails not provided', async () => {
+      const input = createExtendedTestInput({
+        exitMids: {
+          'bid-fill-1m': 101,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.pnlResults).toBeUndefined();
+    });
+
+    it('returns undefined pnlResults when exitMids not provided', async () => {
+      const input = createExtendedTestInput({
+        fillDetails: {
+          'bid-fill-1m': { filled: true, fillPrice: 100 },
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.pnlResults).toBeUndefined();
+    });
+  });
+
+  describe('EV calculation integration', () => {
+    it('returns evResults when fill predictions, delta-mid predictions, and fill prices are provided', async () => {
+      const input = createExtendedTestInput({
+        deltaMidPredictions: {
+          'bid-delta-mid-1m': 5,
+          'bid-delta-mid-5m': 10,
+          'bid-delta-mid-15m': 15,
+          'ask-delta-mid-1m': -3,
+          'ask-delta-mid-5m': -6,
+          'ask-delta-mid-15m': -9,
+        },
+        fillPrices: { bestBid: 100, bestAsk: 101 },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.evResults).toBeDefined();
+      expect(typeof result.evResults?.meanEV).toBe('number');
+      expect(typeof result.evResults?.totalEV).toBe('number');
+      expect(result.evResults?.evBySide).toBeDefined();
+      expect(result.evResults?.evByHorizon).toBeDefined();
+    });
+
+    it('returns undefined evResults when deltaMidPredictions not provided', async () => {
+      const input = createExtendedTestInput({
+        fillPrices: { bestBid: 100, bestAsk: 101 },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.evResults).toBeUndefined();
+    });
+
+    it('returns undefined evResults when fillPrices not provided', async () => {
+      const input = createExtendedTestInput({
+        deltaMidPredictions: {
+          'bid-delta-mid-1m': 5,
+          'bid-delta-mid-5m': 10,
+          'bid-delta-mid-15m': 15,
+          'ask-delta-mid-1m': -3,
+          'ask-delta-mid-5m': -6,
+          'ask-delta-mid-15m': -9,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.evResults).toBeUndefined();
+    });
+  });
+
+  describe('EV-PnL gap calculation integration', () => {
+    it('returns evPnlGap when both EV and PnL are computed', async () => {
+      const input = createExtendedTestInput({
+        deltaMidPredictions: {
+          'bid-delta-mid-1m': 5,
+          'bid-delta-mid-5m': 10,
+          'bid-delta-mid-15m': 15,
+          'ask-delta-mid-1m': -3,
+          'ask-delta-mid-5m': -6,
+          'ask-delta-mid-15m': -9,
+        },
+        fillPrices: { bestBid: 100, bestAsk: 101 },
+        fillDetails: {
+          'bid-fill-1m': { filled: true, fillPrice: 100 },
+          'bid-fill-5m': { filled: true, fillPrice: 100 },
+          'bid-fill-15m': { filled: false },
+          'ask-fill-1m': { filled: true, fillPrice: 101 },
+          'ask-fill-5m': { filled: false },
+          'ask-fill-15m': { filled: false },
+        },
+        exitMids: {
+          'bid-fill-1m': 101,
+          'bid-fill-5m': 102,
+          'bid-fill-15m': undefined,
+          'ask-fill-1m': 100,
+          'ask-fill-5m': undefined,
+          'ask-fill-15m': undefined,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.evPnlGap).toBeDefined();
+      expect(typeof result.evPnlGap?.gap).toBe('number');
+      expect(typeof result.evPnlGap?.gapVariance).toBe('number');
+      expect(typeof result.evPnlGap?.systematicOverestimation).toBe('boolean');
+    });
+
+    it('returns undefined evPnlGap when only EV is computed (no PnL)', async () => {
+      const input = createExtendedTestInput({
+        deltaMidPredictions: {
+          'bid-delta-mid-1m': 5,
+          'bid-delta-mid-5m': 10,
+          'bid-delta-mid-15m': 15,
+          'ask-delta-mid-1m': -3,
+          'ask-delta-mid-5m': -6,
+          'ask-delta-mid-15m': -9,
+        },
+        fillPrices: { bestBid: 100, bestAsk: 101 },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.evResults).toBeDefined(); // EV is computed
+      expect(result.pnlResults).toBeUndefined(); // PnL is not
+      expect(result.evPnlGap).toBeUndefined();
+    });
+
+    it('returns undefined evPnlGap when only PnL is computed (no EV)', async () => {
+      const input = createExtendedTestInput({
+        fillDetails: {
+          'bid-fill-1m': { filled: true, fillPrice: 100 },
+          'bid-fill-5m': { filled: false },
+          'bid-fill-15m': { filled: false },
+          'ask-fill-1m': { filled: false },
+          'ask-fill-5m': { filled: false },
+          'ask-fill-15m': { filled: false },
+        },
+        exitMids: {
+          'bid-fill-1m': 101,
+          'bid-fill-5m': undefined,
+          'bid-fill-15m': undefined,
+          'ask-fill-1m': undefined,
+          'ask-fill-5m': undefined,
+          'ask-fill-15m': undefined,
+        },
+      });
+      const result = await forecastScorer.score(input);
+
+      expect(result.pnlResults).toBeDefined(); // PnL is computed
+      expect(result.evResults).toBeUndefined(); // EV is not
+      expect(result.evPnlGap).toBeUndefined();
+    });
+  });
+});

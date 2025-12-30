@@ -4,8 +4,10 @@ import {
   checkBidFill,
   checkAskFill,
   computeFillGroundTruth,
+  computeExtendedFillGroundTruth,
   type FillCheckResult,
   type FillGroundTruth,
+  type ExtendedFillGroundTruth,
 } from '../src/ground-truth/fill-checker.js';
 
 /**
@@ -469,6 +471,179 @@ describe('Fill Checker', () => {
 
       for (const key of keys) {
         expect(typeof result[key]).toBe('boolean');
+      }
+    });
+  });
+
+  describe('computeExtendedFillGroundTruth', () => {
+    it('returns fill details with fillTime, fillPrice, fillSize when fill occurs', () => {
+      const predictionTime = new Date('2025-01-01T12:00:00Z');
+      const trades: Trade[] = [
+        createTrade({
+          timestamp: new Date('2025-01-01T12:00:30Z'),
+          price: 100,
+          size: 5,
+          takerSide: 'SELL',
+        }),
+        createTrade({
+          timestamp: new Date('2025-01-01T12:00:45Z'),
+          price: 101,
+          size: 3,
+          takerSide: 'BUY',
+        }),
+      ];
+
+      const result = computeExtendedFillGroundTruth(
+        trades,
+        100,
+        101,
+        predictionTime
+      );
+
+      // Check fills property (boolean ground truth)
+      expect(result.fills['bid-fill-1m']).toBe(true);
+      expect(result.fills['ask-fill-1m']).toBe(true);
+
+      // Check details for bid fill
+      expect(result.details['bid-fill-1m'].filled).toBe(true);
+      expect(result.details['bid-fill-1m'].fillTime).toEqual(
+        new Date('2025-01-01T12:00:30Z')
+      );
+      expect(result.details['bid-fill-1m'].fillPrice).toBe(100);
+      expect(result.details['bid-fill-1m'].fillSize).toBe(5);
+
+      // Check details for ask fill
+      expect(result.details['ask-fill-1m'].filled).toBe(true);
+      expect(result.details['ask-fill-1m'].fillTime).toEqual(
+        new Date('2025-01-01T12:00:45Z')
+      );
+      expect(result.details['ask-fill-1m'].fillPrice).toBe(101);
+      expect(result.details['ask-fill-1m'].fillSize).toBe(3);
+    });
+
+    it('returns empty details (filled: false) when no fill', () => {
+      const predictionTime = new Date('2025-01-01T12:00:00Z');
+      const trades: Trade[] = [];
+
+      const result = computeExtendedFillGroundTruth(
+        trades,
+        100,
+        101,
+        predictionTime
+      );
+
+      // Check fills property (all false)
+      expect(result.fills['bid-fill-1m']).toBe(false);
+      expect(result.fills['bid-fill-5m']).toBe(false);
+      expect(result.fills['bid-fill-15m']).toBe(false);
+      expect(result.fills['ask-fill-1m']).toBe(false);
+      expect(result.fills['ask-fill-5m']).toBe(false);
+      expect(result.fills['ask-fill-15m']).toBe(false);
+
+      // Check details are all unfilled
+      expect(result.details['bid-fill-1m'].filled).toBe(false);
+      expect(result.details['bid-fill-1m'].fillTime).toBeUndefined();
+      expect(result.details['bid-fill-1m'].fillPrice).toBeUndefined();
+      expect(result.details['bid-fill-1m'].fillSize).toBeUndefined();
+
+      expect(result.details['ask-fill-15m'].filled).toBe(false);
+      expect(result.details['ask-fill-15m'].fillTime).toBeUndefined();
+    });
+
+    it('detailed results match the boolean ground truth', () => {
+      const predictionTime = new Date('2025-01-01T12:00:00Z');
+      const trades: Trade[] = [
+        // Bid fill at 3 minutes (fills 5m and 15m, not 1m)
+        createTrade({
+          timestamp: new Date('2025-01-01T12:03:00Z'),
+          price: 100,
+          size: 5,
+          takerSide: 'SELL',
+        }),
+        // Ask fill at 7 minutes (fills 15m only, not 1m or 5m)
+        createTrade({
+          timestamp: new Date('2025-01-01T12:07:00Z'),
+          price: 101,
+          size: 3,
+          takerSide: 'BUY',
+        }),
+      ];
+
+      const result = computeExtendedFillGroundTruth(
+        trades,
+        100,
+        101,
+        predictionTime
+      );
+
+      // Verify boolean fills match details.filled for all 6 contracts
+      expect(result.fills['bid-fill-1m']).toBe(
+        result.details['bid-fill-1m'].filled
+      );
+      expect(result.fills['bid-fill-5m']).toBe(
+        result.details['bid-fill-5m'].filled
+      );
+      expect(result.fills['bid-fill-15m']).toBe(
+        result.details['bid-fill-15m'].filled
+      );
+      expect(result.fills['ask-fill-1m']).toBe(
+        result.details['ask-fill-1m'].filled
+      );
+      expect(result.fills['ask-fill-5m']).toBe(
+        result.details['ask-fill-5m'].filled
+      );
+      expect(result.fills['ask-fill-15m']).toBe(
+        result.details['ask-fill-15m'].filled
+      );
+
+      // Verify specific horizon behavior
+      expect(result.fills['bid-fill-1m']).toBe(false);
+      expect(result.fills['bid-fill-5m']).toBe(true);
+      expect(result.fills['bid-fill-15m']).toBe(true);
+      expect(result.fills['ask-fill-1m']).toBe(false);
+      expect(result.fills['ask-fill-5m']).toBe(false);
+      expect(result.fills['ask-fill-15m']).toBe(true);
+
+      // Verify details have proper fill info for filled contracts
+      expect(result.details['bid-fill-5m'].fillTime).toEqual(
+        new Date('2025-01-01T12:03:00Z')
+      );
+      expect(result.details['bid-fill-5m'].fillPrice).toBe(100);
+      expect(result.details['bid-fill-5m'].fillSize).toBe(5);
+
+      expect(result.details['ask-fill-15m'].fillTime).toEqual(
+        new Date('2025-01-01T12:07:00Z')
+      );
+      expect(result.details['ask-fill-15m'].fillPrice).toBe(101);
+      expect(result.details['ask-fill-15m'].fillSize).toBe(3);
+    });
+
+    it('has correct type shape', () => {
+      const predictionTime = new Date('2025-01-01T12:00:00Z');
+      const result = computeExtendedFillGroundTruth(
+        [],
+        100,
+        101,
+        predictionTime
+      );
+
+      // Verify fills has all 6 boolean keys
+      const fillKeys: (keyof FillGroundTruth)[] = [
+        'bid-fill-1m',
+        'bid-fill-5m',
+        'bid-fill-15m',
+        'ask-fill-1m',
+        'ask-fill-5m',
+        'ask-fill-15m',
+      ];
+
+      for (const key of fillKeys) {
+        expect(typeof result.fills[key]).toBe('boolean');
+      }
+
+      // Verify details has all 6 FillCheckResult objects
+      for (const key of fillKeys) {
+        expect(typeof result.details[key].filled).toBe('boolean');
       }
     });
   });

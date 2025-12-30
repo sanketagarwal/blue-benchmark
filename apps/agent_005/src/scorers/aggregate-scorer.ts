@@ -1,8 +1,11 @@
 import { defineScorer } from '@nullagent/scorers';
 
 import { brierScore, meanBrierScore } from './brier-scorer';
+import { scoreDeltaMidPredictions } from './delta-mid-scorer';
+import { calculateAllEV, aggregateEV, calculateEVPnLGap } from './ev-calculator';
 import { logLoss, meanLogLoss } from './log-loss-scorer';
 import { checkMonotonicity } from './monotonicity-scorer';
+import { calculateAllPnL, aggregatePnL } from './pnl-calculator';
 
 import type { ContractId, ForecastScorerInput, ForecastScoreResult, ContractScore, RunningTally, FillContractId } from './types';
 
@@ -55,6 +58,77 @@ function scorePerContract(
   return { perContract, predictionArray, actualArray };
 }
 
+/**
+ * Calculate accuracy at 0.5 threshold
+ *
+ * @param perContract - Array of per-contract scores
+ * @returns Accuracy as a ratio of correct predictions
+ */
+function calculateAccuracy(perContract: ContractScore[]): number {
+  let correctPredictions = 0;
+  for (const contractScore of perContract) {
+    const predictedOutcome = contractScore.predicted >= 0.5;
+    if (predictedOutcome === contractScore.actual) {
+      correctPredictions += 1;
+    }
+  }
+  return correctPredictions / CONTRACT_IDS.length;
+}
+
+/**
+ * Count events that occurred (fills)
+ *
+ * @param perContract - Array of per-contract scores
+ * @returns Number of events that actually occurred
+ */
+function countEvents(perContract: ContractScore[]): number {
+  let eventsOccurred = 0;
+  for (const contractScore of perContract) {
+    if (contractScore.actual) {
+      eventsOccurred += 1;
+    }
+  }
+  return eventsOccurred;
+}
+
+/**
+ * Compute optional extended scoring metrics (delta-mid, PnL, EV)
+ *
+ * @param result - The forecast score result to extend with optional metrics
+ * @param input - The full forecast scorer input containing optional fields
+ */
+function computeExtendedScores(
+  result: ForecastScoreResult,
+  input: ForecastScorerInput
+): void {
+  const { predictions, deltaMidPredictions, deltaMidActuals, fillDetails, exitMids, fillPrices } =
+    input;
+
+  // Optional: Delta-mid scoring
+  if (deltaMidPredictions !== undefined && deltaMidActuals !== undefined) {
+    result.deltaMidScores = scoreDeltaMidPredictions(deltaMidPredictions, deltaMidActuals);
+  }
+
+  // Optional: PnL calculation
+  let pnlResultsRaw: ReturnType<typeof calculateAllPnL> | undefined;
+  if (fillDetails !== undefined && exitMids !== undefined) {
+    pnlResultsRaw = calculateAllPnL(fillDetails, exitMids);
+    result.pnlResults = aggregatePnL(pnlResultsRaw);
+  }
+
+  // Optional: EV calculation
+  let expectedValueResultsRaw: ReturnType<typeof calculateAllEV> | undefined;
+  if (deltaMidPredictions !== undefined && fillPrices !== undefined) {
+    expectedValueResultsRaw = calculateAllEV(predictions, deltaMidPredictions, fillPrices);
+    result.evResults = aggregateEV(expectedValueResultsRaw);
+  }
+
+  // Optional: EV-PnL gap (requires both EV and PnL)
+  if (expectedValueResultsRaw !== undefined && pnlResultsRaw !== undefined) {
+    result.evPnlGap = calculateEVPnLGap(expectedValueResultsRaw, pnlResultsRaw);
+  }
+}
+
 export const forecastScorer = defineScorer<ForecastScorerInput, ForecastScoreResult>({
   id: 'forecast_scorer',
   name: 'Forecast Scorer',
@@ -68,40 +142,27 @@ export const forecastScorer = defineScorer<ForecastScorerInput, ForecastScoreRes
     const meanBrier = meanBrierScore(predictionArray, actualArray);
     const meanLL = meanLogLoss(predictionArray, actualArray);
 
-    // Calculate accuracy (threshold = 0.5)
-    let correctPredictions = 0;
-    for (const contractScore of perContract) {
-      const predictedOutcome = contractScore.predicted >= 0.5;
-      if (predictedOutcome === contractScore.actual) {
-        correctPredictions += 1;
-      }
-    }
-    const accuracy = correctPredictions / CONTRACT_IDS.length;
-
-    // Count events that occurred
-    let eventsOccurred = 0;
-    for (const contractScore of perContract) {
-      if (contractScore.actual) {
-        eventsOccurred += 1;
-      }
-    }
-
     // Check monotonicity violations
     const violations = checkMonotonicity(predictions);
-    const monotonicityViolations = violations.length;
 
-    return {
+    // Build base result
+    const result: ForecastScoreResult = {
       score: meanBrier,
       aggregates: {
         meanBrierScore: meanBrier,
         meanLogLoss: meanLL,
-        accuracy,
-        eventsOccurred,
-        monotonicityViolations,
+        accuracy: calculateAccuracy(perContract),
+        eventsOccurred: countEvents(perContract),
+        monotonicityViolations: violations.length,
       },
       perContract,
       violations,
     };
+
+    // Compute extended scoring metrics if inputs are provided
+    computeExtendedScores(result, input);
+
+    return result;
   },
 });
 

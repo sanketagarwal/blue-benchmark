@@ -19,6 +19,20 @@ export const FILL_CONTRACT_IDS = [
 export type FillContractId = (typeof FILL_CONTRACT_IDS)[number];
 
 /**
+ * Delta-mid contract IDs for expected mid price change predictions
+ */
+export const DELTA_MID_CONTRACT_IDS = [
+  'bid-delta-mid-1m',
+  'bid-delta-mid-5m',
+  'bid-delta-mid-15m',
+  'ask-delta-mid-1m',
+  'ask-delta-mid-5m',
+  'ask-delta-mid-15m',
+] as const;
+
+export type DeltaMidContractId = (typeof DELTA_MID_CONTRACT_IDS)[number];
+
+/**
  * Context interface for market-making predictions
  */
 export interface MarketMakerContext {
@@ -55,14 +69,22 @@ export function clearMarketMakerContext(): void {
   currentMarketMakerContext = undefined;
 }
 
-// Output schema: probability for each fill contract (6 contracts total)
+// Output schema: probability for each fill contract (6 contracts) + delta-mid predictions (6 contracts)
 const PredictionSchema = z.object({
+  // Fill probability contracts (0-1 range)
   'bid-fill-1m': z.number().min(0).max(1),
   'bid-fill-5m': z.number().min(0).max(1),
   'bid-fill-15m': z.number().min(0).max(1),
   'ask-fill-1m': z.number().min(0).max(1),
   'ask-fill-5m': z.number().min(0).max(1),
   'ask-fill-15m': z.number().min(0).max(1),
+  // Delta-mid contracts (no min/max - can be positive or negative)
+  'bid-delta-mid-1m': z.number(),
+  'bid-delta-mid-5m': z.number(),
+  'bid-delta-mid-15m': z.number(),
+  'ask-delta-mid-1m': z.number(),
+  'ask-delta-mid-5m': z.number(),
+  'ask-delta-mid-15m': z.number(),
 });
 
 const OutputSchema = z.object({
@@ -105,7 +127,7 @@ export function createMarketMaker(modelId: ModelId): Agent<MarketMakerOutput> {
           ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
           : '';
 
-      return `Simulate a cryptocurrency market maker predicting fill probabilities for ${symbolId}.
+      return `Simulate a cryptocurrency market maker predicting fill probabilities and expected mid price changes for ${symbolId}.
 
 Current Time: ${currentTime}
 Orderbook State: ${orderbookData}
@@ -117,7 +139,9 @@ Chart Analysis (IMPORTANT: Analyze these chart images for pattern recognition):
 Both charts include: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, SuperTrend(10,3), RSI(14), MACD(12,26,9), Stochastic RSI(14,3,3), ADX(14), CMF(20), Choppiness(14), Volume, and Volume Ratio(20).
 
 **YOUR TASK:**
-You are predicting the fill probability for hypothetical limit orders placed RIGHT NOW at the current best_bid and best_ask prices.
+You are predicting:
+1. Fill probability for hypothetical limit orders placed RIGHT NOW at the current best_bid and best_ask prices
+2. Expected mid price change (delta-mid) conditional on the order filling
 
 **HOW FILLS WORK:**
 - Limit BUY at best_bid fills when a market SELL order crosses into your price (someone sells at or below your bid)
@@ -133,13 +157,29 @@ You are predicting the fill probability for hypothetical limit orders placed RIG
 - Wide spread = higher volatility = higher fill probability (more price movement)
 - High volatility periods = more aggressive market orders = higher fill probability
 
+**DELTA-MID PREDICTIONS:**
+Delta-mid is the expected percentage change in the mid price at the end of the time window, conditional on the order filling.
+- For BIDS: positive delta-mid means the price is expected to go UP after buying (favorable - you bought low)
+- For ASKS: negative delta-mid means the price is expected to go DOWN after selling (favorable - you sold high)
+Think about what market conditions cause fills and what those conditions imply for subsequent price movement.
+
 **CONTRACTS TO PREDICT:**
+
+Fill Probability Contracts (0.0 to 1.0):
 - bid-fill-1m: Limit BUY at best_bid fills within 1 minute
 - bid-fill-5m: Limit BUY at best_bid fills within 5 minutes
 - bid-fill-15m: Limit BUY at best_bid fills within 15 minutes
 - ask-fill-1m: Limit SELL at best_ask fills within 1 minute
 - ask-fill-5m: Limit SELL at best_ask fills within 5 minutes
 - ask-fill-15m: Limit SELL at best_ask fills within 15 minutes
+
+Delta-Mid Contracts (percentage, can be positive or negative):
+- bid-delta-mid-1m: Expected mid price change if bid fills within 1 minute
+- bid-delta-mid-5m: Expected mid price change if bid fills within 5 minutes
+- bid-delta-mid-15m: Expected mid price change if bid fills within 15 minutes
+- ask-delta-mid-1m: Expected mid price change if ask fills within 1 minute
+- ask-delta-mid-5m: Expected mid price change if ask fills within 5 minutes
+- ask-delta-mid-15m: Expected mid price change if ask fills within 15 minutes
 
 **MONOTONICITY CONSTRAINTS (MUST RESPECT):**
 Longer time horizons must have equal or higher fill probability (more time = more chances to fill):
@@ -148,32 +188,41 @@ Longer time horizons must have equal or higher fill probability (more time = mor
 
 ${compactionSection}
 Respond with a JSON object containing:
-- "reasoning": brief explanation of your fill probability analysis
-- "predictions": an object with a probability (0.0 to 1.0) for each contract ID
+- "reasoning": brief explanation of your fill probability and delta-mid analysis
+- "predictions": an object with values for each contract ID
 
 Example:
 {
-  "reasoning": "High positive imbalance suggests buying pressure, making asks more likely to fill. Low volatility reduces overall fill probability...",
+  "reasoning": "High positive imbalance suggests buying pressure, making asks more likely to fill. Bid fills likely indicate downward momentum continuing...",
   "predictions": {
     "bid-fill-1m": 0.15,
     "bid-fill-5m": 0.35,
     "bid-fill-15m": 0.55,
     "ask-fill-1m": 0.25,
     "ask-fill-5m": 0.50,
-    "ask-fill-15m": 0.70
+    "ask-fill-15m": 0.70,
+    "bid-delta-mid-1m": -0.02,
+    "bid-delta-mid-5m": -0.05,
+    "bid-delta-mid-15m": -0.08,
+    "ask-delta-mid-1m": 0.03,
+    "ask-delta-mid-5m": 0.06,
+    "ask-delta-mid-15m": 0.10
   }
 }`;
     },
 
     buildCompactionPrompt: (history) => `
-You've completed ${String(history.length)} rounds of limit order fill probability predictions.
+You've completed ${String(history.length)} rounds of limit order fill probability and delta-mid predictions.
 
-Review your past predictions and the actual fill outcomes. Summarize:
+Review your past predictions and the actual outcomes. Summarize:
 - What orderbook patterns (imbalance, spread, depth) best predicted fills?
 - Which chart indicators correlated with fill probability?
 - How accurate were your monotonicity assumptions (longer horizon = higher fill probability)?
 - What market conditions led to unexpected fills or non-fills?
-- What strategies should you adjust for better fill prediction?
+- How accurate were your delta-mid predictions? Did fills correlate with expected price movements?
+- Were bid-fills followed by upward moves (positive delta-mid) as expected, or the opposite?
+- Were ask-fills followed by downward moves (negative delta-mid) as expected, or the opposite?
+- What strategies should you adjust for better fill and delta-mid prediction?
 
 Keep it concise and actionable for future market-making rounds.
 `,
@@ -207,7 +256,7 @@ export const marketMaker = defineAgent({
         ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
         : '';
 
-    return `Simulate a cryptocurrency market maker predicting fill probabilities for ${symbolId}.
+    return `Simulate a cryptocurrency market maker predicting fill probabilities and expected mid price changes for ${symbolId}.
 
 Current Time: ${currentTime}
 Orderbook State: ${orderbookData}
@@ -219,7 +268,9 @@ Chart Analysis (IMPORTANT: Analyze these chart images for pattern recognition):
 Both charts include: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, SuperTrend(10,3), RSI(14), MACD(12,26,9), Stochastic RSI(14,3,3), ADX(14), CMF(20), Choppiness(14), Volume, and Volume Ratio(20).
 
 **YOUR TASK:**
-You are predicting the fill probability for hypothetical limit orders placed RIGHT NOW at the current best_bid and best_ask prices.
+You are predicting:
+1. Fill probability for hypothetical limit orders placed RIGHT NOW at the current best_bid and best_ask prices
+2. Expected mid price change (delta-mid) conditional on the order filling
 
 **HOW FILLS WORK:**
 - Limit BUY at best_bid fills when a market SELL order crosses into your price (someone sells at or below your bid)
@@ -235,13 +286,29 @@ You are predicting the fill probability for hypothetical limit orders placed RIG
 - Wide spread = higher volatility = higher fill probability (more price movement)
 - High volatility periods = more aggressive market orders = higher fill probability
 
+**DELTA-MID PREDICTIONS:**
+Delta-mid is the expected percentage change in the mid price at the end of the time window, conditional on the order filling.
+- For BIDS: positive delta-mid means the price is expected to go UP after buying (favorable - you bought low)
+- For ASKS: negative delta-mid means the price is expected to go DOWN after selling (favorable - you sold high)
+Think about what market conditions cause fills and what those conditions imply for subsequent price movement.
+
 **CONTRACTS TO PREDICT:**
+
+Fill Probability Contracts (0.0 to 1.0):
 - bid-fill-1m: Limit BUY at best_bid fills within 1 minute
 - bid-fill-5m: Limit BUY at best_bid fills within 5 minutes
 - bid-fill-15m: Limit BUY at best_bid fills within 15 minutes
 - ask-fill-1m: Limit SELL at best_ask fills within 1 minute
 - ask-fill-5m: Limit SELL at best_ask fills within 5 minutes
 - ask-fill-15m: Limit SELL at best_ask fills within 15 minutes
+
+Delta-Mid Contracts (percentage, can be positive or negative):
+- bid-delta-mid-1m: Expected mid price change if bid fills within 1 minute
+- bid-delta-mid-5m: Expected mid price change if bid fills within 5 minutes
+- bid-delta-mid-15m: Expected mid price change if bid fills within 15 minutes
+- ask-delta-mid-1m: Expected mid price change if ask fills within 1 minute
+- ask-delta-mid-5m: Expected mid price change if ask fills within 5 minutes
+- ask-delta-mid-15m: Expected mid price change if ask fills within 15 minutes
 
 **MONOTONICITY CONSTRAINTS (MUST RESPECT):**
 Longer time horizons must have equal or higher fill probability (more time = more chances to fill):
@@ -250,32 +317,41 @@ Longer time horizons must have equal or higher fill probability (more time = mor
 
 ${compactionSection}
 Respond with a JSON object containing:
-- "reasoning": brief explanation of your fill probability analysis
-- "predictions": an object with a probability (0.0 to 1.0) for each contract ID
+- "reasoning": brief explanation of your fill probability and delta-mid analysis
+- "predictions": an object with values for each contract ID
 
 Example:
 {
-  "reasoning": "High positive imbalance suggests buying pressure, making asks more likely to fill. Low volatility reduces overall fill probability...",
+  "reasoning": "High positive imbalance suggests buying pressure, making asks more likely to fill. Bid fills likely indicate downward momentum continuing...",
   "predictions": {
     "bid-fill-1m": 0.15,
     "bid-fill-5m": 0.35,
     "bid-fill-15m": 0.55,
     "ask-fill-1m": 0.25,
     "ask-fill-5m": 0.50,
-    "ask-fill-15m": 0.70
+    "ask-fill-15m": 0.70,
+    "bid-delta-mid-1m": -0.02,
+    "bid-delta-mid-5m": -0.05,
+    "bid-delta-mid-15m": -0.08,
+    "ask-delta-mid-1m": 0.03,
+    "ask-delta-mid-5m": 0.06,
+    "ask-delta-mid-15m": 0.10
   }
 }`;
   },
 
   buildCompactionPrompt: (history) => `
-You've completed ${String(history.length)} rounds of limit order fill probability predictions.
+You've completed ${String(history.length)} rounds of limit order fill probability and delta-mid predictions.
 
-Review your past predictions and the actual fill outcomes. Summarize:
+Review your past predictions and the actual outcomes. Summarize:
 - What orderbook patterns (imbalance, spread, depth) best predicted fills?
 - Which chart indicators correlated with fill probability?
 - How accurate were your monotonicity assumptions (longer horizon = higher fill probability)?
 - What market conditions led to unexpected fills or non-fills?
-- What strategies should you adjust for better fill prediction?
+- How accurate were your delta-mid predictions? Did fills correlate with expected price movements?
+- Were bid-fills followed by upward moves (positive delta-mid) as expected, or the opposite?
+- Were ask-fills followed by downward moves (negative delta-mid) as expected, or the opposite?
+- What strategies should you adjust for better fill and delta-mid prediction?
 
 Keep it concise and actionable for future market-making rounds.
 `,

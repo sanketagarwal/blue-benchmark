@@ -7,6 +7,8 @@ import {
   setMarketMakerContext,
   type MarketMakerOutput,
   FILL_CONTRACT_IDS,
+  DELTA_MID_CONTRACT_IDS,
+  type DeltaMidContractId,
 } from '../src/market-maker';
 
 describe('marketMaker', () => {
@@ -40,7 +42,7 @@ describe('marketMaker', () => {
   });
 
   describe('output schema validation', () => {
-    test('output schema validates correct predictions with all 6 fill contracts', () => {
+    test('output schema validates correct predictions with all 6 fill contracts and 6 delta-mid contracts', () => {
       const validOutput: MarketMakerOutput = {
         reasoning: 'Test reasoning',
         predictions: {
@@ -50,11 +52,58 @@ describe('marketMaker', () => {
           'ask-fill-1m': 0.25,
           'ask-fill-5m': 0.45,
           'ask-fill-15m': 0.65,
+          'bid-delta-mid-1m': 0.05,
+          'bid-delta-mid-5m': 0.08,
+          'bid-delta-mid-15m': 0.12,
+          'ask-delta-mid-1m': -0.03,
+          'ask-delta-mid-5m': -0.06,
+          'ask-delta-mid-15m': -0.10,
         },
       };
 
       const result = marketMaker.definition.outputSchema.safeParse(validOutput);
       expect(result.success).toBe(true);
+    });
+
+    test('output schema accepts negative delta-mid values', () => {
+      const validOutput: MarketMakerOutput = {
+        reasoning: 'Test reasoning',
+        predictions: {
+          'bid-fill-1m': 0.3,
+          'bid-fill-5m': 0.5,
+          'bid-fill-15m': 0.7,
+          'ask-fill-1m': 0.25,
+          'ask-fill-5m': 0.45,
+          'ask-fill-15m': 0.65,
+          'bid-delta-mid-1m': -0.15,
+          'bid-delta-mid-5m': -0.10,
+          'bid-delta-mid-15m': -0.05,
+          'ask-delta-mid-1m': 0.12,
+          'ask-delta-mid-5m': 0.08,
+          'ask-delta-mid-15m': 0.04,
+        },
+      };
+
+      const result = marketMaker.definition.outputSchema.safeParse(validOutput);
+      expect(result.success).toBe(true);
+    });
+
+    test('output schema rejects missing delta-mid contracts', () => {
+      const incompleteOutput = {
+        reasoning: 'Test reasoning',
+        predictions: {
+          'bid-fill-1m': 0.3,
+          'bid-fill-5m': 0.5,
+          'bid-fill-15m': 0.7,
+          'ask-fill-1m': 0.25,
+          'ask-fill-5m': 0.45,
+          'ask-fill-15m': 0.65,
+          // Missing all delta-mid contracts
+        },
+      };
+
+      const result = marketMaker.definition.outputSchema.safeParse(incompleteOutput);
+      expect(result.success).toBe(false);
     });
 
     test('output schema rejects probabilities greater than 1', () => {
@@ -67,6 +116,12 @@ describe('marketMaker', () => {
           'ask-fill-1m': 0.25,
           'ask-fill-5m': 0.45,
           'ask-fill-15m': 0.65,
+          'bid-delta-mid-1m': 0.05,
+          'bid-delta-mid-5m': 0.08,
+          'bid-delta-mid-15m': 0.12,
+          'ask-delta-mid-1m': -0.03,
+          'ask-delta-mid-5m': -0.06,
+          'ask-delta-mid-15m': -0.10,
         },
       };
 
@@ -84,6 +139,12 @@ describe('marketMaker', () => {
           'ask-fill-1m': 0.25,
           'ask-fill-5m': 0.45,
           'ask-fill-15m': 0.65,
+          'bid-delta-mid-1m': 0.05,
+          'bid-delta-mid-5m': 0.08,
+          'bid-delta-mid-15m': 0.12,
+          'ask-delta-mid-1m': -0.03,
+          'ask-delta-mid-5m': -0.06,
+          'ask-delta-mid-15m': -0.10,
         },
       };
 
@@ -113,6 +174,12 @@ describe('marketMaker', () => {
           'ask-fill-1m': 0.25,
           'ask-fill-5m': 0.45,
           'ask-fill-15m': 0.65,
+          'bid-delta-mid-1m': 0.05,
+          'bid-delta-mid-5m': 0.08,
+          'bid-delta-mid-15m': 0.12,
+          'ask-delta-mid-1m': -0.03,
+          'ask-delta-mid-5m': -0.06,
+          'ask-delta-mid-15m': -0.10,
         },
       };
 
@@ -139,6 +206,37 @@ describe('marketMaker', () => {
     });
   });
 
+  describe('DELTA_MID_CONTRACT_IDS', () => {
+    test('exports exactly 6 delta-mid contracts', () => {
+      expect(DELTA_MID_CONTRACT_IDS).toHaveLength(6);
+    });
+
+    test('includes all bid delta-mid contracts', () => {
+      expect(DELTA_MID_CONTRACT_IDS).toContain('bid-delta-mid-1m');
+      expect(DELTA_MID_CONTRACT_IDS).toContain('bid-delta-mid-5m');
+      expect(DELTA_MID_CONTRACT_IDS).toContain('bid-delta-mid-15m');
+    });
+
+    test('includes all ask delta-mid contracts', () => {
+      expect(DELTA_MID_CONTRACT_IDS).toContain('ask-delta-mid-1m');
+      expect(DELTA_MID_CONTRACT_IDS).toContain('ask-delta-mid-5m');
+      expect(DELTA_MID_CONTRACT_IDS).toContain('ask-delta-mid-15m');
+    });
+
+    test('DeltaMidContractId type covers all contract IDs', () => {
+      // Type assertion test - if this compiles, the type is correct
+      const validIds: DeltaMidContractId[] = [
+        'bid-delta-mid-1m',
+        'bid-delta-mid-5m',
+        'bid-delta-mid-15m',
+        'ask-delta-mid-1m',
+        'ask-delta-mid-5m',
+        'ask-delta-mid-15m',
+      ];
+      expect(validIds).toHaveLength(6);
+    });
+  });
+
   describe('buildRoundPrompt', () => {
     test('buildRoundPrompt throws without context', () => {
       expect(() => {
@@ -146,7 +244,7 @@ describe('marketMaker', () => {
       }).toThrow('Market maker context not set. Call setMarketMakerContext() before runRound().');
     });
 
-    test('buildRoundPrompt includes all contract IDs when context is set', () => {
+    test('buildRoundPrompt includes all fill contract IDs when context is set', () => {
       setMarketMakerContext({
         chart4h5mUrl: 'https://example.com/chart-4h-5m',
         chart24h15mUrl: 'https://example.com/chart-24h-15m',
@@ -160,6 +258,76 @@ describe('marketMaker', () => {
       for (const contractId of FILL_CONTRACT_IDS) {
         expect(prompt).toContain(contractId);
       }
+    });
+
+    test('buildRoundPrompt includes all delta-mid contract IDs when context is set', () => {
+      setMarketMakerContext({
+        chart4h5mUrl: 'https://example.com/chart-4h-5m',
+        chart24h15mUrl: 'https://example.com/chart-24h-15m',
+        orderbookData: 'mid_price: 3055.56, spread: 0.12, imbalance: 0.37, best_bid: 3055.50, best_ask: 3055.62',
+        currentTime: '2024-01-01T00:00:00.000Z',
+        symbolId: 'COINBASE_SPOT_ETH_USD',
+      });
+
+      const prompt = marketMaker.definition.buildRoundPrompt({ roundNumber: 0 });
+
+      for (const contractId of DELTA_MID_CONTRACT_IDS) {
+        expect(prompt).toContain(contractId);
+      }
+    });
+
+    test('buildRoundPrompt explains delta-mid predictions', () => {
+      setMarketMakerContext({
+        chart4h5mUrl: 'https://example.com/chart-4h-5m',
+        chart24h15mUrl: 'https://example.com/chart-24h-15m',
+        orderbookData: 'mid_price: 3055.56, spread: 0.12, imbalance: 0.37, best_bid: 3055.50, best_ask: 3055.62',
+        currentTime: '2024-01-01T00:00:00.000Z',
+        symbolId: 'COINBASE_SPOT_ETH_USD',
+      });
+
+      const prompt = marketMaker.definition.buildRoundPrompt({ roundNumber: 0 });
+
+      // Should explain what delta-mid is
+      expect(prompt.toLowerCase()).toContain('delta');
+      expect(prompt.toLowerCase()).toContain('mid');
+      // Should explain that it's expected price change if order fills
+      expect(prompt.toLowerCase()).toContain('expected');
+      expect(prompt.toLowerCase()).toContain('price');
+    });
+
+    test('buildRoundPrompt explains favorable delta-mid for bids and asks', () => {
+      setMarketMakerContext({
+        chart4h5mUrl: 'https://example.com/chart-4h-5m',
+        chart24h15mUrl: 'https://example.com/chart-24h-15m',
+        orderbookData: 'mid_price: 3055.56, spread: 0.12, imbalance: 0.37, best_bid: 3055.50, best_ask: 3055.62',
+        currentTime: '2024-01-01T00:00:00.000Z',
+        symbolId: 'COINBASE_SPOT_ETH_USD',
+      });
+
+      const prompt = marketMaker.definition.buildRoundPrompt({ roundNumber: 0 });
+
+      // Should explain favorable scenarios for bids (positive = favorable)
+      expect(prompt.toLowerCase()).toContain('bid');
+      expect(prompt.toLowerCase()).toContain('positive');
+      // Should explain favorable scenarios for asks (negative = favorable)
+      expect(prompt.toLowerCase()).toContain('ask');
+      expect(prompt.toLowerCase()).toContain('negative');
+    });
+
+    test('buildRoundPrompt includes delta-mid in example JSON', () => {
+      setMarketMakerContext({
+        chart4h5mUrl: 'https://example.com/chart-4h-5m',
+        chart24h15mUrl: 'https://example.com/chart-24h-15m',
+        orderbookData: 'mid_price: 3055.56, spread: 0.12, imbalance: 0.37, best_bid: 3055.50, best_ask: 3055.62',
+        currentTime: '2024-01-01T00:00:00.000Z',
+        symbolId: 'COINBASE_SPOT_ETH_USD',
+      });
+
+      const prompt = marketMaker.definition.buildRoundPrompt({ roundNumber: 0 });
+
+      // Example should include delta-mid predictions
+      expect(prompt).toContain('"bid-delta-mid-1m"');
+      expect(prompt).toContain('"ask-delta-mid-1m"');
     });
 
     test('buildRoundPrompt includes symbol ID', () => {
@@ -365,6 +533,11 @@ describe('marketMaker', () => {
       expect(result.toLowerCase()).toContain('fill');
     });
 
+    test('buildCompactionPrompt mentions delta-mid prediction learning', () => {
+      const result = marketMaker.definition.buildCompactionPrompt([]);
+      expect(result.toLowerCase()).toContain('delta');
+    });
+
     test('buildCompactionPrompt includes history length', () => {
       const history = [
         {
@@ -379,6 +552,12 @@ describe('marketMaker', () => {
               'ask-fill-1m': 0.25,
               'ask-fill-5m': 0.45,
               'ask-fill-15m': 0.65,
+              'bid-delta-mid-1m': 0.05,
+              'bid-delta-mid-5m': 0.08,
+              'bid-delta-mid-15m': 0.12,
+              'ask-delta-mid-1m': -0.03,
+              'ask-delta-mid-5m': -0.06,
+              'ask-delta-mid-15m': -0.10,
             },
           },
           timestamp: '2024-01-01T00:00:00.000Z',
@@ -395,6 +574,12 @@ describe('marketMaker', () => {
               'ask-fill-1m': 0.3,
               'ask-fill-5m': 0.5,
               'ask-fill-15m': 0.7,
+              'bid-delta-mid-1m': 0.06,
+              'bid-delta-mid-5m': 0.09,
+              'bid-delta-mid-15m': 0.13,
+              'ask-delta-mid-1m': -0.04,
+              'ask-delta-mid-5m': -0.07,
+              'ask-delta-mid-15m': -0.11,
             },
           },
           timestamp: '2024-01-01T00:01:00.000Z',

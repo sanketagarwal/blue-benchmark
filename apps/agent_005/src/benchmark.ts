@@ -6,21 +6,116 @@ import {
   advanceClock,
   resetClockState,
 } from './clock-state.js';
-import { computeFillGroundTruth } from './ground-truth/fill-checker.js';
+import { computeExtendedFillGroundTruth } from './ground-truth/fill-checker.js';
 import { createMarketMaker, setMarketMakerContext, clearMarketMakerContext } from './market-maker.js';
 import { MODEL_MATRIX, BENCHMARK_ROUNDS } from './matrix.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
+import { getMidPriceAtTime, getMidPriceChange } from './replay-lab/mid-price.js';
 import { getOrderbookSnapshot, formatOrderbookForPrompt, getBestBidAsk } from './replay-lab/orderbook.js';
 import { getTrades } from './replay-lab/trades.js';
 import { calculateModelSummary, findWinner } from './results.js';
 import { forecastScorer } from './scorers/aggregate-scorer.js';
 import { printResultsTable } from './table.js';
 
+import type { FillCheckResult } from './ground-truth/fill-checker.js';
 import type { ModelId } from './matrix.js';
+import type { Trade } from './replay-lab/trades.js';
 import type { BenchmarkResults, ModelResults, RoundResult } from './results.js';
-import type { FillContractId } from './scorers/types.js';
+import type { DeltaMidContractId, FillContractId } from './scorers/types.js';
 
 const isVerbose = process.argv.includes('--verbose');
+
+// Horizon mappings in milliseconds
+const HORIZON_MS = {
+  '1m': 60_000,
+  '5m': 300_000,
+  '15m': 900_000,
+} as const;
+
+type Horizon = keyof typeof HORIZON_MS;
+type Side = 'bid' | 'ask';
+
+/**
+ * Computes delta-mid ground truth for all contracts where fill occurred.
+ * Returns undefined for contracts where no fill happened.
+ *
+ * @param trades - Array of trades to compute mid prices from
+ * @param fillDetails - Fill details for each contract from extended ground truth
+ * @returns Record mapping delta-mid contract IDs to price changes (undefined if no fill)
+ */
+function computeDeltaMidActuals(
+  trades: Trade[],
+  fillDetails: Record<string, FillCheckResult>
+): Record<DeltaMidContractId, number | undefined> {
+  const result: Record<string, number | undefined> = {};
+
+  const sides: Side[] = ['bid', 'ask'];
+  const horizons: Horizon[] = ['1m', '5m', '15m'];
+
+  for (const side of sides) {
+    for (const horizon of horizons) {
+      const fillContractId = `${side}-fill-${horizon}` as FillContractId;
+      const deltaMidContractId = `${side}-delta-mid-${horizon}` as DeltaMidContractId;
+      // eslint-disable-next-line security/detect-object-injection -- fillContractId is constructed from controlled enum values
+      const fillDetail = fillDetails[fillContractId];
+      const fillTime = fillDetail?.fillTime;
+
+      if (fillDetail !== undefined && fillDetail.filled && fillTime !== undefined) {
+        // eslint-disable-next-line security/detect-object-injection -- horizonMs lookup uses controlled enum key
+        const horizonMs = HORIZON_MS[horizon];
+        const deltaMid = getMidPriceChange(trades, fillTime, horizonMs);
+        // eslint-disable-next-line security/detect-object-injection -- deltaMidContractId is constructed from controlled enum values
+        result[deltaMidContractId] = deltaMid;
+      } else {
+        // eslint-disable-next-line security/detect-object-injection -- deltaMidContractId is constructed from controlled enum values
+        result[deltaMidContractId] = undefined;
+      }
+    }
+  }
+
+  return result as Record<DeltaMidContractId, number | undefined>;
+}
+
+/**
+ * Computes exit mid prices for PnL calculation.
+ * For each filled contract, gets the mid price at fillTime + horizon.
+ *
+ * @param trades - Array of trades to compute mid prices from
+ * @param fillDetails - Fill details for each contract from extended ground truth
+ * @returns Record mapping fill contract IDs to exit mid prices (undefined if no fill or no data)
+ */
+function computeExitMids(
+  trades: Trade[],
+  fillDetails: Record<string, FillCheckResult>
+): Record<FillContractId, number | undefined> {
+  const result: Record<string, number | undefined> = {};
+
+  const sides: Side[] = ['bid', 'ask'];
+  const horizons: Horizon[] = ['1m', '5m', '15m'];
+
+  for (const side of sides) {
+    for (const horizon of horizons) {
+      const fillContractId = `${side}-fill-${horizon}` as FillContractId;
+      // eslint-disable-next-line security/detect-object-injection -- fillContractId is constructed from controlled enum values
+      const fillDetail = fillDetails[fillContractId];
+      const fillTime = fillDetail?.fillTime;
+
+      if (fillDetail !== undefined && fillDetail.filled && fillTime !== undefined) {
+        // eslint-disable-next-line security/detect-object-injection -- horizonMs lookup uses controlled enum key
+        const horizonMs = HORIZON_MS[horizon];
+        const exitTime = new Date(fillTime.getTime() + horizonMs);
+        const exitMid = getMidPriceAtTime(trades, exitTime);
+        // eslint-disable-next-line security/detect-object-injection -- fillContractId is constructed from controlled enum values
+        result[fillContractId] = exitMid;
+      } else {
+        // eslint-disable-next-line security/detect-object-injection -- fillContractId is constructed from controlled enum values
+        result[fillContractId] = undefined;
+      }
+    }
+  }
+
+  return result as Record<FillContractId, number | undefined>;
+}
 
 async function runModelRound(
   modelId: ModelId,
@@ -41,25 +136,50 @@ async function runModelRound(
   const horizonEnd = new Date(predictionTime.getTime() + 15 * 60 * 1000);
   const trades = await getTrades(symbolId, predictionTime, horizonEnd);
 
-  // Compute fill ground truth using best bid/ask from orderbook
-  const groundTruth = computeFillGroundTruth(
+  // Compute extended fill ground truth using best bid/ask from orderbook
+  const extendedGroundTruth = computeExtendedFillGroundTruth(
     trades,
     bestBid,
     bestAsk,
     predictionTime
   );
 
+  // Compute delta-mid ground truth for contracts where fill occurred
+  const deltaMidActuals = computeDeltaMidActuals(trades, extendedGroundTruth.details);
+
+  // Compute exit mids for PnL calculation
+  const exitMids = computeExitMids(trades, extendedGroundTruth.details);
+
   const scoreResult = await forecastScorer.score({
     predictions: output.predictions as Record<FillContractId, number>,
-    actuals: groundTruth as Record<FillContractId, boolean>,
+    actuals: extendedGroundTruth.fills as Record<FillContractId, boolean>,
     predictionTime,
     symbolId,
+    // Extended inputs for delta-mid, PnL, and EV calculations
+    deltaMidPredictions: output.predictions as Record<string, number>,
+    deltaMidActuals: deltaMidActuals as Record<string, number | undefined>,
+    fillDetails: extendedGroundTruth.details as Record<string, { filled: boolean; fillPrice?: number }>,
+    exitMids: exitMids as Record<string, number | undefined>,
+    fillPrices: { bestBid, bestAsk },
   });
 
   if (isVerbose) {
     console.log(`\n  ${modelId}:`);
     console.log(`    Predictions: ${JSON.stringify(output.predictions)}`);
     console.log(`    Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`);
+    // Show extended metrics when available
+    if (scoreResult.deltaMidScores !== undefined) {
+      console.log(`    Delta-Mid MAE=${scoreResult.deltaMidScores.aggregates.meanMAE.toFixed(4)}, Bias=${scoreResult.deltaMidScores.aggregates.meanBias.toFixed(4)}`);
+    }
+    if (scoreResult.pnlResults !== undefined) {
+      console.log(`    PnL Total=${scoreResult.pnlResults.totalPnL.toFixed(4)}, Mean=${scoreResult.pnlResults.meanPnL.toFixed(4)}, Fills=${String(scoreResult.pnlResults.filledCount)}`);
+    }
+    if (scoreResult.evResults !== undefined) {
+      console.log(`    EV Total=${scoreResult.evResults.totalEV.toFixed(4)}, Mean=${scoreResult.evResults.meanEV.toFixed(4)}`);
+    }
+    if (scoreResult.evPnlGap !== undefined) {
+      console.log(`    EV-PnL Gap=${scoreResult.evPnlGap.gap.toFixed(4)}, Systematic Overestimation=${String(scoreResult.evPnlGap.systematicOverestimation)}`);
+    }
   } else {
     console.log(
       `  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`

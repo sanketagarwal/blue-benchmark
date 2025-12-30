@@ -56,6 +56,12 @@ export interface ForecastScorerInput {
   actuals: Record<ContractId, boolean>;
   predictionTime: Date;
   symbolId: string;
+  // Optional extended inputs for delta-mid, PnL, and EV calculations
+  deltaMidPredictions?: Record<string, number>;
+  deltaMidActuals?: Record<string, number | undefined>;
+  fillDetails?: Record<string, { filled: boolean; fillPrice?: number }>;
+  exitMids?: Record<string, number | undefined>;
+  fillPrices?: { bestBid: number; bestAsk: number };
 }
 
 /**
@@ -82,6 +88,54 @@ export interface MonotonicityViolation {
 }
 
 /**
+ * Aggregated PnL result (imported from pnl-calculator)
+ */
+export interface AggregatedPnL {
+  meanPnL: number;
+  totalPnL: number;
+  filledCount: number;
+  pnlBySide: Record<'bid' | 'ask', number>;
+  pnlByHorizon: Record<'1m' | '5m' | '15m', number>;
+}
+
+/**
+ * Aggregated EV result (imported from ev-calculator)
+ */
+export interface EVAggregate {
+  meanEV: number;
+  totalEV: number;
+  evBySide: Record<'bid' | 'ask', number>;
+  evByHorizon: Record<'1m' | '5m' | '15m', number>;
+}
+
+/**
+ * EV-PnL gap analysis result
+ */
+export interface EVPnLGapResult {
+  gap: number;
+  gapVariance: number;
+  systematicOverestimation: boolean;
+}
+
+/**
+ * Delta-mid aggregates
+ */
+export interface DeltaMidAggregates {
+  meanMAE: number;
+  meanMSE: number;
+  meanBias: number;
+  sampleCount: number;
+}
+
+/**
+ * Delta-mid scorer result
+ */
+export interface DeltaMidScorerResult {
+  scores: DeltaMidContractScore[];
+  aggregates: DeltaMidAggregates;
+}
+
+/**
  * Result from scoring a forecast
  */
 export interface ForecastScoreResult extends ScorerResult {
@@ -95,6 +149,11 @@ export interface ForecastScoreResult extends ScorerResult {
   };
   perContract: ContractScore[];
   violations: MonotonicityViolation[];
+  // Optional extended results
+  deltaMidScores?: DeltaMidScorerResult;
+  pnlResults?: AggregatedPnL;
+  evResults?: EVAggregate;
+  evPnlGap?: EVPnLGapResult;
 }
 
 /**
@@ -117,3 +176,125 @@ export interface RunningTally {
     }
   >;
 }
+
+// ============================================================================
+// EV Benchmark Extension Types
+// ============================================================================
+
+/**
+ * Delta-Mid Contract ID type - predicts price movement from mid at fill time
+ * Values are in basis points (1 bp = 0.01%)
+ */
+export type DeltaMidContractId =
+  | 'bid-delta-mid-1m'
+  | 'bid-delta-mid-5m'
+  | 'bid-delta-mid-15m'
+  | 'ask-delta-mid-1m'
+  | 'ask-delta-mid-5m'
+  | 'ask-delta-mid-15m';
+
+/**
+ * All contract types - fill probability and delta-mid predictions
+ */
+export type AllContractId = FillContractId | DeltaMidContractId;
+
+// Delta-Mid Contract ID constants to avoid string duplication
+const BID_DELTA_MID_1M: DeltaMidContractId = 'bid-delta-mid-1m';
+const BID_DELTA_MID_5M: DeltaMidContractId = 'bid-delta-mid-5m';
+const BID_DELTA_MID_15M: DeltaMidContractId = 'bid-delta-mid-15m';
+const ASK_DELTA_MID_1M: DeltaMidContractId = 'ask-delta-mid-1m';
+const ASK_DELTA_MID_5M: DeltaMidContractId = 'ask-delta-mid-5m';
+const ASK_DELTA_MID_15M: DeltaMidContractId = 'ask-delta-mid-15m';
+
+/**
+ * Array of all delta-mid contract IDs for iteration
+ */
+export const DELTA_MID_CONTRACT_IDS: DeltaMidContractId[] = [
+  BID_DELTA_MID_1M,
+  BID_DELTA_MID_5M,
+  BID_DELTA_MID_15M,
+  ASK_DELTA_MID_1M,
+  ASK_DELTA_MID_5M,
+  ASK_DELTA_MID_15M,
+];
+
+/**
+ * Fixed trading fee in basis points (1 bp = 0.01%)
+ */
+export const FIXED_FEE_BPS = 1;
+
+/**
+ * Fixed trading fee as decimal (1 bp = 0.0001)
+ */
+export const FIXED_FEE = 0.0001;
+
+/**
+ * Delta-Mid predictions interface - predicted price movement in bps
+ */
+export interface DeltaMidPredictions {
+  [BID_DELTA_MID_1M]: number;
+  [BID_DELTA_MID_5M]: number;
+  [BID_DELTA_MID_15M]: number;
+  [ASK_DELTA_MID_1M]: number;
+  [ASK_DELTA_MID_5M]: number;
+  [ASK_DELTA_MID_15M]: number;
+}
+
+/**
+ * Delta-Mid ground truth - only populated when fill occurred
+ * undefined means no fill happened, so no delta-mid measurement possible
+ */
+export interface DeltaMidGroundTruth {
+  [BID_DELTA_MID_1M]: number | undefined;
+  [BID_DELTA_MID_5M]: number | undefined;
+  [BID_DELTA_MID_15M]: number | undefined;
+  [ASK_DELTA_MID_1M]: number | undefined;
+  [ASK_DELTA_MID_5M]: number | undefined;
+  [ASK_DELTA_MID_15M]: number | undefined;
+}
+
+/**
+ * Score for an individual delta-mid contract
+ */
+export interface DeltaMidContractScore {
+  contractId: DeltaMidContractId;
+  predicted: number;
+  actual: number;
+  absoluteError: number;
+  squaredError: number;
+  signedError: number; // For bias calculation (predicted - actual)
+}
+
+/**
+ * PnL result for a single trade
+ */
+export interface PnLResult {
+  side: 'bid' | 'ask';
+  horizon: '1m' | '5m' | '15m';
+  filled: boolean;
+  fillPrice?: number;
+  exitMid?: number;
+  pnl: number; // 0 if no fill
+}
+
+/**
+ * Expected Value calculation result
+ */
+export interface EVResult {
+  side: 'bid' | 'ask';
+  horizon: '1m' | '5m' | '15m';
+  predictedFillProb: number;
+  predictedDeltaMid: number;
+  ev: number;
+}
+
+/**
+ * Extended forecast score result with EV benchmark metrics
+ * @deprecated Use ForecastScoreResult with optional fields instead
+ */
+export type ExtendedForecastScoreResult = ForecastScoreResult & {
+  deltaMidScores: NonNullable<ForecastScoreResult['deltaMidScores']>;
+  pnlResults: NonNullable<ForecastScoreResult['pnlResults']>;
+  evResults: NonNullable<ForecastScoreResult['evResults']>;
+  evPnlGap: NonNullable<ForecastScoreResult['evPnlGap']>;
+};
