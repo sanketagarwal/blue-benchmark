@@ -137,6 +137,24 @@ export interface DeltaMidScorerResult {
 }
 
 /**
+ * Raw EV result for quintile analysis
+ */
+export interface RawEVResult {
+  side: string;
+  horizon: string;
+  ev: number;
+}
+
+/**
+ * Raw PnL result for quintile analysis
+ */
+export interface RawPnLResult {
+  side: string;
+  horizon: string;
+  pnl: number;
+}
+
+/**
  * Result from scoring a forecast
  */
 export interface ForecastScoreResult extends ScorerResult {
@@ -155,6 +173,9 @@ export interface ForecastScoreResult extends ScorerResult {
   pnlResults?: AggregatedPnL;
   evResults?: EVAggregate;
   evPnlGap?: EVPnLGapResult;
+  // Raw results for quintile analysis
+  rawEVResults?: RawEVResult[];
+  rawPnLResults?: RawPnLResult[];
 }
 
 /**

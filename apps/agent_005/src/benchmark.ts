@@ -16,12 +16,14 @@ import { getOrderbookSnapshot, formatOrderbookForPrompt, getBestBidAsk } from '.
 import { getTrades } from './replay-lab/trades.js';
 import { calculateModelSummary, findWinner } from './results.js';
 import { forecastScorer } from './scorers/aggregate-scorer.js';
-import { printResultsTable } from './table.js';
+import { bucketByQuintile, collectEVPnLSamples } from './scorers/quintile-analyzer.js';
+import { printResultsTable, printQuintileTable } from './table.js';
 
 import type { FillCheckResult } from './ground-truth/fill-checker.js';
 import type { ModelId } from './matrix.js';
 import type { Trade } from './replay-lab/trades.js';
 import type { BenchmarkResults, ModelResults, RoundResult } from './results.js';
+import type { EVPnLSample } from './scorers/quintile-analyzer.js';
 import type { DeltaMidContractId, FillContractId } from './scorers/types.js';
 
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
@@ -243,6 +245,39 @@ async function runModelRound(
   };
 }
 
+/**
+ * Collect EV-PnL samples from model rounds for quintile analysis
+ *
+ * @param modelResult - Model results containing rounds with EV and PnL data
+ * @returns Array of EV-PnL sample pairs
+ */
+function collectModelSamples(modelResult: ModelResults): EVPnLSample[] {
+  const samples: EVPnLSample[] = [];
+  for (const round of modelResult.rounds) {
+    if (round.score.rawEVResults !== undefined && round.score.rawPnLResults !== undefined) {
+      const roundSamples = collectEVPnLSamples(round.score.rawEVResults, round.score.rawPnLResults);
+      samples.push(...roundSamples);
+    }
+  }
+  return samples;
+}
+
+/**
+ * Print quintile analysis tables for all models
+ *
+ * @param results - Benchmark results containing all model results
+ */
+function printQuintileAnalysisTables(results: BenchmarkResults): void {
+  for (const modelResult of results.models) {
+    const samples = collectModelSamples(modelResult);
+    if (samples.length > 0) {
+      const buckets = bucketByQuintile(samples);
+      logger.newline();
+      printQuintileTable(buckets, modelResult.modelId);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   logger.header('agent_005 Model Matrix Benchmark');
 
@@ -336,6 +371,9 @@ async function main(): Promise<void> {
 
   // Print results table
   printResultsTable(summaries, BENCHMARK_ROUNDS, winner);
+
+  // Print quintile analysis tables
+  printQuintileAnalysisTables(results);
 }
 
 // Use top-level await pattern for CLI

@@ -413,6 +413,13 @@ export class BenchmarkLogger {
     }
     console.log('');
   }
+
+  /**
+   * Output a blank newline (always displayed)
+   */
+  newline(): void {
+    console.log('');
+  }
 }
 
 /**

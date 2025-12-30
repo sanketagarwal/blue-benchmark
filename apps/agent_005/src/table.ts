@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 
 import type { ModelSummary } from './results.js';
+import type { QuintileBucket } from './scorers/quintile-analyzer.js';
 
 // Quality thresholds for color coding
 const BRIER_GOOD = 0.25;
@@ -347,6 +348,58 @@ function printBasicTable(
     ? NO_WINNER_TEXT
     : `Winner: ${chalk.bold.green(winner.modelId)} (lowest Brier score)`;
   table.push([{ colSpan: 4, content: winnerText, hAlign: 'left' }]);
+
+  // eslint-disable-next-line no-console -- CLI table output
+  console.log(table.toString());
+}
+
+/**
+ * Print EV quintile analysis table for a single model.
+ * Shows calibration across the prediction distribution.
+ *
+ * @param buckets - Array of 5 quintile buckets
+ * @param modelId - Model identifier for the table title
+ */
+export function printQuintileTable(buckets: QuintileBucket[], modelId: string): void {
+  const table = new Table({
+    chars: {
+      'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
+      'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
+      'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
+      'right': '│', 'right-mid': '┤', 'middle': '│'
+    },
+    style: { head: [], border: [] }
+  });
+
+  // Title row
+  table.push([{
+    colSpan: 5,
+    content: chalk.bold(`EV Quintile Analysis: ${modelId}`),
+    hAlign: 'center'
+  }]);
+
+  // Column header row
+  table.push([
+    { content: chalk.dim('Quintile'), hAlign: 'center' },
+    { content: chalk.dim('Mean EV'), hAlign: 'center' },
+    { content: chalk.dim('Mean PnL'), hAlign: 'center' },
+    { content: chalk.dim('Gap'), hAlign: 'center' },
+    { content: chalk.dim('N'), hAlign: 'center' },
+  ]);
+
+  // Data rows
+  for (const bucket of buckets) {
+    const gapQuality = getQuality(Math.abs(bucket.evPnLGap), GAP_GOOD, GAP_OK, true);
+    const gapColor = getQualityColor(gapQuality);
+
+    table.push([
+      { content: bucket.label, hAlign: 'left' },
+      { content: bucket.sampleCount > 0 ? formatSigned(bucket.meanPredictedEV, 3) : '-', hAlign: 'right' },
+      { content: bucket.sampleCount > 0 ? formatSigned(bucket.meanRealizedPnL, 3) : '-', hAlign: 'right' },
+      { content: bucket.sampleCount > 0 ? gapColor(formatSigned(bucket.evPnLGap, 3)) : '-', hAlign: 'right' },
+      { content: String(bucket.sampleCount), hAlign: 'right' },
+    ]);
+  }
 
   // eslint-disable-next-line no-console -- CLI table output
   console.log(table.toString());

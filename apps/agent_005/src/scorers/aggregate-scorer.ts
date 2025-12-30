@@ -118,6 +118,15 @@ function computeExtendedScores(
   if (fillDetails !== undefined && exitMids !== undefined) {
     pnlResultsRaw = calculateAllPnL(fillDetails, exitMids);
     result.pnlResults = aggregatePnL(pnlResultsRaw);
+
+    // Preserve raw PnL results for quintile analysis (only filled trades)
+    result.rawPnLResults = pnlResultsRaw
+      .filter((r) => r.filled)
+      .map((r) => ({
+        side: r.side,
+        horizon: r.horizon,
+        pnl: r.pnl,
+      }));
   }
 
   // Optional: EV calculation
@@ -125,6 +134,13 @@ function computeExtendedScores(
   if (deltaMidPredictions !== undefined && fillPrices !== undefined) {
     expectedValueResultsRaw = calculateAllEV(predictions, deltaMidPredictions, fillPrices);
     result.evResults = aggregateEV(expectedValueResultsRaw);
+
+    // Preserve raw EV results for quintile analysis
+    result.rawEVResults = expectedValueResultsRaw.map((r) => ({
+      side: r.side,
+      horizon: r.horizon,
+      ev: r.ev,
+    }));
   }
 
   // Optional: EV-PnL gap (requires both EV and PnL)
