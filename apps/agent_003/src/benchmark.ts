@@ -125,7 +125,6 @@ await main()
     process.exit(0);
   })
   .catch((error: unknown) => {
-    // eslint-disable-next-line no-console -- CLI error output must use console
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);

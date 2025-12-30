@@ -72,7 +72,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 export function getContextWindow(modelId: string): number {
   const contextWindow = MODEL_CONTEXT_WINDOWS[modelId];
   if (contextWindow === undefined) {
-    // eslint-disable-next-line no-console -- Intentional warning for unknown models to help developers add them to the list
+    // eslint-disable-next-line no-console, no-restricted-syntax -- Intentional warning for unknown models to help developers add them to the list
     console.warn(
       `⚠️  WARNING: Unknown model "${modelId}" - using default context window of ${String(DEFAULT_CONTEXT_WINDOW)} tokens. ` +
       `Add this model to MODEL_CONTEXT_WINDOWS in packages/agent-core/src/llm.ts for accurate compaction.`

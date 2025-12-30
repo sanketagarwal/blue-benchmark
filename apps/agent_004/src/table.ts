@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- CLI table output requires console.log, cannot use BenchmarkLogger for ASCII table formatting */
 import type { ModelSummary } from './results.js';
 
 const COL_WIDTH_MODEL = 33;
@@ -139,3 +140,4 @@ export function printResultsTable(
   console.log(bottomBorder);
   /* eslint-enable no-console -- Re-enable console rule after CLI table output */
 }
+/* eslint-enable no-restricted-syntax -- Re-enable after CLI table output */

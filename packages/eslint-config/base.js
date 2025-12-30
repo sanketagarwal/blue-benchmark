@@ -504,7 +504,24 @@ export const config = [
   // General ESLint rules
   {
     rules: {
-      "no-console": "error",
+      // Ban console.log/warn/info - use BenchmarkLogger from @nullagent/cli-utils instead
+      // console.error is allowed for fatal errors only
+      "no-console": ["error", { allow: ["error"] }],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.object.name='console'][callee.property.name='log']",
+          message: "Use BenchmarkLogger from @nullagent/cli-utils instead of console.log. Import with: import { createBenchmarkLogger } from '@nullagent/cli-utils'",
+        },
+        {
+          selector: "CallExpression[callee.object.name='console'][callee.property.name='warn']",
+          message: "Use BenchmarkLogger from @nullagent/cli-utils instead of console.warn. Import with: import { createBenchmarkLogger } from '@nullagent/cli-utils'",
+        },
+        {
+          selector: "CallExpression[callee.object.name='console'][callee.property.name='info']",
+          message: "Use BenchmarkLogger from @nullagent/cli-utils instead of console.info. Import with: import { createBenchmarkLogger } from '@nullagent/cli-utils'",
+        },
+      ],
       "no-debugger": "error",
       "prefer-const": "error",
       "no-var": "error",

@@ -1,5 +1,5 @@
-/* eslint-disable no-console -- CLI benchmark tool requires console output */
 import { runRound } from '@nullagent/agent-core';
+import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
 import {
   initializeClock,
@@ -23,7 +23,7 @@ import type { Trade } from './replay-lab/trades.js';
 import type { BenchmarkResults, ModelResults, RoundResult } from './results.js';
 import type { DeltaMidContractId, FillContractId } from './scorers/types.js';
 
-const isVerbose = process.argv.includes('--verbose');
+const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 
 // Horizon mappings in milliseconds
 const HORIZON_MS = {
@@ -166,28 +166,35 @@ async function runModelRound(
     fillPrices: { bestBid, bestAsk },
   });
 
-  if (isVerbose) {
-    console.log(`\n  ${modelId}:`);
-    console.log(`    Predictions: ${JSON.stringify(output.predictions)}`);
-    console.log(`    Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`);
-    // Show extended metrics when available
-    if (scoreResult.deltaMidScores !== undefined) {
-      console.log(`    Delta-Mid MAE=${scoreResult.deltaMidScores.aggregates.meanMAE.toFixed(4)}, Bias=${scoreResult.deltaMidScores.aggregates.meanBias.toFixed(4)}`);
-    }
-    if (scoreResult.pnlResults !== undefined) {
-      console.log(`    PnL Total=${scoreResult.pnlResults.totalPnL.toFixed(4)}, Mean=${scoreResult.pnlResults.meanPnL.toFixed(4)}, Fills=${String(scoreResult.pnlResults.filledCount)}`);
-    }
-    if (scoreResult.evResults !== undefined) {
-      console.log(`    EV Total=${scoreResult.evResults.totalEV.toFixed(4)}, Mean=${scoreResult.evResults.meanEV.toFixed(4)}`);
-    }
-    if (scoreResult.evPnlGap !== undefined) {
-      console.log(`    EV-PnL Gap=${scoreResult.evPnlGap.gap.toFixed(4)}, Systematic Overestimation=${String(scoreResult.evPnlGap.systematicOverestimation)}`);
-    }
-  } else {
-    console.log(
-      `  ${modelId}: Brier=${scoreResult.aggregates.meanBrierScore.toFixed(3)}, Accuracy=${(scoreResult.aggregates.accuracy * 100).toFixed(1)}%`
-    );
-  }
+  // Stop spinner before verbose output to prevent interleaving
+  logger.succeedSpinner(`${modelId}: Scored`);
+
+  // Log verbose predictions and detailed metrics
+  logger.logModelPredictions(modelId, output.predictions);
+  logger.logBasicScoresInline(
+    scoreResult.aggregates.meanBrierScore,
+    scoreResult.aggregates.accuracy
+  );
+
+  // Log EV metrics with quality indicators
+  logger.logEVMetrics({
+    deltaMidMAE: scoreResult.deltaMidScores?.aggregates.meanMAE,
+    deltaMidBias: scoreResult.deltaMidScores?.aggregates.meanBias,
+    totalPnL: scoreResult.pnlResults?.totalPnL,
+    meanPnL: scoreResult.pnlResults?.meanPnL,
+    filledCount: scoreResult.pnlResults?.filledCount,
+    totalEV: scoreResult.evResults?.totalEV,
+    meanEV: scoreResult.evResults?.meanEV,
+    evPnlGap: scoreResult.evPnlGap?.gap,
+    systematicOverestimation: scoreResult.evPnlGap?.systematicOverestimation,
+  });
+
+  // Always show compact model score line in non-verbose mode
+  logger.logModelScoreCompact(
+    modelId,
+    scoreResult.aggregates.meanBrierScore,
+    scoreResult.aggregates.accuracy
+  );
 
   return {
     roundNumber,
@@ -196,8 +203,7 @@ async function runModelRound(
 }
 
 async function main(): Promise<void> {
-  console.log('agent_005 Model Matrix Benchmark');
-  console.log('================================\n');
+  logger.header('agent_005 Model Matrix Benchmark');
 
   const startTime = new Date().toISOString();
 
@@ -211,10 +217,15 @@ async function main(): Promise<void> {
   resetClockState();
   let clockState = initializeClock();
 
-  console.log(`Symbol: ${symbolId}`);
-  console.log(`Start Time: ${clockState.currentTime.toISOString()}`);
-  console.log(`Models: ${MODEL_MATRIX.join(', ')}`);
-  console.log(`Rounds: ${String(BENCHMARK_ROUNDS)}\n`);
+  logger.logBenchmarkInfo({
+    symbol: symbolId,
+    startTime: clockState.currentTime.toISOString(),
+    models: [...MODEL_MATRIX],
+    rounds: BENCHMARK_ROUNDS,
+  });
+
+  // Show EV metric explanations in verbose mode
+  logger.explainEVMetrics();
 
   // Initialize results tracking
   const modelResults = new Map<ModelId, RoundResult[]>();
@@ -224,7 +235,8 @@ async function main(): Promise<void> {
 
   // Run benchmark rounds
   for (let round = 1; round <= BENCHMARK_ROUNDS; round++) {
-    console.log(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)} (${clockState.currentTime.toISOString()})`);
+    logger.logRoundHeader(round, BENCHMARK_ROUNDS, clockState.currentTime);
+    logger.startSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: Fetching market data...`);
 
     // Fetch data once for this round
     const charts = await getForecastingCharts(symbolId, clockState.currentTime);
@@ -241,8 +253,11 @@ async function main(): Promise<void> {
       symbolId,
     });
 
+    logger.succeedSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: Market data loaded`);
+
     // Run each model sequentially
     for (const modelId of MODEL_MATRIX) {
+      logger.startSpinner(`Round ${String(round)}/${String(BENCHMARK_ROUNDS)}: ${modelId} - Calling LLM...`);
       const roundResult = await runModelRound(
         modelId,
         symbolId,
@@ -259,7 +274,6 @@ async function main(): Promise<void> {
 
     // Advance clock for next round
     clockState = advanceClock();
-    console.log('');
   }
 
   const endTime = new Date().toISOString();
@@ -280,7 +294,6 @@ async function main(): Promise<void> {
   const winner = findWinner(summaries);
 
   // Print results table
-  console.log('');
   printResultsTable(summaries, BENCHMARK_ROUNDS, winner);
 }
 
@@ -295,4 +308,3 @@ await main()
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);
   });
-/* eslint-enable no-console -- Re-enable console rule after CLI benchmark output */
