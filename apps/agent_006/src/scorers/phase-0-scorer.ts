@@ -14,7 +14,7 @@ export interface Phase0RoundScore {
 export interface Phase0AggregateScore {
   meanLogLoss: Record<Horizon, number>;
   extremeErrorRate: Record<Horizon, number>;
-  degeneratePattern: boolean;
+  degenerateByHorizon: Record<Horizon, boolean>;
 }
 
 const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
@@ -63,68 +63,78 @@ export function scorePhase0Round(
  * @returns Aggregate Phase 0 score
  */
 export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0AggregateScore {
-  const meanLogLoss: Record<string, number> = {};
-  const extremeErrorRate: Record<string, number> = {};
+  const meanLogLoss: Record<Horizon, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const extremeErrorRate: Record<Horizon, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const degenerateByHorizon: Record<Horizon, boolean> = {
+    '15m': false,
+    '1h': false,
+    '24h': false,
+    '7d': false,
+  };
 
   for (const horizon of HORIZONS) {
-    // Mean log loss
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const losses = rounds.map(r => r.logLossByHorizon[horizon]);
+    const horizonLosses = rounds.map(r => r.logLossByHorizon[horizon]);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    meanLogLoss[horizon] = losses.reduce((a, b) => a + b, 0) / losses.length;
+    const horizonErrors = rounds.map(r => r.extremeErrors[horizon]);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const horizonPredictions = rounds.map(r => r.predictions[horizon]);
 
-    // Extreme error rate
+    // Mean log loss per horizon
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const errors = rounds.filter(r => r.extremeErrors[horizon]).length;
+    meanLogLoss[horizon] = horizonLosses.reduce((a, b) => a + b, 0) / horizonLosses.length;
+
+    // Extreme error rate per horizon
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    extremeErrorRate[horizon] = errors / rounds.length;
+    extremeErrorRate[horizon] = horizonErrors.filter(Boolean).length / horizonErrors.length;
+
+    // Degenerate check PER HORIZON (not cross-horizon)
+    const alwaysHigh = horizonPredictions.every(p => p > 0.9);
+    const alwaysLow = horizonPredictions.every(p => p < 0.1);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    degenerateByHorizon[horizon] = alwaysHigh || alwaysLow;
   }
 
-  // Degenerate pattern: always > 0.9 or always < 0.1
-  const allPredictions = rounds.flatMap(r => Object.values(r.predictions));
-  const alwaysHigh = allPredictions.every(p => p > 0.9);
-  const alwaysLow = allPredictions.every(p => p < 0.1);
-  const degeneratePattern = alwaysHigh || alwaysLow;
+  return { meanLogLoss, extremeErrorRate, degenerateByHorizon };
+}
 
-  return {
-    meanLogLoss: meanLogLoss as Record<Horizon, number>,
-    extremeErrorRate: extremeErrorRate as Record<Horizon, number>,
-    degeneratePattern,
-  };
+/**
+ * Get horizons that should be disqualified in Phase 0
+ * Returns set of horizons to disqualify (not global elimination)
+ * @param aggregateScore - Aggregate Phase 0 score
+ * @returns Set of horizons to disqualify
+ */
+export function getPhase0DisqualifiedHorizons(
+  aggregateScore: Phase0AggregateScore
+): Set<Horizon> {
+  const threshold = RANDOM_BASELINE * 1.1;
+  const disqualified = new Set<Horizon>();
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const meanLL = aggregateScore.meanLogLoss[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const degenerate = aggregateScore.degenerateByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const extremeRate = aggregateScore.extremeErrorRate[horizon];
+
+    // Disqualify from this horizon if: worse than random OR degenerate OR high extreme error rate
+    if (meanLL > threshold || degenerate || extremeRate > 0.2) {
+      disqualified.add(horizon);
+    }
+  }
+
+  return disqualified;
 }
 
 /**
  * Determine if model should be eliminated in Phase 0
+ * Note: Consider using getPhase0DisqualifiedHorizons for per-horizon elimination
  * @param score - Aggregate Phase 0 score
- * @returns True if model should be eliminated
+ * @returns True if model should be eliminated (disqualified from ALL horizons)
  */
 export function shouldEliminatePhase0(score: Phase0AggregateScore): boolean {
-  const threshold = RANDOM_BASELINE * 1.1;
-
-  // Count horizons with log loss above threshold
-  const horizonsAboveThreshold = HORIZONS.filter(
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    h => score.meanLogLoss[h] > threshold
-  ).length;
-
-  // Eliminate if:
-  // 1. meanLogLoss > baseline * 1.1 on 2+ horizons
-  if (horizonsAboveThreshold >= 2) {
-    return true;
-  }
-
-  // 2. degeneratePattern = true
-  if (score.degeneratePattern) {
-    return true;
-  }
-
-  // 3. extremeErrorRate > 0.2 on any horizon
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    if (score.extremeErrorRate[horizon] > 0.2) {
-      return true;
-    }
-  }
-
-  return false;
+  const disqualified = getPhase0DisqualifiedHorizons(score);
+  // Only fully eliminate if disqualified from ALL horizons
+  return disqualified.size === 4;
 }

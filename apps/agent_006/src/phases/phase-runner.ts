@@ -27,7 +27,10 @@ import type { ModelState, ModelStateManager, RoundScore } from '../state/model-s
 const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
 
 function getPhase0Reason(aggregate: ReturnType<typeof aggregatePhase0Scores>): string {
-  if (aggregate.degeneratePattern) {
+  // Check if any horizon has a degenerate pattern
+  // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+  const hasDegenerateHorizon = HORIZONS.some(h => aggregate.degenerateByHorizon[h]);
+  if (hasDegenerateHorizon) {
     return 'Degenerate pattern';
   }
   const threshold = RANDOM_BASELINE * 1.1;
