@@ -4,6 +4,7 @@ import Table from 'cli-table3';
 
 import type { Horizon } from './horizon-config.js';
 import type { PerHorizonRankings } from './scorers/phase-3-scorer.js';
+import type { TrackBMetrics } from './scorers/timing-metrics.js';
 
 // Quality thresholds for color coding
 const LOG_LOSS_GOOD = 0.5;
@@ -204,5 +205,197 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
 
   // eslint-disable-next-line no-console -- CLI output
   console.log(table.toString());
+}
+
+/**
+ * Print timing diagnostics table per horizon
+ * Shows Track B metrics: earliest detection, mean time-to-detection, redundant confirmations
+ *
+ * @param modelMetrics - Array of model metrics with modelId and TrackBMetrics
+ */
+export function printTimingDiagnosticsTable(
+  modelMetrics: { modelId: string; metrics: TrackBMetrics }[]
+): void {
+  const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+  const MS_PER_MINUTE = 60_000;
+
+  for (const horizon of HORIZONS) {
+    const title = `${horizon} Timing Diagnostics:`;
+    // eslint-disable-next-line no-console -- CLI output
+    console.log(`\n${chalk.bold.cyan(title)}`);
+
+    const table = new Table({
+      chars: {
+        'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
+        'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
+        'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
+        'right': '│', 'right-mid': '┤', 'middle': '│'
+      },
+      style: { head: [], border: [] }
+    });
+
+    table.push([
+      { content: chalk.dim('Model'), hAlign: 'center' as const },
+      { content: chalk.dim('Earliest'), hAlign: 'center' as const },
+      { content: chalk.dim('Mean TtD'), hAlign: 'center' as const },
+      { content: chalk.dim('Redundant'), hAlign: 'center' as const },
+    ]);
+
+    // Sort by mean time to detection (earlier is better)
+    const sorted = [...modelMetrics].sort((a, b) =>
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      a.metrics.byHorizon[horizon].meanTimeToDetectionRatio -
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      b.metrics.byHorizon[horizon].meanTimeToDetectionRatio
+    );
+
+    for (const { modelId, metrics } of sorted) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const m = metrics.byHorizon[horizon];
+      const earliest = m.earliestCorrectPredictionMs === undefined
+        ? chalk.dim('-')
+        : `${(m.earliestCorrectPredictionMs / MS_PER_MINUTE).toFixed(1)}m`;
+      const meanTtD = `${(m.meanTimeToDetectionRatio * 100).toFixed(0)}%`;
+      const redundant = String(m.redundantConfirmations);
+
+      table.push([
+        { content: chalk.cyan(modelId), hAlign: 'left' as const },
+        { content: earliest, hAlign: 'right' as const },
+        { content: meanTtD, hAlign: 'right' as const },
+        { content: redundant, hAlign: 'right' as const },
+      ]);
+    }
+
+    // eslint-disable-next-line no-console -- CLI output
+    console.log(table.toString());
+  }
+}
+
+/**
+ * Model metrics for cross-horizon behavior map
+ */
+interface CrossHorizonModelMetric {
+  modelId: string;
+  qualifiedHorizons: Set<Horizon>;
+  trackB: TrackBMetrics;
+}
+
+/**
+ * Get timing cell indicator for a horizon
+ * Returns E (Early), M (Mid-range), or L (Late) based on mean time-to-detection ratio
+ *
+ * @param ttd - Mean time-to-detection ratio (0-1)
+ * @returns Colored indicator string: E (green), M (yellow), or L (red)
+ */
+function getTimingIndicator(ttd: number): string {
+  if (ttd < 0.3) {
+    return chalk.green('E'); // Early detector
+  }
+  if (ttd < 0.7) {
+    return chalk.yellow('M'); // Mid-range
+  }
+  return chalk.red('L'); // Late confirmer
+}
+
+/**
+ * Determine behavioral profile based on qualified horizons
+ * Returns array of profile labels (e.g., ['Generalist'], ['Short-term'], etc.)
+ *
+ * @param qualified - Array of horizons the model qualifies for
+ * @returns Array of profile labels
+ */
+function determineProfiles(qualified: Horizon[]): string[] {
+  const profiles: string[] = [];
+
+  // Check for generalist (all horizons)
+  if (qualified.length === 4) {
+    profiles.push('Generalist');
+    return profiles;
+  }
+
+  // Check for specialist (single horizon)
+  if (qualified.length === 1) {
+    const firstHorizon = qualified[0];
+    if (firstHorizon !== undefined) {
+      profiles.push(`${firstHorizon} Specialist`);
+    }
+    return profiles;
+  }
+
+  // Check for short-term focus
+  if (qualified.includes('15m') && qualified.includes('1h') && !qualified.includes('7d')) {
+    profiles.push('Short-term');
+  }
+
+  // Check for long-term focus
+  if (qualified.includes('24h') && qualified.includes('7d') && !qualified.includes('15m')) {
+    profiles.push('Long-term');
+  }
+
+  return profiles;
+}
+
+/**
+ * Print cross-horizon behavior map
+ * Shows which horizons each model qualifies for and their timing profile
+ *
+ * @param modelMetrics - Array of model metrics with qualification data and Track B metrics
+ */
+export function printCrossHorizonBehaviorMap(
+  modelMetrics: CrossHorizonModelMetric[]
+): void {
+  const title = chalk.bold.cyan('Cross-Horizon Behavior Map:');
+  // eslint-disable-next-line no-console -- CLI output
+  console.log(`\n${title}`);
+
+  const table = new Table({
+    chars: {
+      'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
+      'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
+      'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
+      'right': '│', 'right-mid': '┤', 'middle': '│'
+    },
+    style: { head: [], border: [] }
+  });
+
+  table.push([
+    { content: chalk.dim('Model'), hAlign: 'center' as const },
+    { content: chalk.dim('15m'), hAlign: 'center' as const },
+    { content: chalk.dim('1h'), hAlign: 'center' as const },
+    { content: chalk.dim('24h'), hAlign: 'center' as const },
+    { content: chalk.dim('7d'), hAlign: 'center' as const },
+    { content: chalk.dim('Profile'), hAlign: 'center' as const },
+  ]);
+
+  const horizonList: Horizon[] = ['15m', '1h', '24h', '7d'];
+
+  for (const { modelId, qualifiedHorizons, trackB } of modelMetrics) {
+    const horizonCells = horizonList.map(h => {
+      if (!qualifiedHorizons.has(h)) {
+        return chalk.dim('✗');
+      }
+      // eslint-disable-next-line security/detect-object-injection -- h from typed array
+      const ttd = trackB.byHorizon[h].meanTimeToDetectionRatio;
+      return getTimingIndicator(ttd);
+    });
+
+    const qualified = [...qualifiedHorizons];
+    const profiles = determineProfiles(qualified);
+    const profileContent = profiles.length > 0 ? profiles.join(', ') : 'Mixed';
+
+    table.push([
+      { content: chalk.cyan(modelId), hAlign: 'left' as const },
+      { content: horizonCells[0], hAlign: 'center' as const },
+      { content: horizonCells[1], hAlign: 'center' as const },
+      { content: horizonCells[2], hAlign: 'center' as const },
+      { content: horizonCells[3], hAlign: 'center' as const },
+      { content: profileContent, hAlign: 'left' as const },
+    ]);
+  }
+
+  // eslint-disable-next-line no-console -- CLI output
+  console.log(table.toString());
+  // eslint-disable-next-line no-console -- CLI output
+  console.log(chalk.dim('\nLegend: E=Early (<30%), M=Mid-range, L=Late (>70%), ✗=Disqualified'));
 }
 /* eslint-enable no-restricted-syntax -- Re-enable after CLI table output */
