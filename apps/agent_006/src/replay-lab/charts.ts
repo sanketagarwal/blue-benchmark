@@ -1,8 +1,11 @@
-import { HORIZON_CHART_CONFIG } from '../horizon-config.js';
+import {
+  TIMEFRAME_IDS,
+  getTimeframeConfig,
+} from '../timeframe-config.js';
 
 import { replayLabFetch } from './client.js';
 
-import type { Horizon } from '../horizon-config.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export interface ChartParams {
   symbolId: string;
@@ -45,33 +48,35 @@ export async function getSignedChartUrl(params: ChartParams): Promise<string> {
 }
 
 export interface ForecastingCharts {
-  chartByHorizon: Record<Horizon, string>;
+  chartByHorizon: Record<TimeframeId, string>;
 }
 
 export async function getForecastingCharts(
   symbolId: string,
   snapTime: Date
 ): Promise<ForecastingCharts> {
-  const horizons: Horizon[] = ['15m', '1h', '24h', '7d'];
-
-  const chartPromises = horizons.map(async (horizon) => {
-    // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
-    const config = HORIZON_CHART_CONFIG[horizon];
-    const fromTime = new Date(snapTime.getTime() - config.lookbackMs);
+  const chartPromises = TIMEFRAME_IDS.map(async (timeframeId) => {
+    const config = getTimeframeConfig(timeframeId);
+    const rangeMs = config.chart.range.fromMinutesAgo * 60_000;
+    const fromTime = new Date(snapTime.getTime() - rangeMs);
+    const timeframe = config.chart.barTimeframe; // Direct access, no helper needed
 
     const url = await getSignedChartUrl({
       symbolId,
-      timeframe: config.candleTimeframe,
+      timeframe,
       from: fromTime,
       to: snapTime,
       layers: CHART_LAYERS,
     });
 
-    return [horizon, url] as const;
+    return [timeframeId, url] as const;
   });
 
   const results = await Promise.all(chartPromises);
-  const chartByHorizon = Object.fromEntries(results) as Record<Horizon, string>;
+  const chartByHorizon = Object.fromEntries(results) as Record<
+    TimeframeId,
+    string
+  >;
 
   return { chartByHorizon };
 }

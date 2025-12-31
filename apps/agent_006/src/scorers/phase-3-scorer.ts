@@ -1,4 +1,4 @@
-import type { Horizon } from '../horizon-config.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export interface Phase3ModelMetrics {
   avgPercentileRank: number;
@@ -168,8 +168,8 @@ export interface PerHorizonRankings {
 export interface ModelWithHorizonMetrics {
   modelId: string;
   metrics: Phase3ModelMetrics;
-  horizonMetrics: Record<Horizon, HorizonMetrics>;
-  qualifiedHorizons: Set<Horizon>;
+  horizonMetrics: Record<TimeframeId, HorizonMetrics>;
+  qualifiedHorizons: Set<TimeframeId>;
 }
 
 interface HorizonScoreRanges {
@@ -230,7 +230,7 @@ function computeHorizonScore(
  */
 export function rankModelsForHorizon(
   models: ModelWithHorizonMetrics[],
-  horizon: Horizon
+  horizon: TimeframeId
 ): HorizonRanking[] {
   // Filter to models that are qualified for this horizon AND have valid data
   const validModels = models.filter(m => {

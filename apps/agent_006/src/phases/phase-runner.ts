@@ -21,10 +21,10 @@ import {
   type Phase3ModelMetrics,
 } from '../scorers/phase-3-scorer.js';
 
-import type { Horizon } from '../horizon-config.js';
 import type { ModelState, ModelStateManager, RoundScore } from '../state/model-state.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
 function getPhase0Reason(aggregate: ReturnType<typeof aggregatePhase0Scores>): string {
   // Check if any horizon has a degenerate pattern
@@ -47,7 +47,7 @@ function getPhase0Reason(aggregate: ReturnType<typeof aggregatePhase0Scores>): s
   return 'Failed sanity check';
 }
 
-function getPhase1Reason(percentiles: Record<Horizon, number>): string {
+function getPhase1Reason(percentiles: Record<TimeframeId, number>): string {
   // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
   const weakHorizons = HORIZONS.filter(h => percentiles[h] < 25);
   if (weakHorizons.length >= 2) {
@@ -63,7 +63,7 @@ function getPhase1Reason(percentiles: Record<Horizon, number>): string {
 
 function getPhase2Reason(
   score: Phase2ModelScore,
-  medianStability: Record<Horizon, number>
+  medianStability: Record<TimeframeId, number>
 ): string {
   // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
   const highRegret = HORIZONS.filter(h => score.regretByHorizon[h] > 1.5);
@@ -79,10 +79,10 @@ function getPhase2Reason(
 }
 
 function buildExtremeErrors(
-  predictions: Record<Horizon, number>,
-  labels: Record<Horizon, boolean> | undefined
-): Record<Horizon, boolean> {
-  const result: Partial<Record<Horizon, boolean>> = {};
+  predictions: Record<TimeframeId, number>,
+  labels: Record<TimeframeId, boolean> | undefined
+): Record<TimeframeId, boolean> {
+  const result: Partial<Record<TimeframeId, boolean>> = {};
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const prediction = predictions[horizon];
@@ -91,7 +91,7 @@ function buildExtremeErrors(
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     result[horizon] = prediction > 0.8 && label === false;
   }
-  return result as Record<Horizon, boolean>;
+  return result as Record<TimeframeId, boolean>;
 }
 
 function convertToPhase0Round(round: RoundScore): Phase0RoundScore | undefined {
@@ -144,7 +144,7 @@ export function runPhase0(manager: ModelStateManager): void {
 }
 
 function computeMeanLogLossForModel(state: ModelState): Phase1ModelScore | undefined {
-  const meanLogLoss: Record<Horizon, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
   let count = 0;
 
   for (const round of state.roundScores) {
@@ -198,7 +198,7 @@ export function runPhase1(manager: ModelStateManager): void {
   }
 }
 
-function getLossesForHorizon(state: ModelState, horizon: Horizon): number[] {
+function getLossesForHorizon(state: ModelState, horizon: TimeframeId): number[] {
   const losses: number[] = [];
   for (const round of state.roundScores) {
     if (round.logLossByHorizon !== undefined) {
@@ -225,9 +225,9 @@ function computePhase2ScoreForModel(state: ModelState): Phase2ModelScore {
 
   return {
     modelId: state.modelId,
-    regretByHorizon: regretByHorizon as Record<Horizon, number>,
-    stabilityByHorizon: stabilityByHorizon as Record<Horizon, number>,
-    worstWindowByHorizon: worstWindowByHorizon as Record<Horizon, number>,
+    regretByHorizon: regretByHorizon as Record<TimeframeId, number>,
+    stabilityByHorizon: stabilityByHorizon as Record<TimeframeId, number>,
+    worstWindowByHorizon: worstWindowByHorizon as Record<TimeframeId, number>,
   };
 }
 
@@ -249,8 +249,8 @@ function computeRegretForScores(phase2Scores: Phase2ModelScore[]): void {
   }
 }
 
-function computeMedianStabilityAcrossModels(phase2Scores: Phase2ModelScore[]): Record<Horizon, number> {
-  const medianStability: Record<Horizon, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+function computeMedianStabilityAcrossModels(phase2Scores: Phase2ModelScore[]): Record<TimeframeId, number> {
+  const medianStability: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
   for (const h of HORIZONS) {
     const stabilities: number[] = [];
     for (const score of phase2Scores) {
@@ -297,7 +297,7 @@ function sumArray(numbers: number[]): number {
   return total;
 }
 
-function getPivotRatiosForHorizon(state: ModelState, horizon: Horizon): number[] {
+function getPivotRatiosForHorizon(state: ModelState, horizon: TimeframeId): number[] {
   const pivotRatios: number[] = [];
   for (const round of state.roundScores) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array

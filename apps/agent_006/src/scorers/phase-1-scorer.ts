@@ -1,11 +1,11 @@
-import type { Horizon } from '../horizon-config.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export interface Phase1ModelScore {
   modelId: string;
-  meanLogLoss: Record<Horizon, number>;
+  meanLogLoss: Record<TimeframeId, number>;
 }
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
 /**
  * Compute percentile ranks for each model per horizon.
@@ -15,8 +15,8 @@ const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
  */
 export function computePercentileRanks(
   modelScores: Phase1ModelScore[]
-): Map<string, Record<Horizon, number>> {
-  const ranks = new Map<string, Record<Horizon, number>>();
+): Map<string, Record<TimeframeId, number>> {
+  const ranks = new Map<string, Record<TimeframeId, number>>();
 
   // Initialize
   for (const score of modelScores) {
@@ -59,8 +59,8 @@ export function computePercentileRanks(
  * @param percentiles - Percentile ranks by horizon
  * @returns Set of horizons the model qualifies for
  */
-export function getQualifiedHorizons(percentiles: Record<Horizon, number>): Set<Horizon> {
-  const qualified = new Set<Horizon>();
+export function getQualifiedHorizons(percentiles: Record<TimeframeId, number>): Set<TimeframeId> {
+  const qualified = new Set<TimeframeId>();
   for (const horizon of HORIZONS) {
     // Top 70% qualifies (percentile >= 30)
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -76,7 +76,7 @@ export function getQualifiedHorizons(percentiles: Record<Horizon, number>): Set<
  * @param qualifiedHorizons - Set of horizons the model qualifies for
  * @returns True if model qualifies for no horizons
  */
-export function hasNoQualifiedHorizons(qualifiedHorizons: Set<Horizon>): boolean {
+export function hasNoQualifiedHorizons(qualifiedHorizons: Set<TimeframeId>): boolean {
   return qualifiedHorizons.size === 0;
 }
 
@@ -86,7 +86,7 @@ export function hasNoQualifiedHorizons(qualifiedHorizons: Set<Horizon>): boolean
  * @param percentiles - Percentile ranks by horizon
  * @returns True if model should be eliminated
  */
-export function shouldEliminatePhase1(percentiles: Record<Horizon, number>): boolean {
+export function shouldEliminatePhase1(percentiles: Record<TimeframeId, number>): boolean {
   // Count horizons with percentile < 25 (bottom quartile)
   const horizonsBelowThreshold = HORIZONS.filter(
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array

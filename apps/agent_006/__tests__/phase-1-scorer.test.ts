@@ -4,7 +4,7 @@ import {
   shouldEliminatePhase1,
   type Phase1ModelScore,
 } from '../src/scorers/phase-1-scorer.js';
-import type { Horizon } from '../src/horizon-config.js';
+import type { TimeframeId } from '../src/timeframe-config.js';
 
 describe('phase-1-scorer', () => {
   describe('computePercentileRanks', () => {
@@ -26,7 +26,7 @@ describe('phase-1-scorer', () => {
 
   describe('shouldEliminatePhase1', () => {
     it('eliminates if percentileRank < 25 on 2+ horizons', () => {
-      const percentiles: Record<Horizon, number> = {
+      const percentiles: Record<TimeframeId, number> = {
         '15m': 20,
         '1h': 15,
         '24h': 50,
@@ -37,7 +37,7 @@ describe('phase-1-scorer', () => {
     });
 
     it('eliminates if no horizon has percentileRank >= 75', () => {
-      const percentiles: Record<Horizon, number> = {
+      const percentiles: Record<TimeframeId, number> = {
         '15m': 50,
         '1h': 60,
         '24h': 55,
@@ -48,7 +48,7 @@ describe('phase-1-scorer', () => {
     });
 
     it('keeps specialists with one strong horizon', () => {
-      const percentiles: Record<Horizon, number> = {
+      const percentiles: Record<TimeframeId, number> = {
         '15m': 80,
         '1h': 40,
         '24h': 35,
@@ -59,7 +59,7 @@ describe('phase-1-scorer', () => {
     });
 
     it('keeps well-rounded models', () => {
-      const percentiles: Record<Horizon, number> = {
+      const percentiles: Record<TimeframeId, number> = {
         '15m': 60,
         '1h': 80,
         '24h': 55,

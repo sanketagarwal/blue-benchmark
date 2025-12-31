@@ -1,7 +1,7 @@
-import { HORIZON_CONFIG } from '../horizon-config.js';
+import { getTimeframeDurationMs } from '../timeframe-config.js';
 
-import type { Horizon } from '../horizon-config.js';
 import type { RoundScore } from '../state/model-state.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export interface TimingMetrics {
   /** Earliest correct prediction time relative to pivot (ms) */
@@ -13,10 +13,10 @@ export interface TimingMetrics {
 }
 
 export interface TrackBMetrics {
-  byHorizon: Record<Horizon, TimingMetrics>;
+  byHorizon: Record<TimeframeId, TimingMetrics>;
 }
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
 /**
  * Compute Track B timing metrics for a model
@@ -26,11 +26,10 @@ const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
  * @returns Track B metrics per horizon
  */
 export function computeTrackBMetrics(rounds: RoundScore[]): TrackBMetrics {
-  const byHorizon: Record<Horizon, TimingMetrics> = {} as Record<Horizon, TimingMetrics>;
+  const byHorizon: Record<TimeframeId, TimingMetrics> = {} as Record<TimeframeId, TimingMetrics>;
 
   for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const horizonDuration = HORIZON_CONFIG[horizon].duration;
+    const horizonDuration = getTimeframeDurationMs(horizon);
 
     // Find rounds with ground truth for this horizon
     const horizonRounds = rounds.filter(r => {

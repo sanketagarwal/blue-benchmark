@@ -2,9 +2,9 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
 
-import type { Horizon } from './horizon-config.js';
 import type { PerHorizonRankings } from './scorers/phase-3-scorer.js';
 import type { TrackBMetrics } from './scorers/timing-metrics.js';
+import type { TimeframeId } from './timeframe-config.js';
 
 // Quality thresholds for color coding
 const LOG_LOSS_GOOD = 0.5;
@@ -67,7 +67,7 @@ function getRankMedal(rank: number): string {
 export function printPerHorizonArenaTable(
   rankings: PerHorizonRankings
 ): void {
-  const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+  const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -130,7 +130,7 @@ interface MinimalModelState {
  */
 export function printFinalSummaryTable<T extends MinimalModelState>(
   models: T[],
-  computeMeanLogLoss: (state: T) => Record<Horizon, number>
+  computeMeanLogLoss: (state: T) => Record<TimeframeId, number>
 ): void {
   const table = new Table({
     chars: {
@@ -216,7 +216,7 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
 export function printTimingDiagnosticsTable(
   modelMetrics: { modelId: string; metrics: TrackBMetrics }[]
 ): void {
-  const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+  const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
   const MS_PER_MINUTE = 60_000;
 
   for (const horizon of HORIZONS) {
@@ -276,7 +276,7 @@ export function printTimingDiagnosticsTable(
  */
 interface CrossHorizonModelMetric {
   modelId: string;
-  qualifiedHorizons: Set<Horizon>;
+  qualifiedHorizons: Set<TimeframeId>;
   trackB: TrackBMetrics;
 }
 
@@ -304,7 +304,7 @@ function getTimingIndicator(ttd: number): string {
  * @param qualified - Array of horizons the model qualifies for
  * @returns Array of profile labels
  */
-function determineProfiles(qualified: Horizon[]): string[] {
+function determineProfiles(qualified: TimeframeId[]): string[] {
   const profiles: string[] = [];
 
   // Check for generalist (all horizons)
@@ -367,7 +367,7 @@ export function printCrossHorizonBehaviorMap(
     { content: chalk.dim('Profile'), hAlign: 'center' as const },
   ]);
 
-  const horizonList: Horizon[] = ['15m', '1h', '24h', '7d'];
+  const horizonList: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
   for (const { modelId, qualifiedHorizons, trackB } of modelMetrics) {
     const horizonCells = horizonList.map(h => {

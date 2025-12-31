@@ -6,7 +6,7 @@ import {
   printCrossHorizonBehaviorMap,
 } from '../src/table';
 import type { PerHorizonRankings } from '../src/scorers/phase-3-scorer';
-import type { Horizon } from '../src/horizon-config';
+import type { TimeframeId } from '../src/timeframe-config';
 import type { TrackBMetrics } from '../src/scorers/timing-metrics';
 
 describe('table', () => {
@@ -104,10 +104,10 @@ describe('table', () => {
       modelId: string;
       eliminated: boolean;
       eliminatedInPhase?: number;
-      logLoss: Record<Horizon, number>;
+      logLoss: Record<TimeframeId, number>;
     }
 
-    const computeMeanLogLoss = (state: TestModelState): Record<Horizon, number> => state.logLoss;
+    const computeMeanLogLoss = (state: TestModelState): Record<TimeframeId, number> => state.logLoss;
 
     it('should print final summary with all models', () => {
       const models: TestModelState[] = [
@@ -196,7 +196,7 @@ describe('table', () => {
   });
 
   describe('printTimingDiagnosticsTable', () => {
-    const createTrackBMetrics = (overrides: Partial<Record<Horizon, Partial<TrackBMetrics['byHorizon']['15m']>>> = {}): TrackBMetrics => ({
+    const createTrackBMetrics = (overrides: Partial<Record<TimeframeId, Partial<TrackBMetrics['byHorizon']['15m']>>> = {}): TrackBMetrics => ({
       byHorizon: {
         '15m': {
           earliestCorrectPredictionMs: overrides['15m']?.earliestCorrectPredictionMs ?? 60_000,
@@ -271,7 +271,7 @@ describe('table', () => {
   });
 
   describe('printCrossHorizonBehaviorMap', () => {
-    const createTrackBMetrics = (ttdOverrides: Partial<Record<Horizon, number>> = {}): TrackBMetrics => ({
+    const createTrackBMetrics = (ttdOverrides: Partial<Record<TimeframeId, number>> = {}): TrackBMetrics => ({
       byHorizon: {
         '15m': {
           earliestCorrectPredictionMs: 60_000,
@@ -300,12 +300,12 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: 'generalist',
-          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as Horizon[]),
+          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as TimeframeId[]),
           trackB: createTrackBMetrics(),
         },
         {
           modelId: 'short-term-only',
-          qualifiedHorizons: new Set(['15m', '1h'] as Horizon[]),
+          qualifiedHorizons: new Set(['15m', '1h'] as TimeframeId[]),
           trackB: createTrackBMetrics(),
         },
       ];
@@ -324,7 +324,7 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: 'partial-qualified',
-          qualifiedHorizons: new Set(['15m', '24h'] as Horizon[]),
+          qualifiedHorizons: new Set(['15m', '24h'] as TimeframeId[]),
           trackB: createTrackBMetrics(),
         },
       ];
@@ -340,7 +340,7 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: 'mixed-timing',
-          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as Horizon[]),
+          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as TimeframeId[]),
           trackB: createTrackBMetrics({ '15m': 0.1, '1h': 0.5, '24h': 0.5, '7d': 0.9 }),
         },
       ];
@@ -356,7 +356,7 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: '15m-specialist',
-          qualifiedHorizons: new Set(['15m'] as Horizon[]),
+          qualifiedHorizons: new Set(['15m'] as TimeframeId[]),
           trackB: createTrackBMetrics(),
         },
       ];
@@ -372,7 +372,7 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: 'model-a',
-          qualifiedHorizons: new Set(['15m'] as Horizon[]),
+          qualifiedHorizons: new Set(['15m'] as TimeframeId[]),
           trackB: createTrackBMetrics(),
         },
       ];

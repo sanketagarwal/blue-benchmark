@@ -1,6 +1,16 @@
 import { replayLabFetch } from './client.js';
 
-import type { FractalParams, ZigzagParams } from '../horizon-config.js';
+/** Fractal pivot detection parameters */
+export interface FractalParams {
+  L: number;
+  candleTimeframe: string;
+}
+
+/** Zigzag pivot detection parameters */
+export interface ZigzagParams {
+  deviationPct: number;
+  candleTimeframe: string;
+}
 
 /**
  * Fill probability contract IDs for market-making predictions.

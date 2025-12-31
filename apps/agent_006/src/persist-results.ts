@@ -1,9 +1,9 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { Horizon } from './horizon-config.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { HorizonRanking, PerHorizonRankings } from './scorers/phase-3-scorer.js';
+import type { TimeframeId } from './timeframe-config.js';
 
 /**
  * Model state for persistence
@@ -14,8 +14,8 @@ interface ModelState {
   eliminatedInPhase?: number;
   eliminationReason?: string;
   roundScores: Phase0RoundScore[];
-  logLossByHorizon: Record<Horizon, number[]>;
-  timeToPivotRatios: Record<Horizon, number[]>;
+  logLossByHorizon: Record<TimeframeId, number[]>;
+  timeToPivotRatios: Record<TimeframeId, number[]>;
   failedRounds?: number[];
 }
 
@@ -53,7 +53,7 @@ interface ModelMetrics {
   compositeScore: number;
 }
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
 
 // Quality thresholds for log loss (lower is better)
@@ -332,7 +332,7 @@ function generateArenaResultsByHorizon(rankings: PerHorizonRankings | undefined)
 
   const lines: string[] = ['## Arena Results by Horizon', ''];
 
-  const horizonLabels: Record<Horizon, string> = {
+  const horizonLabels: Record<TimeframeId, string> = {
     '15m': '15m Arena Winners',
     '1h': '1h Arena Winners',
     '24h': '24h Arena Winners',
@@ -390,7 +390,7 @@ function generateCrossHorizonStrength(rankings: PerHorizonRankings | undefined):
   }
 
   // Count appearances per model across all horizons
-  const modelAppearances = new Map<string, { horizons: Horizon[]; avgRank: number }>();
+  const modelAppearances = new Map<string, { horizons: TimeframeId[]; avgRank: number }>();
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
@@ -462,7 +462,7 @@ function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
   const lines: string[] = ['## Per-Horizon Rankings (All Models)', ''];
 
   // Sort by each horizon and show top 10
-  const keyMap: Record<Horizon, keyof ModelMetrics> = {
+  const keyMap: Record<TimeframeId, keyof ModelMetrics> = {
     '15m': 'logLoss15m',
     '1h': 'logLoss1h',
     '24h': 'logLoss24h',

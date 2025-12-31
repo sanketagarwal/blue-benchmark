@@ -9,7 +9,7 @@ import {
 
 describe('bottom-caller', () => {
   describe('BOTTOM_CONTRACT_IDS', () => {
-    it('has 4 horizon contracts', () => {
+    it('has 4 timeframe contracts', () => {
       expect(BOTTOM_CONTRACT_IDS).toEqual([
         'bottom-15m',
         'bottom-1h',
@@ -57,17 +57,17 @@ describe('bottom-caller', () => {
       );
     });
 
-    it('builds prompt with chart URLs and horizon contracts', () => {
+    it('builds prompt with chart URLs and timeframe contracts', () => {
       const agent = createBottomCaller('anthropic/claude-haiku-4.5');
       const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
       expect(prompt).toContain('chart-15m.png');
       expect(prompt).toContain('chart-1h.png');
       expect(prompt).toContain('chart-24h.png');
       expect(prompt).toContain('chart-7d.png');
-      expect(prompt).toContain('15-Minute Horizon');
-      expect(prompt).toContain('1-Hour Horizon');
-      expect(prompt).toContain('24-Hour Horizon');
-      expect(prompt).toContain('7-Day Horizon');
+      expect(prompt).toContain('15m Timeframe');
+      expect(prompt).toContain('1h Timeframe');
+      expect(prompt).toContain('24h Timeframe');
+      expect(prompt).toContain('7d Timeframe');
     });
 
     it('builds compaction prompt with round count', () => {

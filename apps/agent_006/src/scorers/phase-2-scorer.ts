@@ -1,12 +1,12 @@
-import type { Horizon } from '../horizon-config.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export interface Phase2ModelScore {
   modelId: string;
-  regretByHorizon: Record<Horizon, number>;
-  stabilityByHorizon: Record<Horizon, number>;
-  bestWindowByHorizon?: Record<Horizon, number>;
-  worstWindowByHorizon?: Record<Horizon, number>;
-  timeToPivotRatioByHorizon?: Record<Horizon, number>;
+  regretByHorizon: Record<TimeframeId, number>;
+  stabilityByHorizon: Record<TimeframeId, number>;
+  bestWindowByHorizon?: Record<TimeframeId, number>;
+  worstWindowByHorizon?: Record<TimeframeId, number>;
+  timeToPivotRatioByHorizon?: Record<TimeframeId, number>;
 }
 
 export interface StabilityMetrics {
@@ -15,7 +15,7 @@ export interface StabilityMetrics {
   variance: number;
 }
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 const WINDOW_SIZE = 6;
 
 /**
@@ -88,9 +88,9 @@ export function computeRegret(
  */
 export function getHorizonsToDisqualify(
   modelScore: Phase2ModelScore,
-  medianStability: Record<Horizon, number>
-): Set<Horizon> {
-  const toDisqualify = new Set<Horizon>();
+  medianStability: Record<TimeframeId, number>
+): Set<TimeframeId> {
+  const toDisqualify = new Set<TimeframeId>();
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -118,7 +118,7 @@ export function getHorizonsToDisqualify(
  */
 export function shouldEliminatePhase2(
   modelScore: Phase2ModelScore,
-  medianStability: Record<Horizon, number>
+  medianStability: Record<TimeframeId, number>
 ): boolean {
   // Count horizons with regret > 1.5
   const horizonsHighRegret = HORIZONS.filter(

@@ -1,14 +1,14 @@
-import type { Horizon } from '../horizon-config.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export type Phase = 0 | 1 | 2 | 3;
 
 export interface RoundScore {
   roundNumber: number;
   logLoss: number;
-  logLossByHorizon?: Record<Horizon, number>;
-  predictions?: Record<Horizon, number>;
-  labels?: Record<Horizon, boolean>;
-  timeToPivotRatio?: Record<Horizon, number | undefined>;
+  logLossByHorizon?: Record<TimeframeId, number>;
+  predictions?: Record<TimeframeId, number>;
+  labels?: Record<TimeframeId, boolean>;
+  timeToPivotRatio?: Record<TimeframeId, number | undefined>;
 }
 
 export interface ModelState {
@@ -18,8 +18,8 @@ export interface ModelState {
   eliminationReason?: string;
   roundScores: RoundScore[];
   // NEW: per-horizon qualification
-  qualifiedHorizons: Set<Horizon>;
-  disqualifiedHorizons: Map<Horizon, { phase: Phase; reason: string }>;
+  qualifiedHorizons: Set<TimeframeId>;
+  disqualifiedHorizons: Map<TimeframeId, { phase: Phase; reason: string }>;
 }
 
 /**
@@ -38,7 +38,7 @@ export class ModelStateManager {
         modelId,
         isActive: true,
         roundScores: [],
-        qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as Horizon[]),
+        qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as TimeframeId[]),
         disqualifiedHorizons: new Map(),
       });
     }
@@ -142,7 +142,7 @@ export class ModelStateManager {
    * @param horizon - The horizon to check qualification for
    * @returns Array of model IDs qualified for the horizon
    */
-  getModelsForHorizon(horizon: Horizon): string[] {
+  getModelsForHorizon(horizon: TimeframeId): string[] {
     return [...this.models.values()]
       .filter(m => m.qualifiedHorizons.has(horizon))
       .map(m => m.modelId);
@@ -154,7 +154,7 @@ export class ModelStateManager {
    * @param horizon - The horizon to check qualification for
    * @returns True if the model is qualified for the horizon
    */
-  isQualifiedForHorizon(modelId: string, horizon: Horizon): boolean {
+  isQualifiedForHorizon(modelId: string, horizon: TimeframeId): boolean {
     const state = this.models.get(modelId);
     if (state === undefined) {
       return false;
@@ -171,7 +171,7 @@ export class ModelStateManager {
    */
   disqualifyFromHorizon(
     modelId: string,
-    horizon: Horizon,
+    horizon: TimeframeId,
     phase: Phase,
     reason: string,
   ): void {
@@ -187,7 +187,7 @@ export class ModelStateManager {
    * @param modelId - The ID of the model to qualify
    * @param horizon - The horizon to qualify for
    */
-  qualifyForHorizon(modelId: string, horizon: Horizon): void {
+  qualifyForHorizon(modelId: string, horizon: TimeframeId): void {
     const state = this.models.get(modelId);
     if (state !== undefined) {
       state.qualifiedHorizons.add(horizon);
@@ -200,7 +200,7 @@ export class ModelStateManager {
    * @param modelId - The ID of the model to check
    * @returns Set of qualified horizons, or undefined if model not found
    */
-  getQualifiedHorizonsForModel(modelId: string): Set<Horizon> | undefined {
+  getQualifiedHorizonsForModel(modelId: string): Set<TimeframeId> | undefined {
     return this.models.get(modelId)?.qualifiedHorizons;
   }
 }

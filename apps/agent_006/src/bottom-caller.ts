@@ -1,7 +1,9 @@
 import { defineAgent } from '@nullagent/agent-core';
 import { z } from 'zod';
 
-import type { Horizon } from './horizon-config.js';
+import { TIMEFRAME_IDS, getTimeframeConfig } from './timeframe-config.js';
+
+import type { TimeframeId } from './timeframe-config.js';
 import type { Agent } from '@nullagent/agent-core';
 
 /**
@@ -20,8 +22,8 @@ export type BottomContractId = (typeof BOTTOM_CONTRACT_IDS)[number];
  * Context interface for bottom predictions
  */
 export interface BottomCallerContext {
-  /** Per-horizon chart URLs */
-  chartByHorizon: Record<Horizon, string>;
+  /** Per-timeframe chart URLs */
+  chartByHorizon: Record<TimeframeId, string>;
   /** Current prediction time */
   currentTime: string;
   /** Trading symbol identifier */
@@ -102,23 +104,45 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
           ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
           : '';
 
+      // Build chart sections dynamically
+      const chartSections = TIMEFRAME_IDS.map((id) => {
+        const config = getTimeframeConfig(id);
+        const barSize = config.chart.barSizeMinutes;
+        const range = config.chart.range.fromMinutesAgo;
+        const rangeString =
+          range >= 1440
+            ? `${String(range / 1440)}d`
+            : (range >= 60
+              ? `${String(range / 60)}h`
+              : `${String(range)}m`);
+        const barString =
+          barSize >= 60 ? `${String(barSize / 60)}h` : `${String(barSize)}m`;
+        // eslint-disable-next-line security/detect-object-injection -- id from TIMEFRAME_IDS typed array
+        const chartUrl = chartByHorizon[id];
+        return `${id} Timeframe Chart (${barString} candles, ${rangeString} lookback):
+${chartUrl}`;
+      }).join('\n\n');
+
+      // Build task questions dynamically
+      const questions = TIMEFRAME_IDS.map((id) => {
+        const config = getTimeframeConfig(id);
+        return `- ${id}: ${config.task.questionTemplate}`;
+      }).join('\n');
+
+      // Build max drawdown list
+      const drawdowns = TIMEFRAME_IDS.map((id) => {
+        const config = getTimeframeConfig(id);
+        const pct = (config.task.maxDrawdown * 100).toFixed(1);
+        return `   - ${id}: ${pct}% max drawdown`;
+      }).join('\n');
+
       return `You are predicting structural market bottoms for ${symbolId}.
 
 Current Time: ${currentTime}
 
-**CHART ANALYSIS** (Analyze each chart for its corresponding horizon):
+**CHART ANALYSIS** (Analyze each chart for its corresponding timeframe):
 
-15-Minute Horizon Chart (5m candles, 2h lookback):
-${chartByHorizon['15m']}
-
-1-Hour Horizon Chart (15m candles, 4h lookback):
-${chartByHorizon['1h']}
-
-24-Hour Horizon Chart (1h candles, 24h lookback):
-${chartByHorizon['24h']}
-
-7-Day Horizon Chart (4h candles, 7d lookback):
-${chartByHorizon['7d']}
+${chartSections}
 
 All charts include: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, Volume.
 
@@ -128,27 +152,24 @@ Use this candle as candlesBack = 0.
 candlesBack = 3 means three closed candles before that.
 
 **YOUR TASK:**
-For each horizon, predict:
-1. hasBottomed: Has downside selling pressure been structurally exhausted?
-2. confidence: How confident are you (0.0 to 1.0)?
-3. candlesBack: If you believe a bottom formed, which candle? (0 = rightmost, positive integers only)
+For each timeframe, answer the question and predict:
+${questions}
 
-This is NOT predicting price will go up. You are assessing: "Has the selling pressure at THIS scale been absorbed?"
+Output for each timeframe:
+1. hasBottomed: boolean - Has downside selling pressure been structurally exhausted?
+2. confidence: number (0.0 to 1.0) - How confident are you?
+3. candlesBack: integer >= 0 - If bottomed, which candle? (0 = rightmost)
 
 **WHAT MAKES A STRUCTURAL BOTTOM:**
 1. A local extrema pivot LOW must occur (confirmed by future price action)
 2. Max drawdown from prediction time must not exceed threshold:
-   - 15m: 0.4% max drawdown
-   - 1h: 1% max drawdown
-   - 24h: 2.5% max drawdown
-   - 7d: 6% max drawdown
+${drawdowns}
 
 **HINTS:**
 - High confidence requires BOTH structural pivot AND bounded drawdown
 - Consider volume exhaustion, momentum divergence, support levels
-- Longer horizons are harder to predict but more meaningful
+- Longer timeframes are harder to predict but more meaningful
 - If price is mid-range with no structure, confidence should be low
-- candlesBack helps us understand timing - be specific about where you see structure
 ${compactionSection}`;
     },
 

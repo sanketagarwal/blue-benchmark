@@ -5,7 +5,7 @@ import {
   shouldEliminatePhase2,
   type Phase2ModelScore,
 } from '../src/scorers/phase-2-scorer.js';
-import type { Horizon } from '../src/horizon-config.js';
+import type { TimeframeId } from '../src/timeframe-config.js';
 
 describe('phase-2-scorer', () => {
   describe('computeRollingWindows', () => {
@@ -44,7 +44,7 @@ describe('phase-2-scorer', () => {
         },
         stabilityByHorizon: { '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1 },
       };
-      const medianStability: Record<Horizon, number> = {
+      const medianStability: Record<TimeframeId, number> = {
         '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1,
       };
 
@@ -62,7 +62,7 @@ describe('phase-2-scorer', () => {
           '7d': 0.1,
         },
       };
-      const medianStability: Record<Horizon, number> = {
+      const medianStability: Record<TimeframeId, number> = {
         '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1,
       };
 
@@ -75,7 +75,7 @@ describe('phase-2-scorer', () => {
         regretByHorizon: { '15m': 1.0, '1h': 1.2, '24h': 1.1, '7d': 0.9 },
         stabilityByHorizon: { '15m': 0.08, '1h': 0.09, '24h': 0.1, '7d': 0.11 },
       };
-      const medianStability: Record<Horizon, number> = {
+      const medianStability: Record<TimeframeId, number> = {
         '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1,
       };
 

@@ -42,12 +42,12 @@ import {
 } from './table.js';
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
-import type { Horizon } from './horizon-config.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
 import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 import type { RoundScore } from './state/model-state.js';
+import type { TimeframeId } from './timeframe-config.js';
 
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 const isQuickMode = process.argv.includes('--quick');
@@ -109,7 +109,7 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
 // Bitcoin-only benchmark
 const SYMBOL_ID = 'COINBASE_SPOT_BTC_USD';
@@ -143,12 +143,12 @@ interface ModelState {
   roundScores: Phase0RoundScore[];
   /** Full round data for Track B timing metrics (includes labels and timeToPivotRatio) */
   trackBRounds: RoundScore[];
-  logLossByHorizon: Record<Horizon, number[]>;
-  timeToPivotRatios: Record<Horizon, number[]>;
+  logLossByHorizon: Record<TimeframeId, number[]>;
+  timeToPivotRatios: Record<TimeframeId, number[]>;
   failedRounds: number[];
   // Per-horizon qualification tracking
-  qualifiedHorizons: Set<Horizon>;
-  disqualifiedHorizons: Map<Horizon, { phase: Phase; reason: string }>;
+  qualifiedHorizons: Set<TimeframeId>;
+  disqualifiedHorizons: Map<TimeframeId, { phase: Phase; reason: string }>;
 }
 
 /**
@@ -165,7 +165,7 @@ function createModelState(modelId: string): ModelState {
     logLossByHorizon: { '15m': [], '1h': [], '24h': [], '7d': [] },
     timeToPivotRatios: { '15m': [], '1h': [], '24h': [], '7d': [] },
     failedRounds: [],
-    qualifiedHorizons: new Set<Horizon>(['15m', '1h', '24h', '7d']),
+    qualifiedHorizons: new Set<TimeframeId>(['15m', '1h', '24h', '7d']),
     disqualifiedHorizons: new Map(),
   };
 }
@@ -195,8 +195,8 @@ async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
 function recordModelScore(
   state: ModelState,
   roundScore: Phase0RoundScore,
-  labels: Record<Horizon, boolean>,
-  timeToPivotRatios: Record<Horizon, number | undefined>,
+  labels: Record<TimeframeId, boolean>,
+  timeToPivotRatios: Record<TimeframeId, number | undefined>,
   roundNumber: number
 ): void {
   state.roundScores.push(roundScore);
@@ -238,7 +238,7 @@ function recordModelScore(
 async function resolveAllHorizonsGroundTruth(
   symbolId: string,
   predictionTime: Date
-): Promise<{ labels: Record<Horizon, boolean>; timeToPivotRatios: Record<Horizon, number | undefined> }> {
+): Promise<{ labels: Record<TimeframeId, boolean>; timeToPivotRatios: Record<TimeframeId, number | undefined> }> {
   const labels: Record<string, boolean> = {};
   const ratios: Record<string, number | undefined> = {};
 
@@ -252,8 +252,8 @@ async function resolveAllHorizonsGroundTruth(
   }
 
   return {
-    labels: labels as Record<Horizon, boolean>,
-    timeToPivotRatios: ratios as Record<Horizon, number | undefined>,
+    labels: labels as Record<TimeframeId, boolean>,
+    timeToPivotRatios: ratios as Record<TimeframeId, number | undefined>,
   };
 }
 
@@ -262,7 +262,7 @@ async function resolveAllHorizonsGroundTruth(
  * @param state - Model state with log loss data
  * @returns Mean log loss by horizon
  */
-function computeMeanLogLoss(state: ModelState): Record<Horizon, number> {
+function computeMeanLogLoss(state: ModelState): Record<TimeframeId, number> {
   const meanLogLoss: Record<string, number> = {};
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -274,7 +274,7 @@ function computeMeanLogLoss(state: ModelState): Record<Horizon, number> {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     meanLogLoss[horizon] = sum / losses.length;
   }
-  return meanLogLoss as Record<Horizon, number>;
+  return meanLogLoss as Record<TimeframeId, number>;
 }
 
 /**
@@ -286,7 +286,7 @@ function computeMeanLogLoss(state: ModelState): Record<Horizon, number> {
  */
 function disqualifyFromHorizon(
   state: ModelState,
-  horizon: Horizon,
+  horizon: TimeframeId,
   phase: Phase,
   reason: string
 ): void {
@@ -412,9 +412,9 @@ function runPhase1(models: Map<string, ModelState>): void {
  * @returns Stability metrics by horizon
  */
 function computeModelStabilityMetrics(state: ModelState): {
-  stabilityByHorizon: Record<Horizon, number>;
-  worstWindowByHorizon: Record<Horizon, number>;
-  bestWindowByHorizon: Record<Horizon, number>;
+  stabilityByHorizon: Record<TimeframeId, number>;
+  worstWindowByHorizon: Record<TimeframeId, number>;
+  bestWindowByHorizon: Record<TimeframeId, number>;
 } {
   const stabilityByHorizon: Record<string, number> = {};
   const worstWindowByHorizon: Record<string, number> = {};
@@ -433,9 +433,9 @@ function computeModelStabilityMetrics(state: ModelState): {
   }
 
   return {
-    stabilityByHorizon: stabilityByHorizon as Record<Horizon, number>,
-    worstWindowByHorizon: worstWindowByHorizon as Record<Horizon, number>,
-    bestWindowByHorizon: bestWindowByHorizon as Record<Horizon, number>,
+    stabilityByHorizon: stabilityByHorizon as Record<TimeframeId, number>,
+    worstWindowByHorizon: worstWindowByHorizon as Record<TimeframeId, number>,
+    bestWindowByHorizon: bestWindowByHorizon as Record<TimeframeId, number>,
   };
 }
 
@@ -448,12 +448,12 @@ function collectPhase2Metrics(
   models: Map<string, ModelState>
 ): {
   modelScores: Phase2ModelScore[];
-  allWorstWindows: Record<Horizon, number[]>;
-  allStabilities: Record<Horizon, number[]>;
+  allWorstWindows: Record<TimeframeId, number[]>;
+  allStabilities: Record<TimeframeId, number[]>;
 } {
   const modelScores: Phase2ModelScore[] = [];
-  const allWorstWindows: Record<Horizon, number[]> = { '15m': [], '1h': [], '24h': [], '7d': [] };
-  const allStabilities: Record<Horizon, number[]> = { '15m': [], '1h': [], '24h': [], '7d': [] };
+  const allWorstWindows: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '24h': [], '7d': [] };
+  const allStabilities: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '24h': [], '7d': [] };
 
   for (const state of models.values()) {
     if (state.eliminated) {
@@ -471,7 +471,7 @@ function collectPhase2Metrics(
 
     modelScores.push({
       modelId: state.modelId,
-      regretByHorizon: {} as Record<Horizon, number>,
+      regretByHorizon: {} as Record<TimeframeId, number>,
       stabilityByHorizon: metrics.stabilityByHorizon,
       bestWindowByHorizon: metrics.bestWindowByHorizon,
       worstWindowByHorizon: metrics.worstWindowByHorizon,
@@ -488,7 +488,7 @@ function collectPhase2Metrics(
  */
 function computeAllRegrets(
   modelScores: Phase2ModelScore[],
-  medianWorstWindows: Record<Horizon, number>
+  medianWorstWindows: Record<TimeframeId, number>
 ): void {
   for (const score of modelScores) {
     for (const horizon of HORIZONS) {
@@ -512,13 +512,13 @@ function runPhase2(models: Map<string, ModelState>): void {
   const { modelScores, allWorstWindows, allStabilities } = collectPhase2Metrics(models);
 
   // Compute median values
-  const medianWorstWindows: Record<Horizon, number> = {
+  const medianWorstWindows: Record<TimeframeId, number> = {
     '15m': median(allWorstWindows['15m']),
     '1h': median(allWorstWindows['1h']),
     '24h': median(allWorstWindows['24h']),
     '7d': median(allWorstWindows['7d']),
   };
-  const medianStabilities: Record<Horizon, number> = {
+  const medianStabilities: Record<TimeframeId, number> = {
     '15m': median(allStabilities['15m']),
     '1h': median(allStabilities['1h']),
     '24h': median(allStabilities['24h']),
@@ -576,7 +576,7 @@ function runPhase2(models: Map<string, ModelState>): void {
  */
 function buildHorizonMetrics(
   state: ModelState
-): Record<Horizon, { logLoss: number; bestWindow: number; stability: number }> {
+): Record<TimeframeId, { logLoss: number; bestWindow: number; stability: number }> {
   const horizonMetrics: Record<string, { logLoss: number; bestWindow: number; stability: number }> = {};
 
   for (const horizon of HORIZONS) {
@@ -599,7 +599,7 @@ function buildHorizonMetrics(
     };
   }
 
-  return horizonMetrics as Record<Horizon, { logLoss: number; bestWindow: number; stability: number }>;
+  return horizonMetrics as Record<TimeframeId, { logLoss: number; bestWindow: number; stability: number }>;
 }
 
 /**

@@ -1,23 +1,23 @@
 import { logLoss } from './log-loss-scorer.js';
 
 import type { BottomContractId } from '../bottom-caller.js';
-import type { Horizon } from '../horizon-config.js';
+import type { TimeframeId } from '../timeframe-config.js';
 
 export const RANDOM_BASELINE = Math.log(2);
 
 export interface Phase0RoundScore {
-  logLossByHorizon: Record<Horizon, number>;
-  extremeErrors: Record<Horizon, boolean>;
-  predictions: Record<Horizon, number>;
+  logLossByHorizon: Record<TimeframeId, number>;
+  extremeErrors: Record<TimeframeId, boolean>;
+  predictions: Record<TimeframeId, number>;
 }
 
 export interface Phase0AggregateScore {
-  meanLogLoss: Record<Horizon, number>;
-  extremeErrorRate: Record<Horizon, number>;
-  degenerateByHorizon: Record<Horizon, boolean>;
+  meanLogLoss: Record<TimeframeId, number>;
+  extremeErrorRate: Record<TimeframeId, number>;
+  degenerateByHorizon: Record<TimeframeId, boolean>;
 }
 
-const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
 /**
  * Score a single round for Phase 0 metrics
@@ -27,7 +27,7 @@ const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
  */
 export function scorePhase0Round(
   predictions: Record<BottomContractId, number>,
-  labels: Record<Horizon, boolean>
+  labels: Record<TimeframeId, boolean>
 ): Phase0RoundScore {
   const logLossByHorizon: Record<string, number> = {};
   const extremeErrors: Record<string, boolean> = {};
@@ -51,9 +51,9 @@ export function scorePhase0Round(
   }
 
   return {
-    logLossByHorizon: logLossByHorizon as Record<Horizon, number>,
-    extremeErrors: extremeErrors as Record<Horizon, boolean>,
-    predictions: predictionsByHorizon as Record<Horizon, number>,
+    logLossByHorizon: logLossByHorizon as Record<TimeframeId, number>,
+    extremeErrors: extremeErrors as Record<TimeframeId, boolean>,
+    predictions: predictionsByHorizon as Record<TimeframeId, number>,
   };
 }
 
@@ -63,9 +63,9 @@ export function scorePhase0Round(
  * @returns Aggregate Phase 0 score
  */
 export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0AggregateScore {
-  const meanLogLoss: Record<Horizon, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
-  const extremeErrorRate: Record<Horizon, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
-  const degenerateByHorizon: Record<Horizon, boolean> = {
+  const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const extremeErrorRate: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const degenerateByHorizon: Record<TimeframeId, boolean> = {
     '15m': false,
     '1h': false,
     '24h': false,
@@ -106,9 +106,9 @@ export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0Aggrega
  */
 export function getPhase0DisqualifiedHorizons(
   aggregateScore: Phase0AggregateScore
-): Set<Horizon> {
+): Set<TimeframeId> {
   const threshold = RANDOM_BASELINE * 1.1;
-  const disqualified = new Set<Horizon>();
+  const disqualified = new Set<TimeframeId>();
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
