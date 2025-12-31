@@ -20,6 +20,14 @@ import {
   generateLeaderboard,
   formatLeaderboardTable,
 } from './reports/leaderboards.js';
+import {
+  buildModelProfile,
+  formatProfileTable,
+} from './reports/model-profiles.js';
+import {
+  analyzeMetricSeparability,
+  formatSeparabilityTable,
+} from './reports/separability.js';
 import { brierScore } from './scorers/brier-scorer.js';
 import {
   scorePhase0Round,
@@ -698,6 +706,89 @@ function printHorizonLeaderboards(modelStates: Map<string, ModelState>): void {
 }
 
 /**
+ * Build round data with scores from model track B rounds for profile generation
+ * @param trackBRounds - Array of track B round scores
+ * @returns Array of round data formatted for buildModelProfile
+ */
+function buildRoundDataForProfile(
+  trackBRounds: RoundScore[]
+): {
+  predictions: Record<TimeframeId, number>;
+  labels: Record<TimeframeId, boolean>;
+  logLosses: Record<TimeframeId, number>;
+  briers: Record<TimeframeId, number>;
+}[] {
+  return trackBRounds
+    .filter((round) =>
+      round.predictions !== undefined &&
+      round.labels !== undefined &&
+      round.logLossByHorizon !== undefined
+    )
+    .map((round) => {
+      const briers: Record<string, number> = {};
+      for (const horizon of HORIZONS) {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        const pred = round.predictions?.[horizon] ?? 0.5;
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        const label = round.labels?.[horizon] ?? false;
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        briers[horizon] = brierScore(pred, label);
+      }
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- filter above ensures predictions is defined
+        predictions: round.predictions!,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- filter above ensures labels is defined
+        labels: round.labels!,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- filter above ensures logLossByHorizon is defined
+        logLosses: round.logLossByHorizon!,
+        briers: briers as Record<TimeframeId, number>,
+      };
+    });
+}
+
+/**
+ * Print model quality profiles and separability analysis
+ * @param modelStates - Map of model states
+ */
+function printModelProfilesAndSeparability(modelStates: Map<string, ModelState>): void {
+  // Build profiles for non-eliminated models with round data
+  const profiles = [...modelStates.values()]
+    .filter((state) => !state.eliminated && state.trackBRounds.length > 0)
+    .map((state) => {
+      const roundData = buildRoundDataForProfile(state.trackBRounds);
+      return buildModelProfile(state.modelId, roundData);
+    });
+
+  if (profiles.length === 0) {
+    logger.log('  No models with data to generate profiles');
+    return;
+  }
+
+  // Print Model Quality Profiles
+  logger.newline();
+  logger.log('=== Model Quality Profiles ===');
+  logger.newline();
+  logger.log(formatProfileTable(profiles));
+
+  // Run separability analysis and print
+  const separabilityData = profiles.map((p) => ({
+    modelId: p.modelId,
+    meanLogLoss: p.meanLogLoss,
+    meanBrier: p.meanBrier,
+    expectedCalibrationError: p.expectedCalibrationError,
+    tpRate: p.tpRate,
+    fpRate: p.fpRate,
+  }));
+
+  const separabilityAnalysis = analyzeMetricSeparability(separabilityData);
+
+  logger.newline();
+  logger.log('=== Metric Separability Analysis ===');
+  logger.newline();
+  logger.log(formatSeparabilityTable(separabilityAnalysis));
+}
+
+/**
  * Build horizon metrics for a model
  * @param state - Model state
  * @returns Horizon metrics for each horizon
@@ -824,6 +915,9 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
 
   // Print per-horizon leaderboards
   printHorizonLeaderboards(models);
+
+  // Print model quality profiles and separability analysis
+  printModelProfilesAndSeparability(models);
 
   return perHorizonRankings;
 }
