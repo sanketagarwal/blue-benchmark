@@ -54,7 +54,8 @@ export function clearBottomCallerContext(): void {
 const HorizonPredictionSchema = z.object({
   hasBottomed: z.boolean(),
   confidence: z.number().min(0).max(1),
-  candlesBack: z.number().int().min(0),
+  // Optional - some models omit when hasBottomed=false
+  candlesBack: z.number().int().min(0).optional(),
 });
 
 const PredictionSchema = z.object({
