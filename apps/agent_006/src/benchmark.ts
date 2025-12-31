@@ -656,7 +656,30 @@ function calculateBrierScores(predictionValues: number[], labelValues: boolean[]
 }
 
 /**
+ * Print a summary of which horizons each model is qualified for
+ * @param models - Map of model states
+ */
+function printHorizonQualificationSummary(models: Map<string, ModelState>): void {
+  logger.newline();
+  logger.log('=== Per-Model Horizon Qualification ===');
+
+  for (const state of models.values()) {
+    if (state.eliminated) {
+      continue;
+    }
+
+    const horizonStatus = HORIZONS.map(h => {
+      const qualified = state.qualifiedHorizons.has(h);
+      return qualified ? chalk.green(`\u2713${h}`) : chalk.red(`\u2717${h}`);
+    }).join(' ');
+
+    logger.log(`  ${chalk.cyan(state.modelId)}: ${horizonStatus}`);
+  }
+}
+
+/**
  * Build ModelScoreData maps for each horizon from model states
+ * Only includes model data for horizons they are qualified for
  * @param modelStates - Map of model states
  * @returns Record of horizon to map of modelId to ModelScoreData
  */
@@ -674,6 +697,10 @@ function buildLeaderboardScoreData(
       continue;
     }
     for (const horizon of HORIZONS) {
+      // Only include data for horizons the model is qualified for
+      if (!state.qualifiedHorizons.has(horizon)) {
+        continue;
+      }
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       const logLosses = state.logLossByHorizon[horizon];
       const { predictions, labels } = extractHorizonPredictionsAndLabels(state.trackBRounds, horizon);
@@ -707,17 +734,23 @@ function printHorizonLeaderboards(modelStates: Map<string, ModelState>): void {
 
 /**
  * Build round data with scores from model track B rounds for profile generation
+ * Only includes data for horizons the model is qualified for
  * @param trackBRounds - Array of track B round scores
+ * @param qualifiedHorizons - Set of horizons the model is qualified for
  * @returns Array of round data formatted for buildModelProfile
  */
 function buildRoundDataForProfile(
-  trackBRounds: RoundScore[]
+  trackBRounds: RoundScore[],
+  qualifiedHorizons: Set<TimeframeId>
 ): {
   predictions: Record<TimeframeId, number>;
   labels: Record<TimeframeId, boolean>;
   logLosses: Record<TimeframeId, number>;
   briers: Record<TimeframeId, number>;
 }[] {
+  // Filter to only qualified horizons
+  const qualifiedHorizonList = HORIZONS.filter(h => qualifiedHorizons.has(h));
+
   return trackBRounds
     .filter((round) =>
       round.predictions !== undefined &&
@@ -725,22 +758,34 @@ function buildRoundDataForProfile(
       round.logLossByHorizon !== undefined
     )
     .map((round) => {
+      const predictions: Record<string, number> = {};
+      const labels: Record<string, boolean> = {};
+      const logLosses: Record<string, number> = {};
       const briers: Record<string, number> = {};
-      for (const horizon of HORIZONS) {
+
+      // Only include data for qualified horizons
+      for (const horizon of qualifiedHorizonList) {
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
         const pred = round.predictions?.[horizon] ?? 0.5;
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
         const label = round.labels?.[horizon] ?? false;
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        const ll = round.logLossByHorizon?.[horizon] ?? 0;
+
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        predictions[horizon] = pred;
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        labels[horizon] = label;
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        logLosses[horizon] = ll;
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
         briers[horizon] = brierScore(pred, label);
       }
+
       return {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- filter above ensures predictions is defined
-        predictions: round.predictions!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- filter above ensures labels is defined
-        labels: round.labels!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- filter above ensures logLossByHorizon is defined
-        logLosses: round.logLossByHorizon!,
+        predictions: predictions as Record<TimeframeId, number>,
+        labels: labels as Record<TimeframeId, boolean>,
+        logLosses: logLosses as Record<TimeframeId, number>,
         briers: briers as Record<TimeframeId, number>,
       };
     });
@@ -748,14 +793,16 @@ function buildRoundDataForProfile(
 
 /**
  * Print model quality profiles and separability analysis
+ * Only includes data for horizons each model is qualified for
  * @param modelStates - Map of model states
  */
 function printModelProfilesAndSeparability(modelStates: Map<string, ModelState>): void {
   // Build profiles for non-eliminated models with round data
+  // Only include data for horizons the model is qualified for
   const profiles = [...modelStates.values()]
-    .filter((state) => !state.eliminated && state.trackBRounds.length > 0)
+    .filter((state) => !state.eliminated && state.trackBRounds.length > 0 && state.qualifiedHorizons.size > 0)
     .map((state) => {
-      const roundData = buildRoundDataForProfile(state.trackBRounds);
+      const roundData = buildRoundDataForProfile(state.trackBRounds, state.qualifiedHorizons);
       return buildModelProfile(state.modelId, roundData);
     });
 
@@ -1073,6 +1120,9 @@ async function main(): Promise<void> {
 
   // Run Phase 2 elimination
   runPhase2(models);
+
+  // Print per-model horizon qualification summary
+  printHorizonQualificationSummary(models);
 
   // ========== PHASE 3: Final ranking (no additional rounds) ==========
   const perHorizonRankings = runPhase3(models);
