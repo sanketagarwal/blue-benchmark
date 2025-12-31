@@ -13,16 +13,16 @@ const CLOCK_NOT_INITIALIZED_ERROR = 'Clock not initialized';
 
 let clockState: ClockState | undefined;
 
+// BTC-only benchmark: hardcoded start time when BTC data is available
+// Override with SIMULATION_START_TIME env var for testing
+const DEFAULT_BTC_START_TIME = '2025-12-28T00:00:00.000Z';
+
 export function initializeClock(): ClockState {
   if (clockState !== undefined) {
     return clockState;
   }
 
-  const startTimeString = process.env['SIMULATION_START_TIME'];
-  if (startTimeString === undefined || startTimeString === '') {
-    throw new Error('SIMULATION_START_TIME environment variable is required');
-  }
-
+  const startTimeString = process.env['SIMULATION_START_TIME'] ?? DEFAULT_BTC_START_TIME;
   const startTime = new Date(startTimeString);
   if (Number.isNaN(startTime.getTime())) {
     throw new TypeError(
@@ -46,13 +46,15 @@ export function getClockState(): ClockState {
   return clockState;
 }
 
+// Advance by 15 minutes per round for bottom prediction
+const ROUND_INTERVAL_MS = 15 * 60 * 1000;
+
 export function advanceClock(): ClockState {
   if (clockState === undefined) {
     throw new Error(CLOCK_NOT_INITIALIZED_ERROR);
   }
 
-  const newTime = new Date(clockState.currentTime);
-  newTime.setHours(newTime.getHours() + 1);
+  const newTime = new Date(clockState.currentTime.getTime() + ROUND_INTERVAL_MS);
 
   clockState = {
     ...clockState,

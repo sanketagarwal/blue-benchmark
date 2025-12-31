@@ -13,11 +13,13 @@ import {
 const CLOCK_NOT_INITIALIZED_ERROR = 'Clock not initialized';
 const SIMULATION_START_TIME_ENV_VAR = 'SIMULATION_START_TIME';
 const SIMULATION_START_TIME = '2024-01-01T00:00:00.000Z';
+// 15-minute intervals for bottom prediction benchmark
+const SIMULATION_START_TIME_PLUS_15M = '2024-01-01T00:15:00.000Z';
+const SIMULATION_START_TIME_PLUS_30M = '2024-01-01T00:30:00.000Z';
+const SIMULATION_START_TIME_PLUS_45M = '2024-01-01T00:45:00.000Z';
 const SIMULATION_START_TIME_PLUS_1_HOUR = '2024-01-01T01:00:00.000Z';
-const SIMULATION_START_TIME_PLUS_2_HOURS = '2024-01-01T02:00:00.000Z';
-const SIMULATION_START_TIME_PLUS_3_HOURS = '2024-01-01T03:00:00.000Z';
 const SIMULATION_START_TIME_4_HOURS = '2024-01-01T04:00:00.000Z';
-const SIMULATION_START_TIME_PLUS_6_HOURS = '2024-01-01T06:00:00.000Z';
+const SIMULATION_START_TIME_4H_30M = '2024-01-01T04:30:00.000Z';
 
 describe('clock-state', () => {
   beforeEach(() => {
@@ -36,10 +38,13 @@ describe('clock-state', () => {
       expect(state.roundNumber).toBe(0);
     });
 
-    test('throws error when SIMULATION_START_TIME is missing', () => {
-      expect(() => initializeClock()).toThrow(
-        'SIMULATION_START_TIME environment variable is required'
-      );
+    test('uses default BTC start time when SIMULATION_START_TIME is missing', () => {
+      const state = initializeClock();
+
+      // Default is 2025-12-28T00:00:00.000Z for BTC data availability
+      expect(state.currentTime).toEqual(new Date('2025-12-28T00:00:00.000Z'));
+      expect(state.startTime).toEqual(new Date('2025-12-28T00:00:00.000Z'));
+      expect(state.roundNumber).toBe(0);
     });
 
     test('throws error when SIMULATION_START_TIME is invalid', () => {
@@ -78,13 +83,13 @@ describe('clock-state', () => {
   });
 
   describe('advanceClock', () => {
-    test('advances clock by 1 hour and increments round number', () => {
+    test('advances clock by 15 minutes and increments round number', () => {
       vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME);
       initializeClock();
 
       const state = advanceClock();
 
-      expect(state.currentTime).toEqual(new Date(SIMULATION_START_TIME_PLUS_1_HOUR));
+      expect(state.currentTime).toEqual(new Date(SIMULATION_START_TIME_PLUS_15M));
       expect(state.roundNumber).toBe(1);
       expect(state.startTime).toEqual(new Date(SIMULATION_START_TIME));
     });
@@ -97,7 +102,7 @@ describe('clock-state', () => {
       advanceClock();
       const state = advanceClock();
 
-      expect(state.currentTime).toEqual(new Date(SIMULATION_START_TIME_PLUS_3_HOURS));
+      expect(state.currentTime).toEqual(new Date(SIMULATION_START_TIME_PLUS_45M));
       expect(state.roundNumber).toBe(3);
       expect(state.startTime).toEqual(new Date(SIMULATION_START_TIME));
     });
@@ -121,13 +126,14 @@ describe('clock-state', () => {
     test('returns correct window after clock advancement', () => {
       vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME);
       initializeClock();
-      advanceClock();
-      advanceClock();
+      advanceClock(); // +15m
+      advanceClock(); // +30m
 
       const window = getPredictionWindow();
 
-      expect(window.from).toEqual(new Date(SIMULATION_START_TIME_PLUS_2_HOURS));
-      expect(window.to).toEqual(new Date(SIMULATION_START_TIME_PLUS_3_HOURS));
+      // After 2 advances: from=00:30, to=01:30
+      expect(window.from).toEqual(new Date(SIMULATION_START_TIME_PLUS_30M));
+      expect(window.to).toEqual(new Date('2024-01-01T01:30:00.000Z'));
     });
 
     test('throws error when clock is not initialized', () => {
@@ -149,13 +155,14 @@ describe('clock-state', () => {
     test('returns correct window after clock advancement', () => {
       vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME_4_HOURS);
       initializeClock();
-      advanceClock();
-      advanceClock();
+      advanceClock(); // +15m
+      advanceClock(); // +30m
 
       const window = getChartWindow();
 
-      expect(window.from).toEqual(new Date(SIMULATION_START_TIME_PLUS_2_HOURS));
-      expect(window.to).toEqual(new Date(SIMULATION_START_TIME_PLUS_6_HOURS));
+      // After 2 advances (30m): from=00:30, to=04:30
+      expect(window.from).toEqual(new Date(SIMULATION_START_TIME_PLUS_30M));
+      expect(window.to).toEqual(new Date(SIMULATION_START_TIME_4H_30M));
     });
 
     test('throws error when clock is not initialized', () => {
