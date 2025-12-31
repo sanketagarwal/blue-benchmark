@@ -3,11 +3,15 @@ import {
   scorePhase0Round,
   aggregatePhase0Scores,
   getPhase0DisqualifiedHorizons,
+  getPhase0DisqualifiedHorizonsWithBaselines,
   shouldEliminatePhase0,
+  computeBaselineLogLoss,
   RANDOM_BASELINE,
   type Phase0RoundScore,
   type Phase0AggregateScore,
+  type BaselineLogLoss,
 } from '../src/scorers/phase-0-scorer.js';
+import type { TimeframeId } from '../src/timeframe-config.js';
 
 describe('phase-0-scorer', () => {
   describe('RANDOM_BASELINE', () => {
@@ -292,6 +296,160 @@ describe('phase-0-scorer', () => {
       };
 
       expect(shouldEliminatePhase0(score)).toBe(false);
+    });
+  });
+
+  describe('computeBaselineLogLoss', () => {
+    it('returns random baseline as log(2) for any distribution', () => {
+      const result = computeBaselineLogLoss([true, false, true, false]);
+      expect(result.random).toBeCloseTo(0.693, 3);
+    });
+
+    it('computes always-false baseline based on label frequency', () => {
+      // All labels are false: always-false predicts 0, LL = 0
+      const allFalse = computeBaselineLogLoss([false, false, false]);
+      expect(allFalse.alwaysFalse).toBeCloseTo(0, 5);
+
+      // All labels are true: always-false predicts 0, LL = very high
+      const allTrue = computeBaselineLogLoss([true, true, true]);
+      expect(allTrue.alwaysFalse).toBeGreaterThan(30); // log(epsilon) penalty
+    });
+
+    it('computes always-true baseline based on label frequency', () => {
+      // All labels are true: always-true predicts 1, LL = 0
+      const allTrue = computeBaselineLogLoss([true, true, true]);
+      expect(allTrue.alwaysTrue).toBeCloseTo(0, 5);
+
+      // All labels are false: always-true predicts 1, LL = very high
+      const allFalse = computeBaselineLogLoss([false, false, false]);
+      expect(allFalse.alwaysTrue).toBeGreaterThan(30);
+    });
+
+    it('computes mixed distribution baselines correctly', () => {
+      // 3/4 are false, 1/4 are true
+      const result = computeBaselineLogLoss([false, false, false, true]);
+
+      // Always-false: 3 correct (LL=0) + 1 wrong (LL=high) / 4
+      // Mean = high/4 = still significant penalty
+      expect(result.alwaysFalse).toBeGreaterThan(8);
+
+      // Always-true: 1 correct (LL=0) + 3 wrong (LL=high) / 4
+      // Mean = 3*high/4 = larger penalty
+      expect(result.alwaysTrue).toBeGreaterThan(result.alwaysFalse);
+    });
+
+    it('returns trivialBest as minimum of alwaysFalse and alwaysTrue', () => {
+      const mostlyFalse = computeBaselineLogLoss([false, false, false, true]);
+      expect(mostlyFalse.trivialBest).toBe(mostlyFalse.alwaysFalse);
+
+      const mostlyTrue = computeBaselineLogLoss([true, true, true, false]);
+      expect(mostlyTrue.trivialBest).toBe(mostlyTrue.alwaysTrue);
+    });
+
+    it('handles empty array gracefully', () => {
+      const result = computeBaselineLogLoss([]);
+      expect(result.random).toBeCloseTo(0.693, 3);
+      expect(result.alwaysFalse).toBe(0);
+      expect(result.alwaysTrue).toBe(0);
+      expect(result.trivialBest).toBe(0);
+    });
+  });
+
+  describe('getPhase0DisqualifiedHorizonsWithBaselines', () => {
+    it('returns empty set when model significantly beats trivial baseline', () => {
+      const score: Phase0AggregateScore = {
+        meanLogLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
+        meanBrier: { '15m': 0.15, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '24h': 0, '4h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '24h': false, '4h': false },
+      };
+      // Mixed label distribution: trivial baseline around 8, model at 0.3 should pass
+      const baselines: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '1h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '4h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '24h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
+      expect(disqualified.size).toBe(0);
+    });
+
+    it('disqualifies when model matches trivial baseline (no skill)', () => {
+      const score: Phase0AggregateScore = {
+        // Model LL of 0.16 is >= skillThreshold (trivialBest + SKILL_MARGIN = 0.05 + 0.1 = 0.15)
+        // Model is NOT significantly better than trivial baseline
+        meanLogLoss: { '15m': 0.16, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
+        meanBrier: { '15m': 0.08, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '24h': 0, '4h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '24h': false, '4h': false },
+      };
+      // 15m: skillThreshold = 0.05 + 0.1 = 0.15, model has 0.16 >= 0.15, so disqualified
+      const baselines: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': { random: 0.693, alwaysFalse: 0.05, alwaysTrue: 34, trivialBest: 0.05 },
+        '1h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '4h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '24h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
+      expect(disqualified.has('15m')).toBe(true);
+      expect(disqualified.has('1h')).toBe(false);
+    });
+
+    it('still disqualifies for degenerate patterns regardless of baseline', () => {
+      const score: Phase0AggregateScore = {
+        meanLogLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
+        meanBrier: { '15m': 0.15, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '24h': 0, '4h': 0 },
+        degenerateByHorizon: { '15m': true, '1h': false, '24h': false, '4h': false },
+      };
+      const baselines: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '1h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '4h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '24h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
+      expect(disqualified.has('15m')).toBe(true);
+    });
+
+    it('still disqualifies for high extreme error rate', () => {
+      const score: Phase0AggregateScore = {
+        meanLogLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
+        meanBrier: { '15m': 0.15, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
+        extremeErrorRate: { '15m': 0.25, '1h': 0, '24h': 0, '4h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '24h': false, '4h': false },
+      };
+      const baselines: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '1h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '4h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '24h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
+      expect(disqualified.has('15m')).toBe(true);
+    });
+
+    it('still disqualifies for worse than random baseline', () => {
+      const score: Phase0AggregateScore = {
+        meanLogLoss: { '15m': 0.9, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
+        meanBrier: { '15m': 0.4, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '24h': 0, '4h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '24h': false, '4h': false },
+      };
+      // Even with low trivial baseline, model is worse than random (0.693 * 1.1)
+      const baselines: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': { random: 0.693, alwaysFalse: 0.05, alwaysTrue: 34, trivialBest: 0.05 },
+        '1h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '4h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+        '24h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
+      expect(disqualified.has('15m')).toBe(true);
     });
   });
 });

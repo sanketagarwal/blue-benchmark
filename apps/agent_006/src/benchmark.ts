@@ -32,7 +32,8 @@ import { brierScore } from './scorers/brier-scorer.js';
 import {
   scorePhase0Round,
   aggregatePhase0Scores,
-  getPhase0DisqualifiedHorizons,
+  getPhase0DisqualifiedHorizonsWithBaselines,
+  computeBaselineLogLoss,
 } from './scorers/phase-0-scorer.js';
 import {
   computePercentileRanks,
@@ -56,7 +57,7 @@ import {
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
 import type { ModelScoreData } from './reports/leaderboards.js';
-import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
+import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
 import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phase-3-scorer.js';
@@ -66,6 +67,7 @@ import type { TimeframeId } from './timeframe-config.js';
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 const isQuickMode = process.argv.includes('--quick');
 
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const LOG_LOSS_GOOD = 0.5;
 const LOG_LOSS_OK = 0.8;
 
@@ -111,10 +113,33 @@ function formatLogLoss(value: number): string {
   return chalk.red(formatted);
 }
 
-function formatRoundScore(roundScore: Phase0RoundScore): string {
+/**
+ * Format round score with baseline comparison
+ * Shows LL per horizon with vs baseline (trivialBest)
+ * @param roundScore - Phase 0 round score
+ * @param baselines - Baseline log loss values per horizon
+ * @returns Formatted string with baseline comparisons
+ */
+function formatRoundScoreWithBaseline(
+  roundScore: Phase0RoundScore,
+  baselines: Record<TimeframeId, BaselineLogLoss>
+): string {
   const ll = roundScore.logLossByHorizon;
-  const mean = (ll['15m'] + ll['1h'] + ll['4h'] + ll['24h']) / 4;
-  return `LL[15m:${formatLogLoss(ll['15m'])} 1h:${formatLogLoss(ll['1h'])} 4h:${formatLogLoss(ll['4h'])} 24h:${formatLogLoss(ll['24h'])}] mean:${formatLogLoss(mean)}`;
+  const parts: string[] = [];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const modelLL = ll[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const baseline = baselines[horizon];
+    const baseLL = baseline.trivialBest;
+
+    const formatted = formatLogLoss(modelLL);
+    const baseFormatted = baseLL.toFixed(2);
+    parts.push(`${horizon}:${formatted} vs ${baseFormatted}`);
+  }
+
+  return `LL[${parts.join(' ')}]`;
 }
 
 // Quick mode constants
@@ -135,8 +160,6 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled;
 }
-
-const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 // Bitcoin-only benchmark
 const SYMBOL_ID = 'COINBASE_SPOT_BTC_USD';
@@ -172,6 +195,8 @@ interface ModelState {
   trackBRounds: RoundScore[];
   logLossByHorizon: Record<TimeframeId, number[]>;
   timeToPivotRatios: Record<TimeframeId, number[]>;
+  /** Accumulated labels per horizon for baseline computation */
+  labelsByHorizon: Record<TimeframeId, boolean[]>;
   failedRounds: number[];
   // Per-horizon qualification tracking
   qualifiedHorizons: Set<TimeframeId>;
@@ -191,6 +216,7 @@ function createModelState(modelId: string): ModelState {
     trackBRounds: [],
     logLossByHorizon: { '15m': [], '1h': [], '4h': [], '24h': [] },
     timeToPivotRatios: { '15m': [], '1h': [], '4h': [], '24h': [] },
+    labelsByHorizon: { '15m': [], '1h': [], '4h': [], '24h': [] },
     failedRounds: [],
     qualifiedHorizons: new Set<TimeframeId>(['15m', '1h', '4h', '24h']),
     disqualifiedHorizons: new Map(),
@@ -256,6 +282,10 @@ function recordModelScore(
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       state.timeToPivotRatios[horizon].push(ratio);
     }
+
+    // Track labels for baseline computation
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    state.labelsByHorizon[horizon].push(labels[horizon]);
   }
 }
 
@@ -347,12 +377,80 @@ function disqualifyFromHorizon(
 }
 
 /**
- * Run Phase 0 elimination - sanity filter with per-horizon disqualification
+ * Compute baselines for all horizons from model states
+ * All models see the same labels, so we just take labels from any non-eliminated model
+ * @param models - Map of model states
+ * @returns Baselines per horizon
+ */
+function computeBaselinesFromModels(models: Map<string, ModelState>): Record<TimeframeId, BaselineLogLoss> {
+  // Find labels from any non-eliminated model (they all see the same labels)
+  let sampleLabels: Record<TimeframeId, boolean[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
+  for (const state of models.values()) {
+    if (!state.eliminated && state.labelsByHorizon['15m'].length > 0) {
+      sampleLabels = state.labelsByHorizon;
+      break;
+    }
+  }
+
+  return {
+    '15m': computeBaselineLogLoss(sampleLabels['15m']),
+    '1h': computeBaselineLogLoss(sampleLabels['1h']),
+    '4h': computeBaselineLogLoss(sampleLabels['4h']),
+    '24h': computeBaselineLogLoss(sampleLabels['24h']),
+  };
+}
+
+/**
+ * Print baseline comparison summary for all horizons
+ * Shows per-horizon baselines and label distributions
+ * @param baselines - Baselines per horizon
+ * @param sampleLabels - Sample labels to show distribution
+ */
+function printBaselineComparisonSummary(
+  baselines: Record<TimeframeId, BaselineLogLoss>,
+  sampleLabels: Record<TimeframeId, boolean[]>
+): void {
+  logger.newline();
+  logger.log('=== Baseline Comparisons ===');
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const baseline = baselines[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const labels = sampleLabels[horizon];
+    const trueCount = labels.filter(Boolean).length;
+    const falseCount = labels.length - trueCount;
+
+    logger.log(`  ${horizon}: Random=${baseline.random.toFixed(3)}, ` +
+      `Always-false=${baseline.alwaysFalse.toFixed(3)} (${String(falseCount)}/${String(labels.length)} labels false), ` +
+      `Always-true=${baseline.alwaysTrue.toFixed(3)} (${String(trueCount)}/${String(labels.length)} labels true), ` +
+      `TrivialBest=${baseline.trivialBest.toFixed(3)}`
+    );
+  }
+}
+
+/**
+ * Run Phase 0 elimination - sanity filter with per-horizon disqualification using baselines
  * @param models - Map of model states
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic with baseline comparison is inherently complex
 function runPhase0(models: Map<string, ModelState>): void {
   logger.newline();
   logger.log('=== Phase 0: Sanity Filter (Per-Horizon Disqualification) ===');
+
+  // Compute baselines from observed labels
+  const baselines = computeBaselinesFromModels(models);
+
+  // Print baseline comparison summary
+  let sampleLabels: Record<TimeframeId, boolean[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
+  for (const state of models.values()) {
+    if (!state.eliminated && state.labelsByHorizon['15m'].length > 0) {
+      sampleLabels = state.labelsByHorizon;
+      break;
+    }
+  }
+  printBaselineComparisonSummary(baselines, sampleLabels);
+  logger.newline();
 
   let eliminated = 0;
   for (const state of models.values()) {
@@ -361,7 +459,7 @@ function runPhase0(models: Map<string, ModelState>): void {
     }
 
     const aggregate = aggregatePhase0Scores(state.roundScores);
-    const disqualifiedHorizons = getPhase0DisqualifiedHorizons(aggregate);
+    const disqualifiedHorizons = getPhase0DisqualifiedHorizonsWithBaselines(aggregate, baselines);
 
     // Disqualify from specific horizons
     for (const horizon of disqualifiedHorizons) {
@@ -379,12 +477,12 @@ function runPhase0(models: Map<string, ModelState>): void {
       state.eliminatedInPhase = 0;
       state.eliminationReason = 'Failed sanity check on all horizons';
       eliminated++;
-      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] → ${chalk.red('ELIMINATED')} (all horizons)`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] -> ${chalk.red('ELIMINATED')} (all horizons)`);
     } else if (disqualifiedHorizons.size > 0) {
       const qualifiedList = [...state.qualifiedHorizons].join(', ');
-      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] → qualified for [${chalk.green(qualifiedList)}]`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] -> qualified for [${chalk.green(qualifiedList)}]`);
     } else {
-      logger.log(`  ${chalk.cyan(state.modelId)}: passed sanity check → qualified for [${chalk.green([...state.qualifiedHorizons].join(', '))}]`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: passed sanity check -> qualified for [${chalk.green([...state.qualifiedHorizons].join(', '))}]`);
     }
   }
 
@@ -1032,7 +1130,15 @@ async function runBenchmarkRound(
         labels
       );
       recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
-      const scoreSummary = formatRoundScore(roundScore);
+
+      // Compute baselines from accumulated labels for this model
+      const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': computeBaselineLogLoss(state.labelsByHorizon['15m']),
+        '1h': computeBaselineLogLoss(state.labelsByHorizon['1h']),
+        '4h': computeBaselineLogLoss(state.labelsByHorizon['4h']),
+        '24h': computeBaselineLogLoss(state.labelsByHorizon['24h']),
+      };
+      const scoreSummary = formatRoundScoreWithBaseline(roundScore, baselinesByHorizon);
       logger.succeedSpinner(`${chalk.cyan(state.modelId)}: ${scoreSummary}`);
     } catch (error) {
       // Record failure but continue with other models
