@@ -12,6 +12,11 @@ import {
   advanceClock,
   resetClockState,
 } from './clock-state.js';
+import {
+  initAuditFile,
+  writeAuditRecord,
+  buildAuditRecord,
+} from './diagnostics/audit-writer.js';
 import { resolveDualGroundTruth } from './ground-truth/bottom-checker.js';
 import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
@@ -1077,6 +1082,75 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
 }
 
 /**
+ * Update label counts for base rate calculation
+ * @param labelCounts - Label counts to update
+ * @param labels - Ground truth labels for this round
+ */
+function updateLabelCounts(
+  labelCounts: Record<TimeframeId, { total: number; positive: number }>,
+  labels: Record<TimeframeId, boolean>
+): void {
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    labelCounts[horizon].total++;
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    if (labels[horizon]) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      labelCounts[horizon].positive++;
+    }
+  }
+}
+
+/**
+ * Write audit records for all horizons for a single model prediction
+ * @param params - Parameters for writing audit records
+ * @param params.currentTime - Current prediction time
+ * @param params.roundNumber - Current round number
+ * @param params.modelId - Model identifier
+ * @param params.predictions - Model predictions by horizon
+ * @param params.labels - Ground truth labels by horizon
+ * @param params.firstPivotAts - First pivot times by horizon
+ * @param params.timeToPivotRatios - Time to pivot ratios by horizon
+ * @param params.labelCounts - Label counts for base rate calculation
+ */
+function writeModelAuditRecords(params: {
+  currentTime: Date;
+  roundNumber: number;
+  modelId: string;
+  predictions: BottomPredictions;
+  labels: Record<TimeframeId, boolean>;
+  firstPivotAts: Record<TimeframeId, Date | undefined>;
+  timeToPivotRatios: Record<TimeframeId, number | undefined>;
+  labelCounts: Record<TimeframeId, { total: number; positive: number }>;
+}): void {
+  const { currentTime, roundNumber, modelId, predictions, labels, firstPivotAts, timeToPivotRatios, labelCounts } = params;
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const counts = labelCounts[horizon];
+    const labelBaseRate = counts.total > 0 ? counts.positive / counts.total : 0.5;
+
+    const auditRecord = buildAuditRecord({
+      timestamp: currentTime,
+      roundNumber,
+      modelId,
+      horizon,
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      prediction: predictions[horizon],
+      groundTruth: {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        label: labels[horizon],
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        firstPivotAt: firstPivotAts[horizon],
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        timeToPivotRatio: timeToPivotRatios[horizon],
+      },
+      labelBaseRate,
+    });
+    writeAuditRecord(auditRecord);
+  }
+}
+
+/**
  * Run a single benchmark round for all active models
  * @param models - Map of model states
  * @param roundNumber - Current round number
@@ -1085,6 +1159,7 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
  * @param currentTime - Current prediction time
  * @param currentPhase - Current phase number for persistence
  * @param startTime - Benchmark start time for persistence
+ * @param labelCounts - Label counts for trivial baseline calculation
  */
 async function runBenchmarkRound(
   models: Map<string, ModelState>,
@@ -1093,7 +1168,8 @@ async function runBenchmarkRound(
   symbolId: string,
   currentTime: Date,
   currentPhase: number,
-  startTime: string
+  startTime: string,
+  labelCounts: Record<TimeframeId, { total: number; positive: number }>
 ): Promise<void> {
   logger.logRoundHeader(roundNumber, totalRounds, currentTime);
   logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Fetching market data...`);
@@ -1114,6 +1190,9 @@ async function runBenchmarkRound(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
   const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels } = await resolveAllHorizonsGroundTruth(symbolId, currentTime);
 
+  // Update label counts for base rate calculation in audit records
+  updateLabelCounts(labelCounts, labels);
+
   // Run each active model
   for (const state of models.values()) {
     if (state.eliminated) {
@@ -1130,6 +1209,18 @@ async function runBenchmarkRound(
         labels
       );
       recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
+
+      // Write audit records for each horizon (writes even in quick mode)
+      writeModelAuditRecords({
+        currentTime,
+        roundNumber,
+        modelId: state.modelId,
+        predictions: output.predictions,
+        labels,
+        firstPivotAts,
+        timeToPivotRatios,
+        labelCounts,
+      });
 
       // Compute baselines from accumulated labels for this model
       const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
@@ -1163,6 +1254,9 @@ async function runBenchmarkRound(
 async function main(): Promise<void> {
   logger.header('agent_006 Bitcoin Bottom Arena Benchmark');
 
+  // Initialize audit file (writes even in quick mode)
+  initAuditFile();
+
   // Load all vision models
   let modelIds = getModelIds();
   logger.log(`Loaded ${String(modelIds.length)} vision models`);
@@ -1179,6 +1273,14 @@ async function main(): Promise<void> {
   for (const modelId of modelIds) {
     models.set(modelId, createModelState(modelId));
   }
+
+  // Track label counts for trivial baseline calculation in audit records
+  const labelCounts: Record<TimeframeId, { total: number; positive: number }> = {
+    '15m': { total: 0, positive: 0 },
+    '1h': { total: 0, positive: 0 },
+    '4h': { total: 0, positive: 0 },
+    '24h': { total: 0, positive: 0 },
+  };
 
   // Initialize clock
   resetClockState();
@@ -1201,7 +1303,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 0 rounds (1-${String(phase0Rounds)}) ---`);
   for (let phase0Round = 1; phase0Round <= phase0Rounds; phase0Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, startTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, startTime, labelCounts);
     clockState = advanceClock();
   }
 
@@ -1215,7 +1317,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 1 rounds (${String(phase1Start)}-${String(phase1End)}) ---`);
   for (let phase1Round = 1; phase1Round <= phase1Rounds; phase1Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, startTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, startTime, labelCounts);
     clockState = advanceClock();
   }
 
@@ -1229,7 +1331,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 2 rounds (${String(phase2Start)}-${String(phase2End)}) ---`);
   for (let phase2Round = 1; phase2Round <= phase2Rounds; phase2Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, startTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, startTime, labelCounts);
     clockState = advanceClock();
   }
 
