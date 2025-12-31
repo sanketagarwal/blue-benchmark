@@ -7,9 +7,52 @@ export interface Phase1ModelScore {
 
 const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
 
+/** Default percentile rank for small sample sizes */
+const SMALL_SAMPLE_PERCENTILE: Record<TimeframeId, number> = {
+  '15m': 50,
+  '1h': 50,
+  '24h': 50,
+  '7d': 50,
+};
+
+/**
+ * Assign percentile ranks for a single horizon
+ * @param sorted - Models sorted by log loss ascending (best first)
+ * @param ranks - Map to update with percentile ranks
+ * @param horizon - The horizon being processed
+ */
+function assignPercentilesForHorizon(
+  sorted: Phase1ModelScore[],
+  ranks: Map<string, Record<TimeframeId, number>>,
+  horizon: TimeframeId
+): void {
+  const n = sorted.length;
+  for (let index = 0; index < n; index++) {
+    // eslint-disable-next-line security/detect-object-injection -- index from controlled loop
+    const model = sorted[index];
+    if (model === undefined) {
+      continue;
+    }
+
+    // Percentile: 100 * (n - rank) / n
+    // Best (rank 0) gets ~100, worst gets ~0
+    const percentile = (100 * (n - 1 - index)) / (n - 1);
+    const modelRanks = ranks.get(model.modelId);
+    if (modelRanks !== undefined) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      modelRanks[horizon] = percentile;
+    }
+  }
+}
+
 /**
  * Compute percentile ranks for each model per horizon.
  * Lower log loss = higher percentile (better).
+ *
+ * Note: For sample sizes < 3, percentile ranking is not statistically meaningful.
+ * In these cases, all models receive the 50th percentile (median) to avoid
+ * division-by-zero errors and arbitrary elimination decisions.
+ *
  * @param modelScores - Array of model scores
  * @returns Map of model ID to percentile ranks by horizon
  */
@@ -18,36 +61,28 @@ export function computePercentileRanks(
 ): Map<string, Record<TimeframeId, number>> {
   const ranks = new Map<string, Record<TimeframeId, number>>();
 
-  // Initialize
+  // Guard for small sample sizes - skip percentile ranking
+  // When n < 3, percentile ranking is not statistically meaningful
+  // and the formula (n - 1 - index) / (n - 1) produces NaN when n = 1
+  if (modelScores.length < 3) {
+    for (const score of modelScores) {
+      ranks.set(score.modelId, { ...SMALL_SAMPLE_PERCENTILE });
+    }
+    return ranks;
+  }
+
+  // Initialize all models with zero percentiles
   for (const score of modelScores) {
     ranks.set(score.modelId, { '15m': 0, '1h': 0, '24h': 0, '7d': 0 });
   }
 
   // Compute percentile per horizon
   for (const horizon of HORIZONS) {
-    // Sort by log loss ascending (best first)
     const sorted = [...modelScores].sort(
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       (a, b) => a.meanLogLoss[horizon] - b.meanLogLoss[horizon]
     );
-
-    const n = sorted.length;
-    for (let index = 0; index < n; index++) {
-      // eslint-disable-next-line security/detect-object-injection -- index from controlled loop
-      const model = sorted[index];
-      if (model === undefined) {
-        continue;
-      }
-
-      // Percentile: 100 * (n - rank) / n
-      // Best (rank 0) gets ~100, worst gets ~0
-      const percentile = (100 * (n - 1 - index)) / (n - 1);
-      const modelRanks = ranks.get(model.modelId);
-      if (modelRanks !== undefined) {
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        modelRanks[horizon] = percentile;
-      }
-    }
+    assignPercentilesForHorizon(sorted, ranks, horizon);
   }
 
   return ranks;
