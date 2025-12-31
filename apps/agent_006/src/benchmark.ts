@@ -12,7 +12,7 @@ import {
   advanceClock,
   resetClockState,
 } from './clock-state.js';
-import { resolveBottomGroundTruth } from './ground-truth/bottom-checker.js';
+import { resolveDualGroundTruth } from './ground-truth/bottom-checker.js';
 import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
@@ -243,31 +243,47 @@ function recordModelScore(
 }
 
 /**
- * Resolve ground truth for all horizons using annotations API
+ * Resolve ground truth for all horizons using dual pivot methods
  * @param symbolId - Trading symbol identifier
  * @param predictionTime - Time of prediction
- * @returns Labels and time-to-pivot ratios for all horizons
+ * @returns Labels and time-to-pivot ratios for all horizons (using primary method)
  */
 async function resolveAllHorizonsGroundTruth(
   symbolId: string,
   predictionTime: Date
-): Promise<{ labels: Record<TimeframeId, boolean>; timeToPivotRatios: Record<TimeframeId, number | undefined> }> {
+): Promise<{
+  labels: Record<TimeframeId, boolean>;
+  timeToPivotRatios: Record<TimeframeId, number | undefined>;
+  // Secondary labels for analysis (not used for scoring)
+  secondaryLabels: Record<TimeframeId, boolean>;
+}> {
   const labels: Record<string, boolean> = {};
   const ratios: Record<string, number | undefined> = {};
+  const secondaryLabels: Record<string, boolean> = {};
 
-  // Resolve each horizon using annotations (no raw trades needed)
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- using legacy interface for now
-    const result = await resolveBottomGroundTruth(symbolId, horizon, predictionTime);
+  // Resolve each horizon using dual ground truth in parallel
+  const results = await Promise.all(
+    HORIZONS.map(async (horizon) => {
+      const dualResult = await resolveDualGroundTruth(symbolId, horizon, predictionTime);
+      return { horizon, dualResult };
+    })
+  );
+
+  for (const { horizon, dualResult } of results) {
+    // Primary method for scoring/elimination
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    labels[horizon] = result.hasStructuralBottom;
+    labels[horizon] = dualResult.primary.hasStructuralBottom;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    ratios[horizon] = result.timeToPivotRatio;
+    ratios[horizon] = dualResult.primary.timeToPivotRatio;
+    // Secondary for analysis
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    secondaryLabels[horizon] = dualResult.secondary.hasStructuralBottom;
   }
 
   return {
     labels: labels as Record<TimeframeId, boolean>,
     timeToPivotRatios: ratios as Record<TimeframeId, number | undefined>,
+    secondaryLabels: secondaryLabels as Record<TimeframeId, boolean>,
   };
 }
 
@@ -745,8 +761,9 @@ async function runBenchmarkRound(
 
   logger.succeedSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Market data loaded`);
 
-  // Get ground truth
-  const { labels, timeToPivotRatios } = await resolveAllHorizonsGroundTruth(symbolId, currentTime);
+  // Get ground truth (secondaryLabels captured for future analysis)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
+  const { labels, timeToPivotRatios, secondaryLabels: _secondaryLabels } = await resolveAllHorizonsGroundTruth(symbolId, currentTime);
 
   // Run each active model
   for (const state of models.values()) {
