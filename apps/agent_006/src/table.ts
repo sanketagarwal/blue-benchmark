@@ -67,7 +67,7 @@ function getRankMedal(rank: number): string {
 export function printPerHorizonArenaTable(
   rankings: PerHorizonRankings
 ): void {
-  const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+  const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -158,8 +158,8 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
     { content: chalk.dim('Status'), hAlign: 'center' },
     { content: chalk.dim('LL-15m'), hAlign: 'center' },
     { content: chalk.dim('LL-1h'), hAlign: 'center' },
+    { content: chalk.dim('LL-4h'), hAlign: 'center' },
     { content: chalk.dim('LL-24h'), hAlign: 'center' },
-    { content: chalk.dim('LL-7d'), hAlign: 'center' },
     { content: chalk.dim('Mean'), hAlign: 'center' },
   ]);
 
@@ -168,7 +168,7 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
 
   for (const state of models) {
     const meanLogLoss = computeMeanLogLoss(state);
-    const mean = (meanLogLoss['15m'] + meanLogLoss['1h'] + meanLogLoss['24h'] + meanLogLoss['7d']) / 4;
+    const mean = (meanLogLoss['15m'] + meanLogLoss['1h'] + meanLogLoss['4h'] + meanLogLoss['24h']) / 4;
     const status = state.eliminated
       ? `P${String(state.eliminatedInPhase ?? '?')}`
       : 'WINNER';
@@ -197,8 +197,8 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
       { content: statusContent, hAlign: 'center' },
       { content: formatLogLossColored(ll['15m']), hAlign: 'right' },
       { content: formatLogLossColored(ll['1h']), hAlign: 'right' },
+      { content: formatLogLossColored(ll['4h']), hAlign: 'right' },
       { content: formatLogLossColored(ll['24h']), hAlign: 'right' },
-      { content: formatLogLossColored(ll['7d']), hAlign: 'right' },
       { content: Number.isNaN(meanLL) ? chalk.dim('-') : formatLogLossColored(meanLL), hAlign: 'right' },
     ]);
   }
@@ -216,7 +216,7 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
 export function printTimingDiagnosticsTable(
   modelMetrics: { modelId: string; metrics: TrackBMetrics }[]
 ): void {
-  const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+  const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
   const MS_PER_MINUTE = 60_000;
 
   for (const horizon of HORIZONS) {
@@ -323,12 +323,12 @@ function determineProfiles(qualified: TimeframeId[]): string[] {
   }
 
   // Check for short-term focus
-  if (qualified.includes('15m') && qualified.includes('1h') && !qualified.includes('7d')) {
+  if (qualified.includes('15m') && qualified.includes('1h') && !qualified.includes('24h')) {
     profiles.push('Short-term');
   }
 
   // Check for long-term focus
-  if (qualified.includes('24h') && qualified.includes('7d') && !qualified.includes('15m')) {
+  if (qualified.includes('4h') && qualified.includes('24h') && !qualified.includes('15m')) {
     profiles.push('Long-term');
   }
 
@@ -362,12 +362,12 @@ export function printCrossHorizonBehaviorMap(
     { content: chalk.dim('Model'), hAlign: 'center' as const },
     { content: chalk.dim('15m'), hAlign: 'center' as const },
     { content: chalk.dim('1h'), hAlign: 'center' as const },
+    { content: chalk.dim('4h'), hAlign: 'center' as const },
     { content: chalk.dim('24h'), hAlign: 'center' as const },
-    { content: chalk.dim('7d'), hAlign: 'center' as const },
     { content: chalk.dim('Profile'), hAlign: 'center' as const },
   ]);
 
-  const horizonList: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+  const horizonList: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
   for (const { modelId, qualifiedHorizons, trackB } of modelMetrics) {
     const horizonCells = horizonList.map(h => {

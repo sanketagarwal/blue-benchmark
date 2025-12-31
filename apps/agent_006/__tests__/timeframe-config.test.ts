@@ -10,7 +10,7 @@ import {
 describe('timeframe-config', () => {
   describe('TIMEFRAME_CONFIG', () => {
     it('should have all 4 timeframes configured', () => {
-      expect(TIMEFRAME_IDS).toEqual(['15m', '1h', '24h', '7d']);
+      expect(TIMEFRAME_IDS).toEqual(['15m', '1h', '4h', '24h']);
     });
 
     it('15m uses fractal method with 1m candles', () => {
@@ -20,11 +20,11 @@ describe('timeframe-config', () => {
       expect(TIMEFRAME_CONFIG['15m'].groundTruth.pivot.barTimeframe).toBe('1m');
     });
 
-    it('7d uses zigzag method with 1h candles', () => {
-      expect(TIMEFRAME_CONFIG['7d'].groundTruth.pivot.spec.method).toBe(
+    it('24h uses zigzag method with 1h candles', () => {
+      expect(TIMEFRAME_CONFIG['24h'].groundTruth.pivot.spec.method).toBe(
         'zigzag'
       );
-      expect(TIMEFRAME_CONFIG['7d'].groundTruth.pivot.barTimeframe).toBe('1h');
+      expect(TIMEFRAME_CONFIG['24h'].groundTruth.pivot.barTimeframe).toBe('1h');
     });
   });
 
@@ -33,7 +33,7 @@ describe('timeframe-config', () => {
       const config = getTimeframeConfig('15m');
       expect(config.chart.barSizeMinutes).toBe(5);
       expect(config.chart.barTimeframe).toBe('5m');
-      expect(config.chart.range.fromMinutesAgo).toBe(120);
+      expect(config.chart.range.fromMinutesAgo).toBe(240);
       expect(config.chart.range.to).toBe('snapTime');
     });
 
@@ -48,8 +48,8 @@ describe('timeframe-config', () => {
     it('should calculate duration in ms', () => {
       expect(getTimeframeDurationMs('15m')).toBe(15 * 60_000);
       expect(getTimeframeDurationMs('1h')).toBe(60 * 60_000);
+      expect(getTimeframeDurationMs('4h')).toBe(4 * 60 * 60_000);
       expect(getTimeframeDurationMs('24h')).toBe(24 * 60 * 60_000);
-      expect(getTimeframeDurationMs('7d')).toBe(7 * 24 * 60 * 60_000);
     });
   });
 
@@ -57,8 +57,8 @@ describe('timeframe-config', () => {
     it('has correct thresholds', () => {
       expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0.004);
       expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0.01);
+      expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0.015);
       expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0.025);
-      expect(TIMEFRAME_CONFIG['7d'].task.maxDrawdown).toBe(0.06);
     });
   });
 
@@ -80,7 +80,7 @@ describe('timeframe-config', () => {
       if (config24h.groundTruth.pivot.spec.method === 'zigzag') {
         expect(config24h.groundTruth.pivot.spec.params.deviationPct).toBe(0.025);
         expect(config24h.groundTruth.pivot.spec.params.candleTimeframe).toBe(
-          '15m'
+          '1h'
         );
       }
     });
@@ -141,15 +141,15 @@ describe('timeframe-config', () => {
       expect(config1h.groundTruth.secondaryPivot.spec.method).toBe('zigzag');
     });
 
-    it('24h and 7d use zigzag primary, fractal secondary', () => {
+    it('4h and 24h use zigzag primary, fractal secondary', () => {
+      const config4h = getTimeframeConfig('4h');
       const config24h = getTimeframeConfig('24h');
-      const config7d = getTimeframeConfig('7d');
+
+      expect(config4h.groundTruth.pivot.spec.method).toBe('zigzag');
+      expect(config4h.groundTruth.secondaryPivot.spec.method).toBe('fractal');
 
       expect(config24h.groundTruth.pivot.spec.method).toBe('zigzag');
       expect(config24h.groundTruth.secondaryPivot.spec.method).toBe('fractal');
-
-      expect(config7d.groundTruth.pivot.spec.method).toBe('zigzag');
-      expect(config7d.groundTruth.secondaryPivot.spec.method).toBe('fractal');
     });
 
     it('secondary pivot should have valid search config', () => {

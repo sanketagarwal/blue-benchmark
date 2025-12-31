@@ -17,9 +17,9 @@ describe('phase-runner', () => {
         manager.addRoundScore('model-a', {
           roundNumber: i,
           logLoss: 0.9,
-          logLossByHorizon: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '7d': 0.9 },
-          predictions: { '15m': 0.95, '1h': 0.95, '24h': 0.95, '7d': 0.95 },
-          labels: { '15m': false, '1h': false, '24h': false, '7d': false },
+          logLossByHorizon: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '4h': 0.9 },
+          predictions: { '15m': 0.95, '1h': 0.95, '24h': 0.95, '4h': 0.95 },
+          labels: { '15m': false, '1h': false, '24h': false, '4h': false },
         });
       }
 
@@ -28,9 +28,9 @@ describe('phase-runner', () => {
         manager.addRoundScore('model-b', {
           roundNumber: i,
           logLoss: 0.4,
-          logLossByHorizon: { '15m': 0.4, '1h': 0.4, '24h': 0.4, '7d': 0.4 },
-          predictions: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '7d': 0.5 },
-          labels: { '15m': true, '1h': false, '24h': true, '7d': false },
+          logLossByHorizon: { '15m': 0.4, '1h': 0.4, '24h': 0.4, '4h': 0.4 },
+          predictions: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '4h': 0.5 },
+          labels: { '15m': true, '1h': false, '24h': true, '4h': false },
         });
       }
 
@@ -48,9 +48,9 @@ describe('phase-runner', () => {
         manager.addRoundScore('model-a', {
           roundNumber: i,
           logLoss: 0.9,
-          logLossByHorizon: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '7d': 0.9 },
-          predictions: { '15m': 0.95, '1h': 0.95, '24h': 0.95, '7d': 0.95 },
-          labels: { '15m': false, '1h': false, '24h': false, '7d': false },
+          logLossByHorizon: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '4h': 0.9 },
+          predictions: { '15m': 0.95, '1h': 0.95, '24h': 0.95, '4h': 0.95 },
+          labels: { '15m': false, '1h': false, '24h': false, '4h': false },
         });
       }
 
@@ -75,7 +75,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('good-model', {
           roundNumber: i,
           logLoss: 0.2,
-          logLossByHorizon: { '15m': 0.2, '1h': 0.2, '24h': 0.2, '7d': 0.2 },
+          logLossByHorizon: { '15m': 0.2, '1h': 0.2, '24h': 0.2, '4h': 0.2 },
         });
       }
 
@@ -84,7 +84,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('bad-model', {
           roundNumber: i,
           logLoss: 0.9,
-          logLossByHorizon: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '7d': 0.9 },
+          logLossByHorizon: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '4h': 0.9 },
         });
       }
 
@@ -93,12 +93,12 @@ describe('phase-runner', () => {
         manager.addRoundScore('avg-model-1', {
           roundNumber: i,
           logLoss: 0.5,
-          logLossByHorizon: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '7d': 0.5 },
+          logLossByHorizon: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '4h': 0.5 },
         });
         manager.addRoundScore('avg-model-2', {
           roundNumber: i,
           logLoss: 0.6,
-          logLossByHorizon: { '15m': 0.6, '1h': 0.6, '24h': 0.6, '7d': 0.6 },
+          logLossByHorizon: { '15m': 0.6, '1h': 0.6, '24h': 0.6, '4h': 0.6 },
         });
       }
 
@@ -118,7 +118,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('stable-model', {
           roundNumber: i,
           logLoss: 0.4,
-          logLossByHorizon: { '15m': 0.4, '1h': 0.4, '24h': 0.4, '7d': 0.4 },
+          logLossByHorizon: { '15m': 0.4, '1h': 0.4, '24h': 0.4, '4h': 0.4 },
         });
       }
 
@@ -127,7 +127,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('unstable-model', {
           roundNumber: i,
           logLoss: 0.3,
-          logLossByHorizon: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '7d': 0.3 },
+          logLossByHorizon: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
         });
       }
       // Then crashes very badly (high enough to trigger regret > 1.5 even with median)
@@ -135,7 +135,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('unstable-model', {
           roundNumber: i,
           logLoss: 2.5,
-          logLossByHorizon: { '15m': 2.5, '1h': 2.5, '24h': 2.5, '7d': 2.5 },
+          logLossByHorizon: { '15m': 2.5, '1h': 2.5, '24h': 2.5, '4h': 2.5 },
         });
       }
 
@@ -155,7 +155,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('model-a', {
           roundNumber: i,
           logLoss: 0.2,
-          logLossByHorizon: { '15m': 0.2, '1h': 0.2, '24h': 0.2, '7d': 0.2 },
+          logLossByHorizon: { '15m': 0.2, '1h': 0.2, '24h': 0.2, '4h': 0.2 },
         });
       }
 
@@ -164,7 +164,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('model-b', {
           roundNumber: i,
           logLoss: 0.5,
-          logLossByHorizon: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '7d': 0.5 },
+          logLossByHorizon: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '4h': 0.5 },
         });
       }
 
@@ -173,7 +173,7 @@ describe('phase-runner', () => {
         manager.addRoundScore('model-c', {
           roundNumber: i,
           logLoss: 0.8,
-          logLossByHorizon: { '15m': 0.8, '1h': 0.8, '24h': 0.8, '7d': 0.8 },
+          logLossByHorizon: { '15m': 0.8, '1h': 0.8, '24h': 0.8, '4h': 0.8 },
         });
       }
 
@@ -193,7 +193,7 @@ describe('phase-runner', () => {
           manager.addRoundScore(modelId, {
             roundNumber: i,
             logLoss: 0.5,
-            logLossByHorizon: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '7d': 0.5 },
+            logLossByHorizon: { '15m': 0.5, '1h': 0.5, '24h': 0.5, '4h': 0.5 },
           });
         }
       }

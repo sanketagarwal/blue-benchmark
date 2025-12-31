@@ -15,7 +15,7 @@ export interface StabilityMetrics {
   variance: number;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const WINDOW_SIZE = 6;
 
 /**

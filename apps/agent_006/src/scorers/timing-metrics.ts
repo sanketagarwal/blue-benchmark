@@ -16,7 +16,7 @@ export interface TrackBMetrics {
   byHorizon: Record<TimeframeId, TimingMetrics>;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /**
  * Compute Track B timing metrics for a model

@@ -38,7 +38,7 @@ export class ModelStateManager {
         modelId,
         isActive: true,
         roundScores: [],
-        qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as TimeframeId[]),
+        qualifiedHorizons: new Set(['15m', '1h', '4h', '24h'] as TimeframeId[]),
         disqualifiedHorizons: new Map(),
       });
     }

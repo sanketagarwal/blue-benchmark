@@ -81,8 +81,8 @@ function convertPredictionsForScorer(
   return {
     'bottom-15m': predictionToProbability(predictions['15m']),
     'bottom-1h': predictionToProbability(predictions['1h']),
+    'bottom-4h': predictionToProbability(predictions['4h']),
     'bottom-24h': predictionToProbability(predictions['24h']),
-    'bottom-7d': predictionToProbability(predictions['7d']),
   };
 }
 
@@ -99,8 +99,8 @@ function formatLogLoss(value: number): string {
 
 function formatRoundScore(roundScore: Phase0RoundScore): string {
   const ll = roundScore.logLossByHorizon;
-  const mean = (ll['15m'] + ll['1h'] + ll['24h'] + ll['7d']) / 4;
-  return `LL[15m:${formatLogLoss(ll['15m'])} 1h:${formatLogLoss(ll['1h'])} 24h:${formatLogLoss(ll['24h'])} 7d:${formatLogLoss(ll['7d'])}] mean:${formatLogLoss(mean)}`;
+  const mean = (ll['15m'] + ll['1h'] + ll['4h'] + ll['24h']) / 4;
+  return `LL[15m:${formatLogLoss(ll['15m'])} 1h:${formatLogLoss(ll['1h'])} 4h:${formatLogLoss(ll['4h'])} 24h:${formatLogLoss(ll['24h'])}] mean:${formatLogLoss(mean)}`;
 }
 
 // Quick mode constants
@@ -122,7 +122,7 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 // Bitcoin-only benchmark
 const SYMBOL_ID = 'COINBASE_SPOT_BTC_USD';
@@ -175,10 +175,10 @@ function createModelState(modelId: string): ModelState {
     eliminated: false,
     roundScores: [],
     trackBRounds: [],
-    logLossByHorizon: { '15m': [], '1h': [], '24h': [], '7d': [] },
-    timeToPivotRatios: { '15m': [], '1h': [], '24h': [], '7d': [] },
+    logLossByHorizon: { '15m': [], '1h': [], '4h': [], '24h': [] },
+    timeToPivotRatios: { '15m': [], '1h': [], '4h': [], '24h': [] },
     failedRounds: [],
-    qualifiedHorizons: new Set<TimeframeId>(['15m', '1h', '24h', '7d']),
+    qualifiedHorizons: new Set<TimeframeId>(['15m', '1h', '4h', '24h']),
     disqualifiedHorizons: new Map(),
   };
 }
@@ -217,8 +217,8 @@ function recordModelScore(
   // Also store full round data for Track B timing metrics
   const logLoss = (roundScore.logLossByHorizon['15m'] +
     roundScore.logLossByHorizon['1h'] +
-    roundScore.logLossByHorizon['24h'] +
-    roundScore.logLossByHorizon['7d']) / 4;
+    roundScore.logLossByHorizon['4h'] +
+    roundScore.logLossByHorizon['24h']) / 4;
 
   state.trackBRounds.push({
     roundNumber,
@@ -482,8 +482,8 @@ function collectPhase2Metrics(
   allStabilities: Record<TimeframeId, number[]>;
 } {
   const modelScores: Phase2ModelScore[] = [];
-  const allWorstWindows: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '24h': [], '7d': [] };
-  const allStabilities: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '24h': [], '7d': [] };
+  const allWorstWindows: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
+  const allStabilities: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
 
   for (const state of models.values()) {
     if (state.eliminated) {
@@ -545,14 +545,14 @@ function runPhase2(models: Map<string, ModelState>): void {
   const medianWorstWindows: Record<TimeframeId, number> = {
     '15m': median(allWorstWindows['15m']),
     '1h': median(allWorstWindows['1h']),
+    '4h': median(allWorstWindows['4h']),
     '24h': median(allWorstWindows['24h']),
-    '7d': median(allWorstWindows['7d']),
   };
   const medianStabilities: Record<TimeframeId, number> = {
     '15m': median(allStabilities['15m']),
     '1h': median(allStabilities['1h']),
+    '4h': median(allStabilities['4h']),
     '24h': median(allStabilities['24h']),
-    '7d': median(allStabilities['7d']),
   };
 
   computeAllRegrets(modelScores, medianWorstWindows);

@@ -5,14 +5,14 @@ export interface Phase1ModelScore {
   meanLogLoss: Record<TimeframeId, number>;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /** Default percentile rank for small sample sizes */
 const SMALL_SAMPLE_PERCENTILE: Record<TimeframeId, number> = {
   '15m': 50,
   '1h': 50,
+  '4h': 50,
   '24h': 50,
-  '7d': 50,
 };
 
 /**
@@ -73,7 +73,7 @@ export function computePercentileRanks(
 
   // Initialize all models with zero percentiles
   for (const score of modelScores) {
-    ranks.set(score.modelId, { '15m': 0, '1h': 0, '24h': 0, '7d': 0 });
+    ranks.set(score.modelId, { '15m': 0, '1h': 0, '4h': 0, '24h': 0 });
   }
 
   // Compute percentile per horizon

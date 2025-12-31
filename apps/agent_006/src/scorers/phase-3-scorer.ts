@@ -161,8 +161,8 @@ export interface HorizonRanking {
 export interface PerHorizonRankings {
   '15m': HorizonRanking[];
   '1h': HorizonRanking[];
+  '4h': HorizonRanking[];
   '24h': HorizonRanking[];
-  '7d': HorizonRanking[];
 }
 
 export interface ModelWithHorizonMetrics {
@@ -310,7 +310,7 @@ export function rankModelsPerHorizon(
   return {
     '15m': rankModelsForHorizon(models, '15m'),
     '1h': rankModelsForHorizon(models, '1h'),
+    '4h': rankModelsForHorizon(models, '4h'),
     '24h': rankModelsForHorizon(models, '24h'),
-    '7d': rankModelsForHorizon(models, '7d'),
   };
 }

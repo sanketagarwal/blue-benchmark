@@ -12,8 +12,8 @@ import type { Agent } from '@nullagent/agent-core';
 export const BOTTOM_CONTRACT_IDS = [
   'bottom-15m',
   'bottom-1h',
+  'bottom-4h',
   'bottom-24h',
-  'bottom-7d',
 ] as const;
 
 export type BottomContractId = (typeof BOTTOM_CONTRACT_IDS)[number];
@@ -61,8 +61,8 @@ const HorizonPredictionSchema = z.object({
 const PredictionSchema = z.object({
   '15m': HorizonPredictionSchema,
   '1h': HorizonPredictionSchema,
+  '4h': HorizonPredictionSchema,
   '24h': HorizonPredictionSchema,
-  '7d': HorizonPredictionSchema,
 });
 
 export type HorizonPrediction = z.infer<typeof HorizonPredictionSchema>;

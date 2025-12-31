@@ -10,11 +10,11 @@ describe('phase-1-scorer', () => {
   describe('computePercentileRanks', () => {
     it('computes percentile rank per horizon relative to cohort', () => {
       const modelScores: Phase1ModelScore[] = [
-        { modelId: 'model-a', meanLogLoss: { '15m': 0.3, '1h': 0.4, '24h': 0.5, '7d': 0.6 } },
-        { modelId: 'model-b', meanLogLoss: { '15m': 0.4, '1h': 0.5, '24h': 0.6, '7d': 0.7 } },
-        { modelId: 'model-c', meanLogLoss: { '15m': 0.5, '1h': 0.6, '24h': 0.7, '7d': 0.8 } },
-        { modelId: 'model-d', meanLogLoss: { '15m': 0.6, '1h': 0.7, '24h': 0.8, '7d': 0.9 } },
-        { modelId: 'model-e', meanLogLoss: { '15m': 0.7, '1h': 0.8, '24h': 0.9, '7d': 1.0 } },
+        { modelId: 'model-a', meanLogLoss: { '15m': 0.3, '1h': 0.4, '24h': 0.5, '4h': 0.6 } },
+        { modelId: 'model-b', meanLogLoss: { '15m': 0.4, '1h': 0.5, '24h': 0.6, '4h': 0.7 } },
+        { modelId: 'model-c', meanLogLoss: { '15m': 0.5, '1h': 0.6, '24h': 0.7, '4h': 0.8 } },
+        { modelId: 'model-d', meanLogLoss: { '15m': 0.6, '1h': 0.7, '24h': 0.8, '4h': 0.9 } },
+        { modelId: 'model-e', meanLogLoss: { '15m': 0.7, '1h': 0.8, '24h': 0.9, '4h': 1.0 } },
       ];
 
       const ranks = computePercentileRanks(modelScores);
@@ -30,7 +30,7 @@ describe('phase-1-scorer', () => {
         '15m': 20,
         '1h': 15,
         '24h': 50,
-        '7d': 60,
+        '4h': 60,
       };
 
       expect(shouldEliminatePhase1(percentiles)).toBe(true);
@@ -41,7 +41,7 @@ describe('phase-1-scorer', () => {
         '15m': 50,
         '1h': 60,
         '24h': 55,
-        '7d': 65,
+        '4h': 65,
       };
 
       expect(shouldEliminatePhase1(percentiles)).toBe(true);
@@ -52,7 +52,7 @@ describe('phase-1-scorer', () => {
         '15m': 80,
         '1h': 40,
         '24h': 35,
-        '7d': 30,
+        '4h': 30,
       };
 
       expect(shouldEliminatePhase1(percentiles)).toBe(false);
@@ -63,7 +63,7 @@ describe('phase-1-scorer', () => {
         '15m': 60,
         '1h': 80,
         '24h': 55,
-        '7d': 50,
+        '4h': 50,
       };
 
       expect(shouldEliminatePhase1(percentiles)).toBe(false);

@@ -41,8 +41,8 @@ interface ModelMetrics {
   // Per-horizon log loss
   logLoss15m: number;
   logLoss1h: number;
+  logLoss4h: number;
   logLoss24h: number;
-  logLoss7d: number;
   meanLogLoss: number;
   // Composite score components
   avgPercentileRank: number;
@@ -53,7 +53,7 @@ interface ModelMetrics {
   compositeScore: number;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
 
 // Quality thresholds for log loss (lower is better)
@@ -174,8 +174,8 @@ function calculateModelMetrics(
   // Per-horizon log loss averages
   const logLoss15m = calculateMean(model.logLossByHorizon['15m']);
   const logLoss1h = calculateMean(model.logLossByHorizon['1h']);
+  const logLoss4h = calculateMean(model.logLossByHorizon['4h']);
   const logLoss24h = calculateMean(model.logLossByHorizon['24h']);
-  const logLoss7d = calculateMean(model.logLossByHorizon['7d']);
 
   // Overall mean log loss
   const allLosses: number[] = [];
@@ -225,8 +225,8 @@ function calculateModelMetrics(
     failedRounds: model.failedRounds?.length ?? 0,
     logLoss15m,
     logLoss1h,
+    logLoss4h,
     logLoss24h,
-    logLoss7d,
     meanLogLoss,
     avgPercentileRank,
     avgBestWindow,
@@ -280,7 +280,7 @@ function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
   const lines: string[] = [
     '## Full Results (All Models)',
     '',
-    '| Rank | Model | Status | Rnds | 15m | 1h | 24h | 7d | Mean | %Rank | BestWin | Stabil | TtP | Score |',
+    '| Rank | Model | Status | Rnds | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |',
     '|------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|',
   ];
 
@@ -292,8 +292,8 @@ function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
     // Format with quality indicators
     const ll15m = `${getLogLossEmoji(m.logLoss15m)}${formatNumber(m.logLoss15m, 3)}`;
     const ll1h = `${getLogLossEmoji(m.logLoss1h)}${formatNumber(m.logLoss1h, 3)}`;
+    const ll4h = `${getLogLossEmoji(m.logLoss4h)}${formatNumber(m.logLoss4h, 3)}`;
     const ll24h = `${getLogLossEmoji(m.logLoss24h)}${formatNumber(m.logLoss24h, 3)}`;
-    const ll7d = `${getLogLossEmoji(m.logLoss7d)}${formatNumber(m.logLoss7d, 3)}`;
     const llMean = `${getLogLossEmoji(m.meanLogLoss)}${formatNumber(m.meanLogLoss, 3)}`;
 
     // Format composite components
@@ -304,7 +304,7 @@ function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
     const score = formatNumber(m.compositeScore, 4);
 
     lines.push(
-      `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${ll15m} | ${ll1h} | ${ll24h} | ${ll7d} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`
+      `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`
     );
   }
 
@@ -335,8 +335,8 @@ function generateArenaResultsByHorizon(rankings: PerHorizonRankings | undefined)
   const horizonLabels: Record<TimeframeId, string> = {
     '15m': '15m Arena Winners',
     '1h': '1h Arena Winners',
+    '4h': '4h Arena Winners',
     '24h': '24h Arena Winners',
-    '7d': '7d Arena Winners',
   };
 
   for (const horizon of HORIZONS) {
@@ -465,8 +465,8 @@ function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
   const keyMap: Record<TimeframeId, keyof ModelMetrics> = {
     '15m': 'logLoss15m',
     '1h': 'logLoss1h',
+    '4h': 'logLoss4h',
     '24h': 'logLoss24h',
-    '7d': 'logLoss7d',
   };
 
   for (const horizon of HORIZONS) {

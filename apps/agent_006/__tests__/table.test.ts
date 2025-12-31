@@ -31,7 +31,7 @@ describe('table', () => {
           { modelId: 'model-a', score: 0.90, logLoss: 0.45, bestWindow: 0.35, stability: 0.15 },
         ],
         '24h': [],
-        '7d': [],
+        '4h': [],
       };
 
       printPerHorizonArenaTable(rankings);
@@ -49,7 +49,7 @@ describe('table', () => {
         '15m': [],
         '1h': [],
         '24h': [],
-        '7d': [],
+        '4h': [],
       };
 
       printPerHorizonArenaTable(rankings);
@@ -68,7 +68,7 @@ describe('table', () => {
         ],
         '1h': [],
         '24h': [],
-        '7d': [],
+        '4h': [],
       };
 
       printPerHorizonArenaTable(rankings);
@@ -90,7 +90,7 @@ describe('table', () => {
         ],
         '1h': [],
         '24h': [],
-        '7d': [],
+        '4h': [],
       };
 
       // Should not throw - colors are ANSI escape codes
@@ -111,9 +111,9 @@ describe('table', () => {
 
     it('should print final summary with all models', () => {
       const models: TestModelState[] = [
-        { modelId: 'winner-model', eliminated: false, logLoss: { '15m': 0.4, '1h': 0.45, '24h': 0.5, '7d': 0.55 } },
-        { modelId: 'eliminated-p0', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': 0.8, '1h': 0.85, '24h': 0.9, '7d': 0.95 } },
-        { modelId: 'eliminated-p1', eliminated: true, eliminatedInPhase: 1, logLoss: { '15m': 0.6, '1h': 0.65, '24h': 0.7, '7d': 0.75 } },
+        { modelId: 'winner-model', eliminated: false, logLoss: { '15m': 0.4, '1h': 0.45, '24h': 0.5, '4h': 0.55 } },
+        { modelId: 'eliminated-p0', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': 0.8, '1h': 0.85, '24h': 0.9, '4h': 0.95 } },
+        { modelId: 'eliminated-p1', eliminated: true, eliminatedInPhase: 1, logLoss: { '15m': 0.6, '1h': 0.65, '24h': 0.7, '4h': 0.75 } },
       ];
 
       printFinalSummaryTable(models, computeMeanLogLoss);
@@ -141,9 +141,9 @@ describe('table', () => {
 
     it('should sort models by mean log loss (best first)', () => {
       const models: TestModelState[] = [
-        { modelId: 'worst', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '7d': 0.9 } },
-        { modelId: 'best', eliminated: false, logLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '7d': 0.3 } },
-        { modelId: 'middle', eliminated: true, eliminatedInPhase: 1, logLoss: { '15m': 0.6, '1h': 0.6, '24h': 0.6, '7d': 0.6 } },
+        { modelId: 'worst', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': 0.9, '1h': 0.9, '24h': 0.9, '4h': 0.9 } },
+        { modelId: 'best', eliminated: false, logLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '4h': 0.3 } },
+        { modelId: 'middle', eliminated: true, eliminatedInPhase: 1, logLoss: { '15m': 0.6, '1h': 0.6, '24h': 0.6, '4h': 0.6 } },
       ];
 
       printFinalSummaryTable(models, computeMeanLogLoss);
@@ -159,7 +159,7 @@ describe('table', () => {
 
     it('should handle models without eliminatedInPhase', () => {
       const models: TestModelState[] = [
-        { modelId: 'unknown-phase', eliminated: true, logLoss: { '15m': 0.7, '1h': 0.7, '24h': 0.7, '7d': 0.7 } },
+        { modelId: 'unknown-phase', eliminated: true, logLoss: { '15m': 0.7, '1h': 0.7, '24h': 0.7, '4h': 0.7 } },
       ];
 
       printFinalSummaryTable(models, computeMeanLogLoss);
@@ -170,7 +170,7 @@ describe('table', () => {
 
     it('should display dash for NaN log loss values', () => {
       const models: TestModelState[] = [
-        { modelId: 'nan-model', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': Number.NaN, '1h': Number.NaN, '24h': Number.NaN, '7d': Number.NaN } },
+        { modelId: 'nan-model', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': Number.NaN, '1h': Number.NaN, '24h': Number.NaN, '4h': Number.NaN } },
       ];
 
       printFinalSummaryTable(models, computeMeanLogLoss);
@@ -184,9 +184,9 @@ describe('table', () => {
 
     it('should color-code log loss values', () => {
       const models: TestModelState[] = [
-        { modelId: 'good-ll', eliminated: false, logLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '7d': 0.3 } }, // Good (green)
-        { modelId: 'ok-ll', eliminated: true, eliminatedInPhase: 1, logLoss: { '15m': 0.6, '1h': 0.6, '24h': 0.6, '7d': 0.6 } }, // OK (yellow)
-        { modelId: 'poor-ll', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': 1.0, '1h': 1.0, '24h': 1.0, '7d': 1.0 } }, // Poor (red)
+        { modelId: 'good-ll', eliminated: false, logLoss: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '4h': 0.3 } }, // Good (green)
+        { modelId: 'ok-ll', eliminated: true, eliminatedInPhase: 1, logLoss: { '15m': 0.6, '1h': 0.6, '24h': 0.6, '4h': 0.6 } }, // OK (yellow)
+        { modelId: 'poor-ll', eliminated: true, eliminatedInPhase: 0, logLoss: { '15m': 1.0, '1h': 1.0, '24h': 1.0, '4h': 1.0 } }, // Poor (red)
       ];
 
       // Should not throw - colors are ANSI escape codes
@@ -213,10 +213,10 @@ describe('table', () => {
           meanTimeToDetectionRatio: overrides['24h']?.meanTimeToDetectionRatio ?? 0.5,
           redundantConfirmations: overrides['24h']?.redundantConfirmations ?? 0,
         },
-        '7d': {
-          earliestCorrectPredictionMs: overrides['7d']?.earliestCorrectPredictionMs ?? 600_000,
-          meanTimeToDetectionRatio: overrides['7d']?.meanTimeToDetectionRatio ?? 0.8,
-          redundantConfirmations: overrides['7d']?.redundantConfirmations ?? 3,
+        '4h': {
+          earliestCorrectPredictionMs: overrides['4h']?.earliestCorrectPredictionMs ?? 600_000,
+          meanTimeToDetectionRatio: overrides['4h']?.meanTimeToDetectionRatio ?? 0.8,
+          redundantConfirmations: overrides['4h']?.redundantConfirmations ?? 3,
         },
       },
     });
@@ -233,8 +233,8 @@ describe('table', () => {
       const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
       expect(output).toContain('15m Timing Diagnostics');
       expect(output).toContain('1h Timing Diagnostics');
+      expect(output).toContain('4h Timing Diagnostics');
       expect(output).toContain('24h Timing Diagnostics');
-      expect(output).toContain('7d Timing Diagnostics');
       expect(output).toContain('fast-model');
       expect(output).toContain('slow-model');
     });
@@ -288,9 +288,9 @@ describe('table', () => {
           meanTimeToDetectionRatio: ttdOverrides['24h'] ?? 0.5,
           redundantConfirmations: 0,
         },
-        '7d': {
+        '4h': {
           earliestCorrectPredictionMs: 600_000,
-          meanTimeToDetectionRatio: ttdOverrides['7d'] ?? 0.8,
+          meanTimeToDetectionRatio: ttdOverrides['4h'] ?? 0.8,
           redundantConfirmations: 3,
         },
       },
@@ -300,7 +300,7 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: 'generalist',
-          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as TimeframeId[]),
+          qualifiedHorizons: new Set(['15m', '1h', '24h', '4h'] as TimeframeId[]),
           trackB: createTrackBMetrics(),
         },
         {
@@ -340,8 +340,8 @@ describe('table', () => {
       const modelMetrics = [
         {
           modelId: 'mixed-timing',
-          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as TimeframeId[]),
-          trackB: createTrackBMetrics({ '15m': 0.1, '1h': 0.5, '24h': 0.5, '7d': 0.9 }),
+          qualifiedHorizons: new Set(['15m', '1h', '24h', '4h'] as TimeframeId[]),
+          trackB: createTrackBMetrics({ '15m': 0.1, '1h': 0.5, '24h': 0.5, '4h': 0.9 }),
         },
       ];
 

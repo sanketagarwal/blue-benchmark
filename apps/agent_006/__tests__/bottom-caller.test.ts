@@ -13,8 +13,8 @@ describe('bottom-caller', () => {
       expect(BOTTOM_CONTRACT_IDS).toEqual([
         'bottom-15m',
         'bottom-1h',
+        'bottom-4h',
         'bottom-24h',
-        'bottom-7d',
       ]);
     });
   });
@@ -24,8 +24,8 @@ describe('bottom-caller', () => {
       chartByHorizon: {
         '15m': 'https://example.com/chart-15m.png',
         '1h': 'https://example.com/chart-1h.png',
+        '4h': 'https://example.com/chart-4h.png',
         '24h': 'https://example.com/chart-24h.png',
-        '7d': 'https://example.com/chart-7d.png',
       },
       currentTime: '2025-01-01T00:00:00Z',
       symbolId: 'COINBASE_SPOT_BTC_USD',
@@ -62,12 +62,12 @@ describe('bottom-caller', () => {
       const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
       expect(prompt).toContain('chart-15m.png');
       expect(prompt).toContain('chart-1h.png');
+      expect(prompt).toContain('chart-4h.png');
       expect(prompt).toContain('chart-24h.png');
-      expect(prompt).toContain('chart-7d.png');
       expect(prompt).toContain('15m Timeframe');
       expect(prompt).toContain('1h Timeframe');
+      expect(prompt).toContain('4h Timeframe');
       expect(prompt).toContain('24h Timeframe');
-      expect(prompt).toContain('7d Timeframe');
     });
 
     it('builds compaction prompt with round count', () => {

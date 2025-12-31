@@ -4,7 +4,7 @@
  * Rule: "If a number or a sentence describes the experiment, it comes from config."
  */
 
-export type TimeframeId = '15m' | '1h' | '24h' | '7d';
+export type TimeframeId = '15m' | '1h' | '4h' | '24h';
 
 export type QueryMode = 'time_range_snapped';
 
@@ -106,7 +106,7 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       barSizeMinutes: 5,
       barTimeframe: '5m',
       queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 120, to: 'snapTime' }, // 2h lookback
+      range: { fromMinutesAgo: 240, to: 'snapTime' }, // 4h lookback = 48 candles
     },
     task: {
       forwardWindowMinutes: 15,
@@ -149,7 +149,7 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       barSizeMinutes: 15,
       barTimeframe: '15m',
       queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 240, to: 'snapTime' }, // 4h lookback
+      range: { fromMinutesAgo: 720, to: 'snapTime' }, // 12h lookback = 48 candles
     },
     task: {
       forwardWindowMinutes: 60,
@@ -187,18 +187,61 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
     },
   },
 
-  '24h': {
+  '4h': {
     chart: {
       barSizeMinutes: 60,
       barTimeframe: '1h',
       queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 1440, to: 'snapTime' }, // 24h lookback
+      range: { fromMinutesAgo: 2880, to: 'snapTime' }, // 48h lookback = 48 candles
+    },
+    task: {
+      forwardWindowMinutes: 240, // 4h
+      questionTemplate:
+        'Based on the chart shown, has downside already been exhausted for the next 4 hours?',
+      outputCoordinateSystem: 'bars_1h',
+      maxDrawdown: 0.015, // 1.5%
+    },
+    candleIndexing: {
+      rule: 'rightmost_closed_is_zero',
+      formingCandlePolicy: 'exclude',
+      snapIntervalMinutes: 15,
+    },
+    groundTruth: {
+      window: { start: 'snapTime', durationMinutes: 240 },
+      pivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '15m',
+        spec: {
+          method: 'zigzag',
+          params: { deviationPct: 0.015, candleTimeframe: '15m' },
+        },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
+      secondaryPivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '15m',
+        spec: { method: 'fractal', params: { L: 4, candleTimeframe: '15m' } },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
+    },
+  },
+
+  '24h': {
+    chart: {
+      barSizeMinutes: 240,
+      barTimeframe: '4h',
+      queryMode: 'time_range_snapped',
+      range: { fromMinutesAgo: 10_080, to: 'snapTime' }, // 7d lookback = 42 candles
     },
     task: {
       forwardWindowMinutes: 1440, // 24h
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 24 hours?',
-      outputCoordinateSystem: 'bars_1h',
+      outputCoordinateSystem: 'bars_4h',
       maxDrawdown: 0.025, // 2.5%
     },
     candleIndexing: {
@@ -212,53 +255,10 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         provider: 'replaylab',
         annotationType: 'local_extrema',
         availableAtMode: 'closesAt',
-        barTimeframe: '15m',
-        spec: {
-          method: 'zigzag',
-          params: { deviationPct: 0.025, candleTimeframe: '15m' },
-        },
-        search: { mode: 'snapTime_to_close', slackCandles: 0 },
-      },
-      secondaryPivot: {
-        provider: 'replaylab',
-        annotationType: 'local_extrema',
-        availableAtMode: 'closesAt',
-        barTimeframe: '15m',
-        spec: { method: 'fractal', params: { L: 5, candleTimeframe: '15m' } },
-        search: { mode: 'snapTime_to_close', slackCandles: 0 },
-      },
-    },
-  },
-
-  '7d': {
-    chart: {
-      barSizeMinutes: 240,
-      barTimeframe: '4h',
-      queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 10_080, to: 'snapTime' }, // 7d lookback
-    },
-    task: {
-      forwardWindowMinutes: 10_080, // 7d
-      questionTemplate:
-        'Based on the chart shown, has downside already been exhausted for the next 7 days?',
-      outputCoordinateSystem: 'bars_4h',
-      maxDrawdown: 0.06, // 6%
-    },
-    candleIndexing: {
-      rule: 'rightmost_closed_is_zero',
-      formingCandlePolicy: 'exclude',
-      snapIntervalMinutes: 15,
-    },
-    groundTruth: {
-      window: { start: 'snapTime', durationMinutes: 10_080 },
-      pivot: {
-        provider: 'replaylab',
-        annotationType: 'local_extrema',
-        availableAtMode: 'closesAt',
         barTimeframe: '1h',
         spec: {
           method: 'zigzag',
-          params: { deviationPct: 0.05, candleTimeframe: '1h' },
+          params: { deviationPct: 0.025, candleTimeframe: '1h' },
         },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
@@ -275,7 +275,7 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
 };
 
 /** All timeframe IDs */
-export const TIMEFRAME_IDS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+export const TIMEFRAME_IDS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /**
  * Get config for a timeframe

@@ -40,12 +40,12 @@ describe('phase-2-scorer', () => {
           '15m': 1.8,
           '1h': 1.6,
           '24h': 1.0,
-          '7d': 0.9,
+          '4h': 0.9,
         },
-        stabilityByHorizon: { '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1 },
+        stabilityByHorizon: { '15m': 0.1, '1h': 0.1, '24h': 0.1, '4h': 0.1 },
       };
       const medianStability: Record<TimeframeId, number> = {
-        '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1,
+        '15m': 0.1, '1h': 0.1, '24h': 0.1, '4h': 0.1,
       };
 
       expect(shouldEliminatePhase2(modelScore, medianStability)).toBe(true);
@@ -54,16 +54,16 @@ describe('phase-2-scorer', () => {
     it('eliminates if stability > 2x median on 3+ horizons', () => {
       const modelScore: Phase2ModelScore = {
         modelId: 'test',
-        regretByHorizon: { '15m': 1.0, '1h': 1.0, '24h': 1.0, '7d': 1.0 },
+        regretByHorizon: { '15m': 1.0, '1h': 1.0, '24h': 1.0, '4h': 1.0 },
         stabilityByHorizon: {
           '15m': 0.3,
           '1h': 0.3,
           '24h': 0.3,
-          '7d': 0.1,
+          '4h': 0.1,
         },
       };
       const medianStability: Record<TimeframeId, number> = {
-        '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1,
+        '15m': 0.1, '1h': 0.1, '24h': 0.1, '4h': 0.1,
       };
 
       expect(shouldEliminatePhase2(modelScore, medianStability)).toBe(true);
@@ -72,11 +72,11 @@ describe('phase-2-scorer', () => {
     it('keeps stable models', () => {
       const modelScore: Phase2ModelScore = {
         modelId: 'test',
-        regretByHorizon: { '15m': 1.0, '1h': 1.2, '24h': 1.1, '7d': 0.9 },
-        stabilityByHorizon: { '15m': 0.08, '1h': 0.09, '24h': 0.1, '7d': 0.11 },
+        regretByHorizon: { '15m': 1.0, '1h': 1.2, '24h': 1.1, '4h': 0.9 },
+        stabilityByHorizon: { '15m': 0.08, '1h': 0.09, '24h': 0.1, '4h': 0.11 },
       };
       const medianStability: Record<TimeframeId, number> = {
-        '15m': 0.1, '1h': 0.1, '24h': 0.1, '7d': 0.1,
+        '15m': 0.1, '1h': 0.1, '24h': 0.1, '4h': 0.1,
       };
 
       expect(shouldEliminatePhase2(modelScore, medianStability)).toBe(false);

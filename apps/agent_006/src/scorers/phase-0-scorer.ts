@@ -20,7 +20,7 @@ export interface Phase0AggregateScore {
   degenerateByHorizon: Record<TimeframeId, boolean>;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /**
  * Score a single round for Phase 0 metrics
@@ -70,14 +70,14 @@ export function scorePhase0Round(
  * @returns Aggregate Phase 0 score
  */
 export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0AggregateScore {
-  const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
-  const meanBrier: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
-  const extremeErrorRate: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
+  const meanBrier: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
+  const extremeErrorRate: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
   const degenerateByHorizon: Record<TimeframeId, boolean> = {
     '15m': false,
     '1h': false,
+    '4h': false,
     '24h': false,
-    '7d': false,
   };
 
   for (const horizon of HORIZONS) {

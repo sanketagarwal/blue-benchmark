@@ -25,7 +25,7 @@ import {
 import type { ModelState, ModelStateManager, RoundScore } from '../state/model-state.js';
 import type { TimeframeId } from '../timeframe-config.js';
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '24h', '7d'];
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 function getPhase0Reason(aggregate: ReturnType<typeof aggregatePhase0Scores>): string {
   // Check if any horizon has a degenerate pattern
@@ -159,7 +159,7 @@ export function runPhase0(manager: ModelStateManager): void {
 }
 
 function computeMeanLogLossForModel(state: ModelState): Phase1ModelScore | undefined {
-  const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
   let count = 0;
 
   for (const round of state.roundScores) {
@@ -265,7 +265,7 @@ function computeRegretForScores(phase2Scores: Phase2ModelScore[]): void {
 }
 
 function computeMedianStabilityAcrossModels(phase2Scores: Phase2ModelScore[]): Record<TimeframeId, number> {
-  const medianStability: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const medianStability: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
   for (const h of HORIZONS) {
     const stabilities: number[] = [];
     for (const score of phase2Scores) {

@@ -206,14 +206,14 @@ describe('Replay Lab Charts', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            url: 'https://signed.example.com/chart-24h',
+            url: 'https://signed.example.com/chart-4h',
             expiresAt: '2025-12-22T16:00:00Z',
           }),
         })
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            url: 'https://signed.example.com/chart-7d',
+            url: 'https://signed.example.com/chart-24h',
             expiresAt: '2025-12-22T16:00:00Z',
           }),
         });
@@ -222,8 +222,8 @@ describe('Replay Lab Charts', () => {
 
       expect(result.chartByHorizon['15m']).toBe('https://signed.example.com/chart-15m');
       expect(result.chartByHorizon['1h']).toBe('https://signed.example.com/chart-1h');
+      expect(result.chartByHorizon['4h']).toBe('https://signed.example.com/chart-4h');
       expect(result.chartByHorizon['24h']).toBe('https://signed.example.com/chart-24h');
-      expect(result.chartByHorizon['7d']).toBe('https://signed.example.com/chart-7d');
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
   });
