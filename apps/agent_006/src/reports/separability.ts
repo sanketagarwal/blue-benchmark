@@ -18,7 +18,7 @@ export interface MetricSeparability {
   range: number; // max - min across models
   stdDev: number; // standard deviation
   rankCorrelation: number; // Spearman correlation with overall ranking
-  separates: boolean; // range > 0.1 && stdDev > 0.05
+  separates: boolean | undefined; // range > 0.1 && stdDev > 0.05, undefined if insufficient cohort
 }
 
 /**
@@ -51,6 +51,12 @@ const METRICS: MetricDefinition[] = [
   { name: 'tpRate', accessor: (p) => p.tpRate },
   { name: 'fpRate', accessor: (p) => p.fpRate },
 ];
+
+/**
+ * Minimum number of models required for meaningful separability analysis
+ * With fewer than 3 models, rank correlation and separability are not statistically meaningful
+ */
+const MIN_MODELS_FOR_SEPARABILITY = 3;
 
 /**
  * Calculate the range (max - min) of an array
@@ -232,20 +238,23 @@ function extractMetricValues(
  * @param metricName - Name of the metric
  * @param metricValues - Array of metric values across models
  * @param referenceRanks - Ranks based on meanLogLoss for correlation
+ * @param insufficientCohort - If true, set separates to null (insufficient data)
  * @returns MetricSeparability analysis result
  */
 function analyzeOneMetric(
   metricName: string,
   metricValues: number[],
-  referenceRanks: number[]
+  referenceRanks: number[],
+  insufficientCohort: boolean
 ): MetricSeparability {
   const range = calculateRange(metricValues);
   const standardDeviation = calculateStandardDeviation(metricValues);
   const metricRanks = computeRanks(metricValues);
   const rankCorrelation = calculateSpearmanCorrelation(referenceRanks, metricRanks);
 
-  // Separates if range > 0.1 AND stdDev > 0.05
-  const separates = range > 0.1 && standardDeviation > 0.05;
+  // If insufficient cohort, separates is undefined (not false - we don't know)
+  // Otherwise: separates if range > 0.1 AND stdDev > 0.05
+  const separates = insufficientCohort ? undefined : (range > 0.1 && standardDeviation > 0.05);
 
   return {
     metricName,
@@ -265,6 +274,9 @@ function analyzeOneMetric(
  * - Computes Spearman correlation with overall ranking (by meanLogLoss)
  * - Determines if metric separates models (range > 0.1 AND stdDev > 0.05)
  *
+ * Note: Requires MIN_MODELS_FOR_SEPARABILITY (3) models for meaningful analysis.
+ * With fewer models, separates will be null to indicate insufficient data.
+ *
  * @param profiles - Array of model profiles with metrics
  * @returns Array of separability analysis for each metric
  */
@@ -273,6 +285,9 @@ export function analyzeMetricSeparability(profiles: ModelProfile[]): MetricSepar
     return [];
   }
 
+  // Check if cohort is too small for meaningful separability analysis
+  const insufficientCohort = profiles.length < MIN_MODELS_FOR_SEPARABILITY;
+
   // Extract meanLogLoss values and compute reference ranks
   const logLossValues = extractMetricValues(profiles, (p) => p.meanLogLoss);
   const referenceRanks = computeRanks(logLossValues);
@@ -280,9 +295,15 @@ export function analyzeMetricSeparability(profiles: ModelProfile[]): MetricSepar
   // Analyze each metric
   return METRICS.map((metric) => {
     const values = extractMetricValues(profiles, metric.accessor);
-    return analyzeOneMetric(metric.name, values, referenceRanks);
+    return analyzeOneMetric(metric.name, values, referenceRanks, insufficientCohort);
   });
 }
+
+/**
+ * Get the profile count from the analysis (for display purposes)
+ * This is used by formatSeparabilityTable to show the actual cohort size
+ */
+export { MIN_MODELS_FOR_SEPARABILITY };
 
 /**
  * Format a number for table display
@@ -295,11 +316,15 @@ function formatNumber(value: number, decimals: number): string {
 }
 
 /**
- * Format boolean as colored indicator
- * @param value - Boolean value
+ * Format separates value as colored indicator
+ * @param value - Boolean value or undefined (insufficient data)
+ * @param cohortSize - Number of models in cohort (for display)
  * @returns Colored string
  */
-function formatSeparates(value: boolean): string {
+function formatSeparates(value: boolean | undefined, cohortSize: number): string {
+  if (value === undefined) {
+    return chalk.yellow(`insufficient cohort (n=${String(cohortSize)})`);
+  }
   return value ? chalk.green('Yes') : chalk.red('No');
 }
 
@@ -307,9 +332,10 @@ function formatSeparates(value: boolean): string {
  * Format separability analysis as a CLI table string
  *
  * @param analysis - Array of metric separability results
+ * @param cohortSize - Number of models in the cohort (for insufficient data messages)
  * @returns Formatted table string ready for console output
  */
-export function formatSeparabilityTable(analysis: MetricSeparability[]): string {
+export function formatSeparabilityTable(analysis: MetricSeparability[], cohortSize = 0): string {
   const table = new Table({
     chars: {
       'top': '\u2500',
@@ -356,7 +382,7 @@ export function formatSeparabilityTable(analysis: MetricSeparability[]): string 
       { content: formatNumber(metric.range, 4), hAlign: 'right' as const },
       { content: formatNumber(metric.stdDev, 4), hAlign: 'right' as const },
       { content: formatNumber(metric.rankCorrelation, 4), hAlign: 'right' as const },
-      { content: formatSeparates(metric.separates), hAlign: 'center' as const },
+      { content: formatSeparates(metric.separates, cohortSize), hAlign: 'center' as const },
     ]);
   }
 

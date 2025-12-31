@@ -832,7 +832,8 @@ function printModelProfilesAndSeparability(modelStates: Map<string, ModelState>)
   logger.newline();
   logger.log('=== Metric Separability Analysis ===');
   logger.newline();
-  logger.log(formatSeparabilityTable(separabilityAnalysis));
+  // Pass cohort size for display in insufficient data messages
+  logger.log(formatSeparabilityTable(separabilityAnalysis, separabilityData.length));
 }
 
 /**

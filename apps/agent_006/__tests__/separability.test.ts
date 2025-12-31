@@ -328,6 +328,7 @@ describe('separability', () => {
     });
 
     it('marks metric as non-separating when range <= 0.1', () => {
+      // Need 3+ models for separability analysis (otherwise separates is undefined)
       const profiles: ModelProfile[] = [
         {
           modelId: 'model-a',
@@ -340,7 +341,15 @@ describe('separability', () => {
         {
           modelId: 'model-b',
           meanLogLoss: 0.2,
-          meanBrier: 0.15, // Range = 0.05 < 0.1
+          meanBrier: 0.12, // Range = 0.04 < 0.1
+          expectedCalibrationError: 0.05,
+          tpRate: 0.9,
+          fpRate: 0.05,
+        },
+        {
+          modelId: 'model-c',
+          meanLogLoss: 0.3,
+          meanBrier: 0.14, // Range = 0.04 < 0.1
           expectedCalibrationError: 0.05,
           tpRate: 0.9,
           fpRate: 0.05,
@@ -390,7 +399,7 @@ describe('separability', () => {
       expect(tpRateAnalysis?.range).toBeGreaterThan(0.1);
     });
 
-    it('handles single model profile', () => {
+    it('handles single model profile with insufficient cohort', () => {
       const profiles: ModelProfile[] = [
         {
           modelId: 'model-a',
@@ -408,7 +417,8 @@ describe('separability', () => {
       // Single value: range=0, stdDev=NaN
       expect(analysis[0]?.range).toBe(0);
       expect(Number.isNaN(analysis[0]?.stdDev)).toBe(true);
-      expect(analysis[0]?.separates).toBe(false);
+      // With insufficient cohort (n < 3), separates is undefined (not false)
+      expect(analysis[0]?.separates).toBeUndefined();
     });
   });
 
@@ -559,10 +569,10 @@ describe('separability', () => {
       ];
 
       const analysis = analyzeMetricSeparability(profiles);
-      const table = formatSeparabilityTable(analysis);
+      const table = formatSeparabilityTable(analysis, profiles.length);
 
-      // Single model can't separate
-      expect(table).toContain('No');
+      // Single model has insufficient cohort (n < 3)
+      expect(table).toContain('insufficient cohort');
     });
 
     it('formats numbers with 4 decimal places', () => {

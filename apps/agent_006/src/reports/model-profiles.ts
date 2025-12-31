@@ -21,6 +21,12 @@ import type { TimeframeId } from '../timeframe-config.js';
 const ECE_BIN_COUNT = 10;
 
 /**
+ * Minimum samples required for calibration metrics to be meaningful
+ * With fewer samples, ECE and calibration slope calculations are unreliable
+ */
+const MIN_SAMPLES_FOR_CALIBRATION = 20;
+
+/**
  * Comprehensive quality profile for a single model
  */
 export interface ModelQualityProfile {
@@ -483,12 +489,14 @@ export function buildModelProfile(
   const fpRate = calculateFpRate(confusionCounts);
   const functionRate = calculateFunctionRate(confusionCounts);
 
-  // Calculate calibration metrics
-  const calibrationSlope = calculateCalibrationSlope(predictions, labels);
-  const expectedCalibrationError = calculateExpectedCalibrationError(
-    predictions,
-    labels
-  );
+  // Calculate calibration metrics (require minimum sample size for meaningful results)
+  const hasSufficientSamples = predictions.length >= MIN_SAMPLES_FOR_CALIBRATION;
+  const calibrationSlope = hasSufficientSamples
+    ? calculateCalibrationSlope(predictions, labels)
+    : Number.NaN;
+  const expectedCalibrationError = hasSufficientSamples
+    ? calculateExpectedCalibrationError(predictions, labels)
+    : Number.NaN;
 
   // Calculate variance by horizon
   const varianceByHorizon = calculateVarianceByHorizon(roundData);

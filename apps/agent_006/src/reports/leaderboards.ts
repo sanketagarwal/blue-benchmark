@@ -57,6 +57,12 @@ export interface ModelScoreData {
 const ECE_BIN_COUNT = 10;
 
 /**
+ * Minimum samples required for calibration error to be meaningful
+ * With fewer samples, ECE calculation is unreliable noise
+ */
+const MIN_SAMPLES_FOR_CALIBRATION = 20;
+
+/**
  * Calculate mean of an array of numbers
  * @param values - Array of numbers
  * @returns Mean value, or NaN if empty
@@ -301,7 +307,12 @@ export function generateLeaderboard(
     const meanBrier = calculateMean(data.briers);
     const winRate = calculateWinRate(data.predictions, data.labels);
     const precision = calculatePrecision(data.predictions, data.labels);
-    const calibrationError = calculateExpectedCalibrationError(data.predictions, data.labels);
+
+    // Calibration error requires minimum sample size to be meaningful
+    const sampleCount = data.predictions.length;
+    const calibrationError = sampleCount < MIN_SAMPLES_FOR_CALIBRATION
+      ? Number.NaN
+      : calculateExpectedCalibrationError(data.predictions, data.labels);
 
     entries.push({
       modelId,
@@ -311,7 +322,7 @@ export function generateLeaderboard(
       winRate,
       precision,
       calibrationError,
-      roundsPlayed: data.predictions.length,
+      roundsPlayed: sampleCount,
     });
   }
 

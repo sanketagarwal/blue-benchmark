@@ -219,6 +219,38 @@ describe('model-profiles', () => {
     });
 
     it('calculates calibration slope from predictions', () => {
+      // Need at least 20 samples for calibration metrics (MIN_SAMPLES_FOR_CALIBRATION)
+      // 5 rounds x 4 horizons = 20 samples
+      const roundData = [
+        {
+          predictions: { '15m': 0.2, '1h': 0.4, '4h': 0.6, '24h': 0.8 },
+          labels: { '15m': false, '1h': false, '4h': true, '24h': true },
+        },
+        {
+          predictions: { '15m': 0.3, '1h': 0.5, '4h': 0.7, '24h': 0.9 },
+          labels: { '15m': false, '1h': true, '4h': true, '24h': true },
+        },
+        {
+          predictions: { '15m': 0.15, '1h': 0.35, '4h': 0.55, '24h': 0.75 },
+          labels: { '15m': false, '1h': false, '4h': true, '24h': true },
+        },
+        {
+          predictions: { '15m': 0.25, '1h': 0.45, '4h': 0.65, '24h': 0.85 },
+          labels: { '15m': false, '1h': false, '4h': true, '24h': true },
+        },
+        {
+          predictions: { '15m': 0.1, '1h': 0.3, '4h': 0.5, '24h': 0.7 },
+          labels: { '15m': false, '1h': false, '4h': true, '24h': true },
+        },
+      ];
+
+      const profile = buildModelProfile('model', roundData);
+      // Slope should be positive (higher predictions correlate with more positives)
+      expect(profile.calibrationSlope).toBeGreaterThan(0);
+    });
+
+    it('returns NaN for calibration metrics with insufficient samples', () => {
+      // With fewer than 20 samples, calibration metrics should be NaN
       const roundData = [
         {
           predictions: { '15m': 0.2, '1h': 0.4, '4h': 0.6, '24h': 0.8 },
@@ -231,8 +263,9 @@ describe('model-profiles', () => {
       ];
 
       const profile = buildModelProfile('model', roundData);
-      // Slope should be positive (higher predictions correlate with more positives)
-      expect(profile.calibrationSlope).toBeGreaterThan(0);
+      // With only 8 samples (2 rounds x 4 horizons), calibration metrics are NaN
+      expect(Number.isNaN(profile.calibrationSlope)).toBe(true);
+      expect(Number.isNaN(profile.expectedCalibrationError)).toBe(true);
     });
   });
 
