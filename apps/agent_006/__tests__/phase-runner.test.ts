@@ -13,7 +13,7 @@ describe('phase-runner', () => {
       const manager = new ModelStateManager(['model-a', 'model-b']);
 
       // Add failing scores for model-a (degenerate pattern - always high predictions)
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('model-a', {
           roundNumber: i,
           logLoss: 0.9,
@@ -24,7 +24,7 @@ describe('phase-runner', () => {
       }
 
       // Add passing scores for model-b
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('model-b', {
           roundNumber: i,
           logLoss: 0.4,
@@ -40,11 +40,11 @@ describe('phase-runner', () => {
       expect(manager.isEliminated('model-b')).toBe(false);
     });
 
-    it('skips models with fewer than 6 rounds', () => {
+    it('skips models with fewer than 4 rounds', () => {
       const manager = new ModelStateManager(['model-a']);
 
-      // Add only 5 rounds
-      for (let i = 1; i <= 5; i++) {
+      // Add only 3 rounds
+      for (let i = 1; i <= 3; i++) {
         manager.addRoundScore('model-a', {
           roundNumber: i,
           logLoss: 0.9,
@@ -71,7 +71,7 @@ describe('phase-runner', () => {
       ]);
 
       // Good model - low log loss
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('good-model', {
           roundNumber: i,
           logLoss: 0.2,
@@ -80,7 +80,7 @@ describe('phase-runner', () => {
       }
 
       // Bad model - high log loss on all horizons
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('bad-model', {
           roundNumber: i,
           logLoss: 0.9,
@@ -89,7 +89,7 @@ describe('phase-runner', () => {
       }
 
       // Average models
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('avg-model-1', {
           roundNumber: i,
           logLoss: 0.5,
@@ -114,7 +114,7 @@ describe('phase-runner', () => {
       const manager = new ModelStateManager(['stable-model', 'unstable-model']);
 
       // Stable model - consistent performance
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= 8; i++) {
         manager.addRoundScore('stable-model', {
           roundNumber: i,
           logLoss: 0.4,
@@ -123,19 +123,19 @@ describe('phase-runner', () => {
       }
 
       // Unstable model - very high worst window performance
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('unstable-model', {
           roundNumber: i,
           logLoss: 0.3,
           logLossByHorizon: { '15m': 0.3, '1h': 0.3, '24h': 0.3, '7d': 0.3 },
         });
       }
-      // Then crashes badly
-      for (let i = 7; i <= 12; i++) {
+      // Then crashes very badly (high enough to trigger regret > 1.5 even with median)
+      for (let i = 5; i <= 8; i++) {
         manager.addRoundScore('unstable-model', {
           roundNumber: i,
-          logLoss: 1.5,
-          logLossByHorizon: { '15m': 1.5, '1h': 1.5, '24h': 1.5, '7d': 1.5 },
+          logLoss: 2.5,
+          logLossByHorizon: { '15m': 2.5, '1h': 2.5, '24h': 2.5, '7d': 2.5 },
         });
       }
 
@@ -151,7 +151,7 @@ describe('phase-runner', () => {
       const manager = new ModelStateManager(['model-a', 'model-b', 'model-c']);
 
       // Best model
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('model-a', {
           roundNumber: i,
           logLoss: 0.2,
@@ -160,7 +160,7 @@ describe('phase-runner', () => {
       }
 
       // Medium model
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('model-b', {
           roundNumber: i,
           logLoss: 0.5,
@@ -169,7 +169,7 @@ describe('phase-runner', () => {
       }
 
       // Worst model
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= 4; i++) {
         manager.addRoundScore('model-c', {
           roundNumber: i,
           logLoss: 0.8,
@@ -189,7 +189,7 @@ describe('phase-runner', () => {
       const manager = new ModelStateManager(modelIds);
 
       for (const modelId of modelIds) {
-        for (let i = 1; i <= 12; i++) {
+        for (let i = 1; i <= 4; i++) {
           manager.addRoundScore(modelId, {
             roundNumber: i,
             logLoss: 0.5,

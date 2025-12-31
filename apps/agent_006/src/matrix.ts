@@ -42,4 +42,4 @@ export const MODEL_MATRIX = getModelIds();
 
 export type ModelId = string;
 
-export const BENCHMARK_ROUNDS = 6; // Phase 0: 6-12 rounds for sanity filter
+export const BENCHMARK_ROUNDS = 4; // Phase 0: 4 rounds for sanity filter

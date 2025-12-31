@@ -22,15 +22,15 @@ This benchmark uses a rigorous 4-phase elimination process to filter out models 
 
 ## The 4 Phases
 
-### Phase 0: Sanity Filter (6 rounds)
+### Phase 0: Sanity Filter (4 rounds)
 Eliminates models that:
 - Predict all 1s or all 0s (degenerate)
 - Perform worse than random baseline
 
-### Phase 1: Relative Performance (12 rounds)
+### Phase 1: Relative Performance (4 rounds)
 Eliminates models in the **bottom quartile** of log loss performance across all horizons.
 
-### Phase 2: Stability & Regret (24 rounds)
+### Phase 2: Stability & Regret (4 rounds)
 Eliminates models with:
 - **High variance** in predictions (unstable)
 - **High regret** (worst-case performance far below median)

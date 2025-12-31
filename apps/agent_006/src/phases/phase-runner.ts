@@ -114,7 +114,7 @@ function processModelForPhase0(
     }
   }
 
-  if (phase0Rounds.length < 6) {
+  if (phase0Rounds.length < 4) {
     return;
   }
 

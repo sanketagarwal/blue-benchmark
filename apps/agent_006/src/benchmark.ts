@@ -46,9 +46,9 @@ const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
 const SYMBOL_ID = 'COINBASE_SPOT_BTC_USD';
 
 // Phase round counts
-const PHASE_0_ROUNDS = 6;
-const PHASE_1_ROUNDS = 12;
-const PHASE_2_ROUNDS = 24;
+const PHASE_0_ROUNDS = 4;
+const PHASE_1_ROUNDS = 4;
+const PHASE_2_ROUNDS = 4;
 
 /**
  * Model state for tracking across phases
@@ -539,9 +539,9 @@ async function main(): Promise<void> {
   const totalRounds = PHASE_0_ROUNDS + PHASE_1_ROUNDS + PHASE_2_ROUNDS;
   let roundNumber = 0;
 
-  // ========== PHASE 0: 6 rounds ==========
+  // ========== PHASE 0: 4 rounds ==========
   logger.newline();
-  logger.log('--- Starting Phase 0 rounds (1-6) ---');
+  logger.log('--- Starting Phase 0 rounds (1-4) ---');
   for (let phase0Round = 1; phase0Round <= PHASE_0_ROUNDS; phase0Round++) {
     roundNumber++;
     await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
@@ -551,9 +551,9 @@ async function main(): Promise<void> {
   // Run Phase 0 elimination
   runPhase0(models);
 
-  // ========== PHASE 1: 12 more rounds (7-18) ==========
+  // ========== PHASE 1: 4 more rounds (5-8) ==========
   logger.newline();
-  logger.log('--- Starting Phase 1 rounds (7-18) ---');
+  logger.log('--- Starting Phase 1 rounds (5-8) ---');
   for (let phase1Round = 1; phase1Round <= PHASE_1_ROUNDS; phase1Round++) {
     roundNumber++;
     await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
@@ -563,9 +563,9 @@ async function main(): Promise<void> {
   // Run Phase 1 elimination
   runPhase1(models);
 
-  // ========== PHASE 2: 24 more rounds (19-42) ==========
+  // ========== PHASE 2: 4 more rounds (9-12) ==========
   logger.newline();
-  logger.log('--- Starting Phase 2 rounds (19-42) ---');
+  logger.log('--- Starting Phase 2 rounds (9-12) ---');
   for (let phase2Round = 1; phase2Round <= PHASE_2_ROUNDS; phase2Round++) {
     roundNumber++;
     await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
