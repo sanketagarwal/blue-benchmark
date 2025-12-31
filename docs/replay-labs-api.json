@@ -585,7 +585,11 @@
                 },
                 "type": {
                   "type": "string",
-                  "description": "Annotation type (e.g., dump_event, regime, vol_spike)"
+                  "description": "Annotation type (e.g., dump_event, pump_event, local_extrema)"
+                },
+                "method": {
+                  "type": "string",
+                  "description": "Detection method (e.g., simple-threshold, fractal, zigzag)"
                 },
                 "schema_version": {
                   "type": "string",
@@ -600,7 +604,7 @@
                 },
                 "source": {
                   "type": "string",
-                  "description": "Annotator that created this annotation"
+                  "description": "Internal annotator source string"
                 },
                 "created_at": {
                   "type": "string",
@@ -612,6 +616,7 @@
                 "time_start",
                 "time_end",
                 "type",
+                "method",
                 "schema_version",
                 "payload",
                 "source"
@@ -943,6 +948,205 @@
           "symbol_id",
           "trades"
         ]
+      },
+      "HindsightSpec": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of hindsight requirements"
+              }
+            },
+            "required": [
+              "mode",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "fixed_bars"
+                ]
+              },
+              "fixedFutureBars": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Fixed number of future bars needed"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of hindsight requirements"
+              }
+            },
+            "required": [
+              "mode",
+              "fixedFutureBars",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "variable"
+                ]
+              },
+              "maxFutureBars": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum future bars that might be needed"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of hindsight requirements"
+              }
+            },
+            "required": [
+              "mode",
+              "maxFutureBars",
+              "description"
+            ]
+          }
+        ]
+      },
+      "EventSpec": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "dump_event",
+              "pump_event",
+              "local_extrema",
+              "regime",
+              "vol_spike",
+              "sweep_reclaim"
+            ],
+            "description": "High-level event category"
+          },
+          "method": {
+            "type": "string",
+            "description": "Detection method identifier (e.g., simple-threshold, drawdown)"
+          },
+          "candleTimeframe": {
+            "type": "string",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "description": "Native detection candle timeframe"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Fully normalized detection parameters"
+          },
+          "hindsight": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "none"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Human-readable description of hindsight requirements"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "description"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "fixed_bars"
+                    ]
+                  },
+                  "fixedFutureBars": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Fixed number of future bars needed"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Human-readable description of hindsight requirements"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "fixedFutureBars",
+                  "description"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "variable"
+                    ]
+                  },
+                  "maxFutureBars": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum future bars that might be needed"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Human-readable description of hindsight requirements"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "maxFutureBars",
+                  "description"
+                ]
+              }
+            ],
+            "description": "Hindsight/availability semantics"
+          },
+          "id": {
+            "type": "string",
+            "description": "Canonical stable identifier for caching and reproducibility"
+          }
+        },
+        "required": [
+          "type",
+          "method",
+          "candleTimeframe",
+          "params",
+          "hindsight",
+          "id"
+        ]
       }
     },
     "parameters": {}
@@ -950,7 +1154,7 @@
   "info": {
     "title": "Replay Lab API",
     "version": "2.0.0",
-    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator and fractal annotations\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20&annotations=fractal:3\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
+    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator and fractal annotations\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20&type=local_extrema&method=fractal&params=%7B%22L%22:3,%22candleTimeframe%22:%221m%22%7D\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
   },
   "servers": [
     {
@@ -969,7 +1173,7 @@
     },
     {
       "name": "Annotators",
-      "description": "Annotation generation system for ground truth labels.\n\n## What Are Annotations?\n\nAnnotations are **labeled time ranges** representing ground truth events:\n- **Agent evaluation** - Measure how well trading agents detect dumps, pumps, regime changes\n- **Backtesting** - Test strategies against historical events\n- **Data labeling** - Create supervised learning datasets\n\n## Building Custom Annotators (V2 Pattern)\n\nAn annotator is a registered function that processes candles and emits annotations with explicit hindsight semantics.\n\n### Annotator Definition\n\n```typescript\nimport type { AvailabilityMeta } from '@recallnet/core-domain/replay-lab'\n\ndefineAnnotator({\n  name: 'dump-simple-1m-3pct',\n  version: 'v2',\n  annotationType: 'dump_event',\n  source: 'ohlcv_candles',\n  windowSize: '1h',\n  config: { threshold: -0.03, candleTimeframe: '1m' },\n\n  // V2 REQUIRED: Hindsight specification\n  hindsight: {\n    mode: 'none', // or 'fixed_bars' or 'variable'\n    description: 'Available when candle closes.',\n  },\n\n  transform: async (context) => {\n    const candles = await context.getCandles('1m')\n    const dumps = []\n    for (const candle of candles) {\n      const returnPct = (candle.close - candle.open) / candle.open\n      if (returnPct <= context.config.threshold) {\n        const availability: AvailabilityMeta = {\n          availableAt: candle.timestamp.toISOString(),\n          futureBarsUsed: 0,\n          mode: 'none',\n        }\n        dumps.push({\n          timeStart: candle.timestamp,\n          payload: {\n            method: 'simple-threshold',\n            params: { threshold: -0.03 }, // V2: params separated\n            availability,                  // V2: REQUIRED\n            returnPct,\n          }\n        })\n      }\n    }\n    return dumps\n  }\n})\n```\n\n### Annotator Types\n\n**Simple Threshold**: Flag candles crossing a return threshold\n- `dump-simple-{timeframe}-{pct}` - e.g., dump-simple-1m-3pct\n- `pump-simple-{timeframe}-{pct}` - e.g., pump-simple-1m-3pct\n\n**Volatility-Adjusted**: Normalize returns by rolling volatility (z-score)\n- `dump-vol-adjusted-{timeframe}-z{threshold}` - e.g., dump-vol-adjusted-1m-z2\n- `pump-vol-adjusted-{timeframe}-z{threshold}` - e.g., pump-vol-adjusted-1m-z2\n\n**Drawdown/Drawup**: Track peak-to-trough/trough-to-peak with recovery detection\n- `dump-drawdown-{pct}` - e.g., dump-drawdown-3pct\n- `pump-drawup-{pct}` - e.g., pump-drawup-3pct\n\n**Local Extrema**: Fractal pivots and ZigZag turning points\n- `local-extrema-fractal-{timeframe}-L{bars}` - e.g., local-extrema-fractal-1m-L5\n- `local-extrema-zigzag-{timeframe}-{pct}` - e.g., local-extrema-zigzag-1m-3pct\n\n### Version Bumping\n\nBump `version` when algorithm logic changes - triggers fresh backfill while preserving old annotations.\n"
+      "description": "Annotation generation system for ground truth labels.\n\n## What Are Annotations?\n\nAnnotations are **labeled time ranges** representing ground truth events:\n- **Agent evaluation** - Measure how well trading agents detect dumps, pumps, regime changes\n- **Backtesting** - Test strategies against historical events\n- **Data labeling** - Create supervised learning datasets\n\n## Building Custom Annotators (EventSpec Pattern)\n\nAn annotator is a registered function that processes candles and emits annotations. Use `defineEventAnnotator` with an `EventSpec` for proper hindsight semantics and cache key generation.\n\n### Annotator Definition\n\n```typescript\nimport { defineEventAnnotator, buildEventSpec } from '@recallnet/core-domain'\nimport type { AvailabilityMeta } from '@recallnet/core-domain/replay-lab'\n\nconst eventSpec = buildEventSpec({\n  type: 'dump_event',\n  method: 'simple-threshold',\n  candleTimeframe: '1m',\n  params: { threshold: -0.03 },\n  hindsight: {\n    mode: 'none',\n    description: 'Available when candle closes.',\n  },\n})\n\ndefineEventAnnotator({\n  name: 'dump-simple-1m-3pct',\n  version: 'v2',\n  eventSpec,\n  windowSize: '1h',\n  startTime: null,\n  description: 'Detects 3% dumps on 1m candles',\n\n  transform: async (ctx) => {\n    const candles = await ctx.getCandles('1m')\n    const dumps = []\n    for (const candle of candles) {\n      const returnPct = (candle.close - candle.open) / candle.open\n      if (returnPct <= eventSpec.params.threshold) {\n        const availability: AvailabilityMeta = {\n          availableAt: candle.timestamp.toISOString(),\n          futureBarsUsed: 0,\n          mode: 'none',\n        }\n        dumps.push({\n          timeStart: candle.timestamp,\n          payload: {\n            method: eventSpec.method,\n            params: eventSpec.params,\n            availability,\n            returnPct,\n          }\n        })\n      }\n    }\n    return dumps\n  }\n})\n```\n\n### Annotator Types\n\n**Simple Threshold**: Flag candles crossing a return threshold\n- `dump-simple-{timeframe}-{pct}` - e.g., dump-simple-1m-3pct\n- `pump-simple-{timeframe}-{pct}` - e.g., pump-simple-1m-3pct\n\n**Volatility-Adjusted**: Normalize returns by rolling volatility (z-score)\n- `dump-vol-adjusted-{timeframe}-z{threshold}` - e.g., dump-vol-adjusted-1m-z2\n- `pump-vol-adjusted-{timeframe}-z{threshold}` - e.g., pump-vol-adjusted-1m-z2\n\n**Drawdown/Drawup**: Track peak-to-trough/trough-to-peak with recovery detection\n- `dump-drawdown-{pct}` - e.g., dump-drawdown-3pct\n- `pump-drawup-{pct}` - e.g., pump-drawup-3pct\n\n**Local Extrema**: Fractal pivots and ZigZag turning points\n- `local-extrema-fractal-{timeframe}-L{bars}` - e.g., local-extrema-fractal-1m-L5\n- `local-extrema-zigzag-{timeframe}-{pct}` - e.g., local-extrema-zigzag-1m-3pct\n\n### Version Bumping\n\nBump `version` when algorithm logic changes - triggers fresh backfill while preserving old annotations.\n"
     },
     {
       "name": "Annotations",
@@ -1454,7 +1658,7 @@
     "/api/charts/{symbolId}/image": {
       "get": {
         "summary": "Generate chart image",
-        "description": "Renders a static chart image with configurable layers and caching.\n\n**Caching behavior:**\n- Historical charts (time range before current bar): Cached for 1 year (immutable)\n- Current charts: Cached based on timeframe (1m=30s, 1h=30min, 1d=12h)\n\n**Canonical redirect:**\nWhen `from`/`to` are omitted, the server returns a 302 redirect to a canonical URL\nwith explicit timestamps. This ensures stable cache keys.\n",
+        "description": "Renders a static chart image with configurable layers and annotation overlays.\n\n**Annotation Parameters:**\nUse `type`, `method`, and `params` to configure annotations:\n\n| Type | Valid Methods |\n|------|---------------|\n| `local_extrema` | fractal, zigzag |\n| `dump_event` | simple-threshold, vol-adjusted-zscore, drawdown |\n| `pump_event` | simple-threshold, vol-adjusted-zscore, drawup |\n| `sweep_reclaim` | sweep-reclaim-low, sweep-reclaim-high |\n\n**Caching behavior:**\n- Historical charts (time range before current bar): Cached for 1 year (immutable)\n- Current charts: Cached based on timeframe (1m=30s, 1h=30min, 1d=12h)\n\n**Canonical redirect:**\nWhen `from`/`to` are omitted, the server returns a 302 redirect to a canonical URL\nwith explicit timestamps. This ensures stable cache keys.\n",
         "tags": [
           "Charts"
         ],
@@ -1671,13 +1875,40 @@
           {
             "schema": {
               "type": "string",
-              "default": "fractal:3",
-              "description": "Comma-separated annotation types with optional parameters. Use \"none\" to disable.",
-              "example": "fractal:3"
+              "enum": [
+                "local_extrema",
+                "dump_event",
+                "pump_event",
+                "sweep_reclaim"
+              ],
+              "description": "Annotation type to overlay on chart.\n\n**Valid methods per type:**\n- `local_extrema`: fractal, zigzag\n- `dump_event`: simple-threshold, vol-adjusted-zscore, drawdown\n- `pump_event`: simple-threshold, vol-adjusted-zscore, drawup\n- `sweep_reclaim`: sweep-reclaim-low, sweep-reclaim-high",
+              "example": "local_extrema"
             },
             "required": false,
-            "description": "Comma-separated annotation types with optional parameters. Use \"none\" to disable.",
-            "name": "annotations",
+            "description": "Annotation type to overlay on chart.\n\n**Valid methods per type:**\n- `local_extrema`: fractal, zigzag\n- `dump_event`: simple-threshold, vol-adjusted-zscore, drawdown\n- `pump_event`: simple-threshold, vol-adjusted-zscore, drawup\n- `sweep_reclaim`: sweep-reclaim-low, sweep-reclaim-high",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Detection method. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+              "example": "fractal"
+            },
+            "required": false,
+            "description": "Detection method. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+            "name": "method",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "JSON-encoded parameters for the annotation method. Examples:\n- fractal: {\"L\": 3}\n- zigzag: {\"deviationPct\": 0.03}\n- simple-threshold: {\"threshold\": -0.01}\n- vol-adjusted-zscore: {\"lookbackCandles\": 20, \"zThreshold\": -2, \"minAbsoluteThreshold\": -0.005}",
+              "example": "{\"L\": 3}"
+            },
+            "required": false,
+            "description": "JSON-encoded parameters for the annotation method. Examples:\n- fractal: {\"L\": 3}\n- zigzag: {\"deviationPct\": 0.03}\n- simple-threshold: {\"threshold\": -0.01}\n- vol-adjusted-zscore: {\"lookbackCandles\": 20, \"zThreshold\": -2, \"minAbsoluteThreshold\": -0.005}",
+            "name": "params",
             "in": "query"
           }
         ],
@@ -1688,6 +1919,16 @@
               "image/png": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "fractal": {
+                    "summary": "Fractal detection (Williams fractals)",
+                    "value": "Binary PNG image data"
+                  },
+                  "dumpSimple": {
+                    "summary": "Simple dump threshold",
+                    "value": "Binary PNG image data"
+                  }
                 }
               }
             }
@@ -2420,7 +2661,7 @@
     "/api/annotations/{symbolId}": {
       "get": {
         "summary": "Get ground truth annotations",
-        "description": "Returns annotations for agent self-scoring.\n\nAnnotation types:\n- `dump_event`: Significant price drops\n- `regime`: Market regime changes\n- `vol_spike`: Volatility spikes\n",
+        "description": "Returns annotations for agent self-scoring.\n\n**Query parameters:**\n- `type`: Filter by annotation type (dump_event, pump_event, local_extrema, sweep_reclaim)\n- `method`: Filter by detection method\n- `from`/`to`: Time range filter\n- `availableAt`: Filter by availability timestamp (for non-lookahead filtering)\n\n**Valid methods per type:**\n| Type | Methods |\n|------|---------|\n| `local_extrema` | fractal, zigzag |\n| `dump_event` | simple-threshold, vol-adjusted-zscore, drawdown |\n| `pump_event` | simple-threshold, vol-adjusted-zscore, drawup |\n| `sweep_reclaim` | sweep-reclaim-low, sweep-reclaim-high |\n",
         "tags": [
           "Annotations"
         ],
@@ -2493,23 +2734,21 @@
             "schema": {
               "type": "string",
               "enum": [
-                "sweep-reclaim-low",
-                "sweep-reclaim-high",
-                "dump-simple",
-                "dump-vol-adjusted",
-                "dump-drawdown",
-                "pump-simple",
-                "pump-vol-adjusted",
-                "pump-drawup",
                 "fractal",
-                "zigzag"
+                "zigzag",
+                "simple-threshold",
+                "vol-adjusted-zscore",
+                "drawdown",
+                "drawup",
+                "sweep-reclaim-low",
+                "sweep-reclaim-high"
               ],
-              "description": "Filter by specific annotator/detector",
-              "example": "dump-simple-1h-0.5pct"
+              "description": "Filter by detection method",
+              "example": "simple-threshold"
             },
             "required": false,
-            "description": "Filter by specific annotator/detector",
-            "name": "source",
+            "description": "Filter by detection method",
+            "name": "method",
             "in": "query"
           },
           {
@@ -2573,7 +2812,11 @@
                           },
                           "type": {
                             "type": "string",
-                            "description": "Annotation type (e.g., dump_event, regime, vol_spike)"
+                            "description": "Annotation type (e.g., dump_event, pump_event, local_extrema)"
+                          },
+                          "method": {
+                            "type": "string",
+                            "description": "Detection method (e.g., simple-threshold, fractal, zigzag)"
                           },
                           "schema_version": {
                             "type": "string",
@@ -2588,7 +2831,7 @@
                           },
                           "source": {
                             "type": "string",
-                            "description": "Annotator that created this annotation"
+                            "description": "Internal annotator source string"
                           },
                           "created_at": {
                             "type": "string",
@@ -2600,6 +2843,7 @@
                           "time_start",
                           "time_end",
                           "type",
+                          "method",
                           "schema_version",
                           "payload",
                           "source"
@@ -3063,7 +3307,7 @@
     "/api/annotations/{symbolId}/compute": {
       "post": {
         "summary": "Compute annotations on-demand",
-        "description": "Run parameterized annotation detection without pre-registration.\nComputes annotations for a given symbol, type, method, params, and time range.\n\nAvailable methods:\n- **dump_event**: simple-threshold, vol-adjusted-zscore, drawdown\n- **pump_event**: simple-threshold, vol-adjusted-zscore, drawup\n- **local_extrema**: fractal, zigzag\n- **sweep_reclaim**: sweep-reclaim (not yet implemented)\n",
+        "description": "Run parameterized annotation detection without pre-registration.\nComputes annotations for a given symbol, type, method, params, and time range.\n\n**Valid methods per type:**\n\n| Type | Methods |\n|------|---------|\n| `local_extrema` | fractal, zigzag |\n| `dump_event` | simple-threshold, vol-adjusted-zscore, drawdown |\n| `pump_event` | simple-threshold, vol-adjusted-zscore, drawup |\n| `sweep_reclaim` | sweep-reclaim-low, sweep-reclaim-high |\n\n**Parameter reference by method:**\n- **fractal**: `{ L: number, candleTimeframe: string }` - Williams fractal with L bars on each side\n- **zigzag**: `{ deviationPct: number, candleTimeframe: string }` - ZigZag with minimum deviation\n- **simple-threshold**: `{ threshold: number, candleTimeframe: string }` - Fixed return threshold (negative for dumps, positive for pumps)\n- **vol-adjusted-zscore**: `{ lookbackCandles: number, zThreshold: number, minAbsoluteThreshold: number, candleTimeframe: string }` - Z-score normalized returns\n- **drawdown/drawup**: `{ threshold: number, candleTimeframe: string }` - Peak-to-trough/trough-to-peak detection\n",
         "tags": [
           "Annotations"
         ],
@@ -3106,30 +3350,38 @@
                       "local_extrema",
                       "sweep_reclaim"
                     ],
-                    "description": "Annotation type template"
+                    "description": "Annotation type. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+                    "example": "local_extrema"
                   },
                   "method": {
                     "type": "string",
-                    "description": "Detection method (e.g., simple-threshold, fractal)"
+                    "description": "Detection method. Must match the type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+                    "example": "fractal"
                   },
                   "params": {
                     "type": "object",
                     "additionalProperties": {
                       "nullable": true
                     },
-                    "description": "Method parameters"
+                    "description": "Method-specific parameters.\n\n**Parameter reference by method:**\n- fractal: { L: number, candleTimeframe: \"1m\"|\"5m\"|\"15m\"|\"1h\"|\"4h\"|\"1d\" }\n- zigzag: { deviationPct: number, candleTimeframe: string }\n- simple-threshold: { threshold: number, candleTimeframe: string }\n- vol-adjusted-zscore: { lookbackCandles: number, zThreshold: number, minAbsoluteThreshold: number, candleTimeframe: string }\n- drawdown/drawup: { threshold: number, candleTimeframe: string }\n- sweep-reclaim-*: { swingLookback: number, minDisplacementATR: number, maxBarsToReclaim: number, candleTimeframe: string }",
+                    "example": {
+                      "L": 3,
+                      "candleTimeframe": "1m"
+                    }
                   },
                   "from": {
                     "type": "string",
                     "nullable": true,
                     "format": "date",
-                    "description": "Time range start (ISO 8601)"
+                    "description": "Time range start (ISO 8601)",
+                    "example": "2025-12-30T15:00:00Z"
                   },
                   "to": {
                     "type": "string",
                     "nullable": true,
                     "format": "date",
-                    "description": "Time range end (ISO 8601)"
+                    "description": "Time range end (ISO 8601)",
+                    "example": "2025-12-30T16:00:00Z"
                   },
                   "cachePolicy": {
                     "type": "string",
@@ -3139,7 +3391,8 @@
                       "persist"
                     ],
                     "default": "none",
-                    "description": "Cache policy"
+                    "description": "Cache policy: none (no caching), ephemeral (in-memory), persist (database)",
+                    "example": "none"
                   }
                 },
                 "required": [
@@ -3149,6 +3402,94 @@
                   "from",
                   "to"
                 ]
+              },
+              "examples": {
+                "fractal": {
+                  "summary": "Fractal detection (Williams fractals)",
+                  "value": {
+                    "type": "local_extrema",
+                    "method": "fractal",
+                    "params": {
+                      "L": 3,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "zigzag": {
+                  "summary": "ZigZag pivot detection",
+                  "value": {
+                    "type": "local_extrema",
+                    "method": "zigzag",
+                    "params": {
+                      "deviationPct": 0.03,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "dumpSimple": {
+                  "summary": "Simple dump threshold (-1%)",
+                  "value": {
+                    "type": "dump_event",
+                    "method": "simple-threshold",
+                    "params": {
+                      "threshold": -0.01,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "dumpVolAdjusted": {
+                  "summary": "Volatility-adjusted dump (z-score)",
+                  "value": {
+                    "type": "dump_event",
+                    "method": "vol-adjusted-zscore",
+                    "params": {
+                      "lookbackCandles": 20,
+                      "zThreshold": -2,
+                      "minAbsoluteThreshold": -0.005,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "dumpDrawdown": {
+                  "summary": "Drawdown-based dump detection",
+                  "value": {
+                    "type": "dump_event",
+                    "method": "drawdown",
+                    "params": {
+                      "threshold": -0.03,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "pumpSimple": {
+                  "summary": "Simple pump threshold (+1%)",
+                  "value": {
+                    "type": "pump_event",
+                    "method": "simple-threshold",
+                    "params": {
+                      "threshold": 0.01,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                }
               }
             }
           }

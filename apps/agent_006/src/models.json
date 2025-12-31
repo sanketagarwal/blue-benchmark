@@ -1,0 +1,542 @@
+{
+  "models": [
+    {
+      "id": "anthropic/claude-haiku-4.5",
+      "provider": "anthropic",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Fast, cheap, vision capable"
+    },
+    {
+      "id": "anthropic/claude-sonnet-4.5",
+      "provider": "anthropic",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Balanced performance with vision"
+    },
+    {
+      "id": "anthropic/claude-3.5-haiku",
+      "provider": "anthropic",
+      "inputCostPerMillion": 0.25,
+      "outputCostPerMillion": 1.25,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Legacy fast tier with vision"
+    },
+    {
+      "id": "anthropic/claude-3.5-sonnet",
+      "provider": "anthropic",
+      "inputCostPerMillion": 0.80,
+      "outputCostPerMillion": 4.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Strong reasoning with vision"
+    },
+    {
+      "id": "anthropic/claude-3.7-sonnet",
+      "provider": "anthropic",
+      "inputCostPerMillion": 1.00,
+      "outputCostPerMillion": 5.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Latest sonnet with vision"
+    },
+    {
+      "id": "openai/gpt-4o",
+      "provider": "openai",
+      "inputCostPerMillion": 2.50,
+      "outputCostPerMillion": 10.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Omni model - text, image, audio"
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "provider": "openai",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Fast, cheap, vision capable"
+    },
+    {
+      "id": "openai/gpt-4-turbo",
+      "provider": "openai",
+      "inputCostPerMillion": 10.00,
+      "outputCostPerMillion": 30.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "GPT-4 with vision (exceeds $10 limit but included for reference)"
+    },
+    {
+      "id": "openai/gpt-5-nano",
+      "provider": "openai",
+      "inputCostPerMillion": 0.05,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Cheapest GPT-5 with vision"
+    },
+    {
+      "id": "openai/gpt-5-mini",
+      "provider": "openai",
+      "inputCostPerMillion": 0.25,
+      "outputCostPerMillion": 1.25,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Mid-tier GPT-5 with vision"
+    },
+    {
+      "id": "openai/gpt-5.2",
+      "provider": "openai",
+      "inputCostPerMillion": 0.45,
+      "outputCostPerMillion": 1.80,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Latest GPT-5 with vision"
+    },
+    {
+      "id": "google/gemini-2.0-flash",
+      "provider": "google",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Fast multimodal Gemini"
+    },
+    {
+      "id": "google/gemini-2.0-flash-lite",
+      "provider": "google",
+      "inputCostPerMillion": 0.40,
+      "outputCostPerMillion": 1.60,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Lite multimodal Gemini"
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "provider": "google",
+      "inputCostPerMillion": 0.15,
+      "outputCostPerMillion": 0.60,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Latest flash with vision"
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite",
+      "provider": "google",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Cheapest Gemini multimodal"
+    },
+    {
+      "id": "google/gemini-2.5-pro",
+      "provider": "google",
+      "inputCostPerMillion": 1.25,
+      "outputCostPerMillion": 5.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Pro tier multimodal"
+    },
+    {
+      "id": "google/gemini-3-flash",
+      "provider": "google",
+      "inputCostPerMillion": 0.27,
+      "outputCostPerMillion": 1.15,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Gemini 3 flash multimodal"
+    },
+    {
+      "id": "google/gemini-3-flash-preview",
+      "provider": "google",
+      "inputCostPerMillion": 0.75,
+      "outputCostPerMillion": 3.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Gemini 3 preview multimodal"
+    },
+    {
+      "id": "google/gemini-3-pro-preview",
+      "provider": "google",
+      "inputCostPerMillion": 1.00,
+      "outputCostPerMillion": 5.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Gemini 3 pro multimodal"
+    },
+    {
+      "id": "xai/grok-2-vision",
+      "provider": "xai",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 2 with vision (exceeds limit)"
+    },
+    {
+      "id": "xai/grok-4-fast-non-reasoning",
+      "provider": "xai",
+      "inputCostPerMillion": 0.30,
+      "outputCostPerMillion": 2.50,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Latest Grok fast with vision"
+    },
+    {
+      "id": "xai/grok-4-fast-reasoning",
+      "provider": "xai",
+      "inputCostPerMillion": 1.00,
+      "outputCostPerMillion": 5.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 4 reasoning with vision"
+    },
+    {
+      "id": "mistral/pixtral-12b",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.20,
+      "outputCostPerMillion": 0.50,
+      "tier": "budget",
+      "vision": true,
+      "notes": "12B vision model"
+    },
+    {
+      "id": "mistral/pixtral-large",
+      "provider": "mistral",
+      "inputCostPerMillion": 2.00,
+      "outputCostPerMillion": 6.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Large vision model"
+    },
+    {
+      "id": "mistral/mistral-small",
+      "provider": "mistral",
+      "inputCostPerMillion": 1.20,
+      "outputCostPerMillion": 6.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Small with vision support"
+    },
+    {
+      "id": "mistral/mistral-large-3",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.50,
+      "outputCostPerMillion": 1.50,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Latest large multimodal"
+    },
+    {
+      "id": "mistral/ministral-3b-2512",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.04,
+      "outputCostPerMillion": 0.10,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Tiny vision model"
+    },
+    {
+      "id": "mistral/ministral-8b-2512",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.15,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Small vision model"
+    },
+    {
+      "id": "mistral/ministral-14b-2512",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.15,
+      "outputCostPerMillion": 0.20,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Mid vision model"
+    },
+    {
+      "id": "qwen/qwen3-vl-instruct",
+      "provider": "qwen",
+      "inputCostPerMillion": 1.15,
+      "outputCostPerMillion": 8.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Qwen 3 vision-language flagship"
+    },
+    {
+      "id": "qwen/qwen3-vl-8b-instruct",
+      "provider": "qwen",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Qwen 3 vision 8B"
+    },
+    {
+      "id": "qwen/qwen2.5-vl-72b-instruct",
+      "provider": "qwen",
+      "inputCostPerMillion": 0.40,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Qwen 2.5 vision 72B"
+    },
+    {
+      "id": "qwen/qwen2.5-vl-7b-instruct",
+      "provider": "qwen",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.10,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Qwen 2.5 vision 7B"
+    },
+    {
+      "id": "qwen/qwen2.5-vl-32b-instruct",
+      "provider": "qwen",
+      "inputCostPerMillion": 0.20,
+      "outputCostPerMillion": 0.20,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Qwen 2.5 vision 32B"
+    },
+    {
+      "id": "meta/llama-3.2-11b-vision-instruct",
+      "provider": "meta",
+      "inputCostPerMillion": 0.055,
+      "outputCostPerMillion": 0.055,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Llama 3.2 vision 11B"
+    },
+    {
+      "id": "meta/llama-3.2-90b-vision-instruct",
+      "provider": "meta",
+      "inputCostPerMillion": 0.35,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Llama 3.2 vision 90B"
+    },
+    {
+      "id": "meta/llama-4-maverick",
+      "provider": "meta",
+      "inputCostPerMillion": 2.00,
+      "outputCostPerMillion": 8.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Llama 4 flagship multimodal"
+    },
+    {
+      "id": "amazon/nova-lite",
+      "provider": "amazon",
+      "inputCostPerMillion": 0.06,
+      "outputCostPerMillion": 0.24,
+      "tier": "budget",
+      "vision": true,
+      "notes": "AWS Nova lite multimodal"
+    },
+    {
+      "id": "amazon/nova-pro",
+      "provider": "amazon",
+      "inputCostPerMillion": 0.80,
+      "outputCostPerMillion": 3.20,
+      "tier": "mid",
+      "vision": true,
+      "notes": "AWS Nova pro multimodal"
+    },
+    {
+      "id": "amazon/nova-2-lite-v1",
+      "provider": "amazon",
+      "inputCostPerMillion": 0.50,
+      "outputCostPerMillion": 2.50,
+      "tier": "mid",
+      "vision": true,
+      "notes": "AWS Nova 2 lite multimodal"
+    },
+    {
+      "id": "glm/glm-4.5v",
+      "provider": "glm",
+      "inputCostPerMillion": 0.27,
+      "outputCostPerMillion": 1.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "GLM 4.5 vision"
+    },
+    {
+      "id": "glm/glm-4.6v",
+      "provider": "glm",
+      "inputCostPerMillion": 0.47,
+      "outputCostPerMillion": 2.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "GLM 4.6 vision"
+    },
+    {
+      "id": "glm/glm-4.6v-flash",
+      "provider": "glm",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.29,
+      "tier": "budget",
+      "vision": true,
+      "notes": "GLM 4.6 vision flash"
+    },
+    {
+      "id": "nvidia/nemotron-nano-12b-v2-vl",
+      "provider": "nvidia",
+      "inputCostPerMillion": 0.07,
+      "outputCostPerMillion": 0.30,
+      "tier": "budget",
+      "vision": true,
+      "notes": "NVIDIA Nemotron vision-language"
+    },
+    {
+      "id": "bytedance/seed-1.6-flash",
+      "provider": "bytedance",
+      "inputCostPerMillion": 0.075,
+      "outputCostPerMillion": 0.30,
+      "tier": "budget",
+      "vision": true,
+      "notes": "ByteDance Seed vision flash"
+    },
+    {
+      "id": "bytedance/seed-1.6",
+      "provider": "bytedance",
+      "inputCostPerMillion": 0.50,
+      "outputCostPerMillion": 2.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "ByteDance Seed vision"
+    },
+    {
+      "id": "deepseek/deepseek-janus-pro-7b",
+      "provider": "deepseek",
+      "inputCostPerMillion": 0.05,
+      "outputCostPerMillion": 0.05,
+      "tier": "budget",
+      "vision": true,
+      "notes": "DeepSeek Janus vision 7B"
+    },
+    {
+      "id": "liuhaotian/llava-v1.6-34b",
+      "provider": "liuhaotian",
+      "inputCostPerMillion": 0.90,
+      "outputCostPerMillion": 0.90,
+      "tier": "mid",
+      "vision": true,
+      "notes": "LLaVA 1.6 vision 34B"
+    },
+    {
+      "id": "liuhaotian/llava-yi-34b",
+      "provider": "liuhaotian",
+      "inputCostPerMillion": 0.90,
+      "outputCostPerMillion": 0.90,
+      "tier": "mid",
+      "vision": true,
+      "notes": "LLaVA-Yi vision 34B"
+    },
+    {
+      "id": "01-ai/yi-vision",
+      "provider": "01-ai",
+      "inputCostPerMillion": 0.19,
+      "outputCostPerMillion": 0.19,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Yi Vision model"
+    },
+    {
+      "id": "moondream/moondream2",
+      "provider": "moondream",
+      "inputCostPerMillion": 0.00,
+      "outputCostPerMillion": 0.00,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Free tiny vision model"
+    },
+    {
+      "id": "microsoft/phi-4-multimodal-instruct",
+      "provider": "microsoft",
+      "inputCostPerMillion": 0.07,
+      "outputCostPerMillion": 0.14,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Phi 4 multimodal"
+    },
+    {
+      "id": "microsoft/phi-3.5-vision-instruct",
+      "provider": "microsoft",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.10,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Phi 3.5 vision"
+    },
+    {
+      "id": "google/gemma-3-27b-it",
+      "provider": "google",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.20,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Gemma 3 multimodal 27B"
+    },
+    {
+      "id": "google/gemma-3-12b-it",
+      "provider": "google",
+      "inputCostPerMillion": 0.06,
+      "outputCostPerMillion": 0.12,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Gemma 3 multimodal 12B"
+    },
+    {
+      "id": "google/gemma-3-4b-it",
+      "provider": "google",
+      "inputCostPerMillion": 0.04,
+      "outputCostPerMillion": 0.08,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Gemma 3 multimodal 4B"
+    }
+  ],
+  "tiers": {
+    "budget": {
+      "description": "Under $1/M output tokens",
+      "maxOutputCost": 1.00
+    },
+    "mid": {
+      "description": "$1-5/M output tokens",
+      "minOutputCost": 1.00,
+      "maxOutputCost": 5.00
+    },
+    "frontier": {
+      "description": "$5-10/M output tokens",
+      "minOutputCost": 5.00,
+      "maxOutputCost": 10.00
+    }
+  },
+  "providers": [
+    "anthropic",
+    "openai",
+    "google",
+    "xai",
+    "mistral",
+    "qwen",
+    "meta",
+    "amazon",
+    "glm",
+    "nvidia",
+    "bytedance",
+    "deepseek",
+    "liuhaotian",
+    "01-ai",
+    "moondream",
+    "microsoft"
+  ]
+}
