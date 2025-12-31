@@ -14,7 +14,6 @@ import {
 import { resolveBottomGroundTruth } from './ground-truth/bottom-checker.js';
 import { getModelIds } from './matrix.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
-import { getTrades } from './replay-lab/trades.js';
 import {
   scorePhase0Round,
   aggregatePhase0Scores,
@@ -93,7 +92,7 @@ async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
 }
 
 /**
- * Resolve ground truth for all horizons
+ * Resolve ground truth for all horizons using annotations API
  * @param symbolId - Trading symbol identifier
  * @param predictionTime - Time of prediction
  * @returns Labels and time-to-pivot ratios for all horizons
@@ -105,15 +104,11 @@ async function resolveAllHorizonsGroundTruth(
   const labels: Record<string, boolean> = {};
   const ratios: Record<string, number | undefined> = {};
 
-  // Need to fetch trades covering the longest horizon (7d)
-  const maxDuration = 7 * 24 * 60 * 60 * 1000;
-  const tradeWindowEnd = new Date(predictionTime.getTime() + maxDuration);
-  const trades = await getTrades(symbolId, predictionTime, tradeWindowEnd);
-
+  // Resolve each horizon using annotations (no raw trades needed)
   for (const horizon of HORIZONS) {
-    const result = await resolveBottomGroundTruth(symbolId, horizon, predictionTime, trades);
+    const result = await resolveBottomGroundTruth(symbolId, horizon, predictionTime);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    labels[horizon] = result.isValid;
+    labels[horizon] = result.hasStructuralBottom;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     ratios[horizon] = result.timeToPivotRatio;
   }

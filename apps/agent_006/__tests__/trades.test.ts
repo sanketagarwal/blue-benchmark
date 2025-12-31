@@ -194,16 +194,54 @@ describe('Replay Lab Trades', () => {
       expect(trades).toEqual([]);
     });
 
-    it('should throw error when from and to are on different UTC days', async () => {
+    it('should fetch multiple days when from and to span UTC day boundaries', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const from = new Date('2025-12-22T23:00:00Z');
       const to = new Date('2025-12-23T01:00:00Z');
 
-      await expect(getTrades(symbolId, from, to)).rejects.toThrow(
-        'from and to must be on the same UTC day'
-      );
+      // First call for day 1 (22nd)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          symbol_id: symbolId,
+          trades: [
+            {
+              symbol_id: symbolId,
+              timestamp: '2025-12-22T23:30:00Z',
+              price: 3000,
+              size: 1.0,
+              taker_side: 'BUY',
+              uuid: 'trade-1',
+            },
+          ],
+        }),
+      });
 
-      expect(mockFetch).not.toHaveBeenCalled();
+      // Second call for day 2 (23rd)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          symbol_id: symbolId,
+          trades: [
+            {
+              symbol_id: symbolId,
+              timestamp: '2025-12-23T00:30:00Z',
+              price: 3100,
+              size: 0.5,
+              taker_side: 'SELL',
+              uuid: 'trade-2',
+            },
+          ],
+        }),
+      });
+
+      const trades = await getTrades(symbolId, from, to);
+
+      expect(trades).toHaveLength(2);
+      expect(trades[0].price).toBe(3000);
+      expect(trades[1].price).toBe(3100);
+      // Should have made 2 calls, one per day
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it('should allow from and to on the same UTC day at day boundaries', async () => {

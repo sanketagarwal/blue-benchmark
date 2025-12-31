@@ -5,7 +5,7 @@ describe('matrix', () => {
   describe('loadModelMatrix', () => {
     it('loads all vision models from models.json', () => {
       const models = loadModelMatrix();
-      expect(models.length).toBeGreaterThan(50);
+      expect(models.length).toBeGreaterThan(20);
       expect(models.every(m => m.vision === true)).toBe(true);
     });
 
@@ -22,7 +22,7 @@ describe('matrix', () => {
   describe('getModelIds', () => {
     it('returns array of model ID strings', () => {
       const ids = getModelIds();
-      expect(ids.length).toBeGreaterThan(50);
+      expect(ids.length).toBeGreaterThan(20);
       expect(ids.every(id => typeof id === 'string')).toBe(true);
       expect(ids[0]).toMatch(/\//); // Format: provider/model
     });

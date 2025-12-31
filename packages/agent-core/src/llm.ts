@@ -51,17 +51,37 @@ export const DEFAULT_CONTEXT_WINDOW = 100_000;
 
 /**
  * Known model context window sizes
+ * Model IDs match Vercel AI Gateway format: provider/model-name
  */
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  // Anthropic
+  'anthropic/claude-haiku-4-5': 200_000,
+  'anthropic/claude-sonnet-4-5': 200_000,
+  'anthropic/claude-3-5-sonnet-20241022': 200_000,
+  'anthropic/claude-3-5-haiku-latest': 200_000,
+  'anthropic/claude-3-7-sonnet-latest': 200_000,
+  // OpenAI
   'openai/gpt-4o': 128_000,
   'openai/gpt-4o-mini': 128_000,
+  'openai/gpt-4.1': 128_000,
+  'openai/gpt-4.1-mini': 128_000,
+  'openai/gpt-5': 128_000,
+  'openai/gpt-5-mini': 128_000,
   'openai/gpt-5-nano': 128_000,
-  'deepseek/deepseek-v3.2': 128_000,
-  'anthropic/claude-sonnet-4': 200_000,
-  'anthropic/claude-haiku-4.5': 200_000,
-  'xai/grok-4.1-fast-reasoning': 2_000_000,
-  'xai/grok-4-fast-reasoning': 2_000_000,
+  // Google Gemini
+  'google/gemini-2.0-flash': 1_000_000,
+  'google/gemini-2.5-flash': 1_000_000,
+  'google/gemini-2.5-flash-lite': 1_000_000,
+  'google/gemini-2.5-pro': 1_000_000,
+  'google/gemini-3-pro-preview': 1_000_000,
+  // xAI
+  'xai/grok-2-vision': 128_000,
   'xai/grok-4-fast-non-reasoning': 2_000_000,
+  // Mistral
+  'mistral/pixtral-large-latest': 128_000,
+  'mistral/pixtral-12b-2409': 128_000,
+  'mistral/ministral-3b-latest': 128_000,
+  'mistral/ministral-8b-latest': 128_000,
 };
 
 /**

@@ -79,16 +79,16 @@ describe('llm', () => {
     it('has correct context windows for known models', () => {
       expect(MODEL_CONTEXT_WINDOWS['openai/gpt-4o']).toBe(128_000);
       expect(MODEL_CONTEXT_WINDOWS['openai/gpt-4o-mini']).toBe(128_000);
-      expect(MODEL_CONTEXT_WINDOWS['deepseek/deepseek-v3.2']).toBe(128_000);
-      expect(MODEL_CONTEXT_WINDOWS['anthropic/claude-sonnet-4']).toBe(200_000);
+      expect(MODEL_CONTEXT_WINDOWS['anthropic/claude-haiku-4-5']).toBe(200_000);
+      expect(MODEL_CONTEXT_WINDOWS['google/gemini-2.5-flash']).toBe(1_000_000);
     });
   });
 
   describe('getContextWindow', () => {
     it('returns correct context window for known models', () => {
       expect(getContextWindow('openai/gpt-4o')).toBe(128_000);
-      expect(getContextWindow('anthropic/claude-sonnet-4')).toBe(200_000);
-      expect(getContextWindow('xai/grok-4-fast-reasoning')).toBe(2_000_000);
+      expect(getContextWindow('anthropic/claude-sonnet-4-5')).toBe(200_000);
+      expect(getContextWindow('xai/grok-4-fast-non-reasoning')).toBe(2_000_000);
     });
 
     it('returns default context window for unknown models', () => {

@@ -1,179 +1,93 @@
-# agent_006: One-Sided Execution EV Estimator
+# agent_006: Bitcoin Bottom Arena
 
-A production-grade benchmark for evaluating LLM capability at limit order fill prediction, conditional price movement estimation, and expected value calculation—the core competencies of HFT market-making.
+A multi-phase selection protocol for evaluating vision-capable LLMs at predicting structural market bottoms across multiple time horizons.
 
-**What this is:**
-- A one-sided execution EV estimator
-- With out-of-sample realized PnL validation
-- And confidence-aware diagnostics
-- Suitable for feeding into a meta-allocator or strategy selector
+## What This Is
 
-This is the measurement layer that model-selection and ensemble systems depend on.
+- **Multi-horizon bottom prediction** (15m, 1h, 24h, 7d)
+- **4-phase elimination tournament** to find models with genuine predictive skill
+- **Ground truth via structural pivots** using Williams Fractal and Zigzag annotations
+- **Log loss scoring** for probabilistic predictions
+
+This benchmark identifies which vision models can reliably detect structural bottoms from chart patterns—a core competency for automated trading systems.
 
 ## Why This Matters
 
-From HFT research: *"The real-time model that estimates the expected value of placing, keeping, or canceling a limit order right now."*
+Predicting market bottoms is hard. Most models either:
+- **Call bottoms everywhere** (high recall, no precision)
+- **Never call bottoms** (safe but useless)
+- **Show unstable performance** (lucky streaks don't compound)
 
-This benchmark tells uncomfortable truths about model capability:
-- **Capturing spread** is easy
-- **Avoiding adverse selection** (being filled then price moves against you) is hard
-- **Directional skill vs hallucinated magnitude** is what separates research from capital-deployable
+This benchmark uses a rigorous 4-phase elimination process to filter out models that exhibit degenerate behavior, leaving only those with genuine, stable predictive skill.
 
-## Key Design Decisions
+## The 4 Phases
 
-### ATR-Normalized Delta-Mid Clipping
+### Phase 0: Sanity Filter (6 rounds)
+Eliminates models that:
+- Predict all 1s or all 0s (degenerate)
+- Perform worse than random baseline
 
-**Critical constraint:** Delta-mid predictions are clipped to `[-3, +3] ATR` before EV calculation.
+### Phase 1: Relative Performance (12 rounds)
+Eliminates models in the **bottom quartile** of log loss performance across all horizons.
 
-Without this, models can hallucinate arbitrarily large values that dominate EV calculations, making directional skill meaningless. This mirrors real trading systems where position limits and risk controls prevent unbounded exposure.
+### Phase 2: Stability & Regret (24 rounds)
+Eliminates models with:
+- **High variance** in predictions (unstable)
+- **High regret** (worst-case performance far below median)
 
-```
-MAX_ATR_MULTIPLE = 3
-clipped_delta = clip(raw_delta, -3*ATR, +3*ATR)
-```
+### Phase 3: Final Ranking
+Ranks surviving models by composite score:
+- Average percentile rank across horizons
+- Best-window performance (peak skill)
+- Stability (consistency)
+- Early detection bonus (time-to-pivot ratio)
 
-### Bid/Ask Split Reporting
+Top 8 models enter the **Arena** for ongoing competition.
 
-All metrics are reported separately for bid and ask sides:
-- MAE (Mean Absolute Error) per side
-- EV (Expected Value) per side
-- PnL (Profit/Loss) per side
+## Ground Truth
 
-This reveals asymmetric model behavior that aggregate metrics hide.
+A prediction is **correct** (label=1) if a **structural pivot LOW** occurs within the prediction window.
 
-### Low Sample Warnings
+Detection methods by horizon:
+| Horizon | Method | Parameters |
+|---------|--------|------------|
+| 15m, 1h | Williams Fractal | period=5 |
+| 24h, 7d | Zigzag | threshold=0.03 |
 
-Metrics with fewer than 10 fills per side are marked with `†` and dimmed. This prevents over-interpretation of noisy data.
+Ground truth is resolved via the Replay Lab annotations API—no raw trade data needed.
 
-### EV Quintile Analysis
+## Model Matrix
 
-After the main results, a separate table shows EV calibration across prediction confidence buckets:
-- Q1 (lowest predicted EV) through Q5 (highest)
-- Mean predicted EV vs mean realized PnL per bucket
-- Gap analysis reveals where models are miscalibrated
+24 verified vision models from 5 providers:
 
-## Three Evaluation Legs
+**Anthropic (5)**
+- claude-haiku-4-5, claude-sonnet-4-5, claude-3-5-sonnet, claude-3-5-haiku, claude-3-7-sonnet
 
-### Leg 1: Fill Probability (Binary Classification)
+**OpenAI (7)**
+- gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-5, gpt-5-mini, gpt-5-nano
 
-| Contract | Description |
-|----------|-------------|
-| `bid-fill-1m/5m/15m` | Limit BUY at best_bid fills within horizon |
-| `ask-fill-1m/5m/15m` | Limit SELL at best_ask fills within horizon |
+**Google (5)**
+- gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-pro, gemini-3-pro-preview
 
-**Metrics:** Brier Score (lower=better), Accuracy
+**xAI (2)**
+- grok-2-vision, grok-4-fast-non-reasoning
 
-**Monotonicity enforced:** `fill-15m >= fill-5m >= fill-1m`
+**Mistral (4)**
+- pixtral-large-latest, pixtral-12b-2409, ministral-3b-latest, ministral-8b-latest
 
-### Leg 2: Conditional Price Movement (Regression)
-
-| Contract | Description |
-|----------|-------------|
-| `bid-delta-mid-*` | Expected mid price change IF bid fills |
-| `ask-delta-mid-*` | Expected mid price change IF ask fills |
-
-**Only scored when fill actually occurs.**
-
-**Metrics:**
-- Normalized MAE (error / ATR) - comparable across assets and timeframes
-- Per-side breakdown reveals asymmetric model behavior
-
-### Leg 3: Realized PnL (Ground Truth)
-
-Deterministic calculation of profit/loss:
-
-```
-Bid fills:  PnL = exit_mid - fill_price - fee
-Ask fills:  PnL = fill_price - exit_mid - fee
-No fill:    PnL = 0
-
-Fixed fee: 1 basis point (0.0001)
-```
-
-### Derived EV
-
-Expected Value is computed from predictions, not predicted directly:
-
-```
-EV = p_fill × clipped_delta_mid - fees
-```
-
-**EV-PnL Gap** reveals model calibration:
-- **Large positive gap**: Model overestimates value (optimistic)
-- **Large negative gap**: Model underestimates value (conservative)
-- **Near zero**: Well-calibrated model
+All model IDs verified against [Vercel AI Gateway documentation](https://vercel.com/docs/ai-gateway/models-and-providers).
 
 ## Usage
 
 ```bash
 cd apps/agent_006
 
-# Run model matrix benchmark
-pnpm benchmark
+# Run the benchmark
+SIMULATION_START_TIME="2025-01-01T12:00:00Z" pnpm benchmark
 
 # Verbose mode
-pnpm benchmark --verbose
+SIMULATION_START_TIME="2025-01-01T12:00:00Z" pnpm benchmark --verbose
 ```
-
-### Example Output
-
-```
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│                          agent_006 EV Benchmark Results (3 rounds)                            │
-├──────────────────────┬────────┬────────┬──────────┬──────────┬──────────┬──────────┬──────────┤
-│                      │   Leg 1: Fill   │  Leg 2: Δ MAE   │   Leg 3: EV    │  Leg 3: PnL  │ Gap  │
-├──────────────────────┼────────┼────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
-│ Model                │ Brier↓ │  Acc↑  │   Bid↓   │   Ask↓   │   Bid    │   Ask    │   →0     │
-├──────────────────────┼────────┼────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
-│ xai/grok-4-reasoning │  0.187 │  72.2% │     0.45 │     0.52 │  +0.0012 │  -0.0008 │  +0.0002 │
-│ anthropic/haiku-4.5  │  0.201 │  68.5% │     0.58†│     0.61†│  +0.0008†│  -0.0005†│  +0.0001 │
-│ openai/gpt-5-nano    │  0.195 │  70.1% │     0.51 │     0.55 │  +0.0010 │  -0.0006 │  +0.0003 │
-├──────────────────────┴────────┴────────┴──────────┴──────────┴──────────┴──────────┴──────────┤
-│ Realized PnL: +0.0005  │  Winner: xai/grok-4-reasoning                                        │
-│ † Low sample size (<10 fills) - interpret with caution                                        │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────┐
-│    EV Quintile Analysis: xai/grok-4-reasoning   │
-├──────────────┬─────────┬─────────┬───────┬──────┤
-│   Quintile   │ Mean EV │ Mean PnL│  Gap  │   N  │
-├──────────────┼─────────┼─────────┼───────┼──────┤
-│ Q1 (lowest)  │  -0.002 │  -0.001 │ -0.001│   12 │
-│ Q2           │  +0.000 │  +0.000 │ +0.000│   14 │
-│ Q3           │  +0.001 │  +0.001 │ +0.000│   11 │
-│ Q4           │  +0.002 │  +0.001 │ +0.001│   13 │
-│ Q5 (highest) │  +0.003 │  +0.002 │ +0.001│   10 │
-└──────────────┴─────────┴─────────┴───────┴──────┘
-```
-
-## How Fill Detection Works
-
-Ground truth uses tick-by-tick trade data with `taker_side`:
-
-```
-Limit BUY at best_bid fills when:
-  trade.taker_side = SELL AND trade.price <= best_bid
-
-Limit SELL at best_ask fills when:
-  trade.taker_side = BUY AND trade.price >= best_ask
-```
-
-This mirrors real exchange mechanics—a limit BUY fills when someone sells into it.
-
-## Model Matrix
-
-```typescript
-// src/matrix.ts
-export const MODEL_MATRIX = [
-  'xai/grok-4-fast-reasoning',
-  'anthropic/claude-haiku-4.5',
-  'openai/gpt-5-nano',
-] as const;
-
-export const BENCHMARK_ROUNDS = 3;
-```
-
-Each model gets isolated message history via a unique agent ID.
 
 ## Architecture
 
@@ -184,122 +98,107 @@ Each model gets isolated message history via a unique agent ID.
                             │
               ┌─────────────┴─────────────┐
               │       Clock State         │
-              │   (simulation time mgmt)  │
+              │  (15-minute intervals)    │
               └─────────────┬─────────────┘
                             │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-│  Replay Lab   │  │  Replay Lab   │  │  Replay Lab   │
-│  Charts API   │  │  Orderbook    │  │  Trades API   │
-│ (signed URLs) │  │  (bid/ask)    │  │ (taker_side)  │
-└───────┬───────┘  └───────┬───────┘  └───────┬───────┘
-        │                   │                   │
-        └─────────┬─────────┘                   │
-                  │                             │
-                  ▼                             │
-    ┌─────────────────────────┐                 │
-    │      Market Maker       │                 │
-    │  ┌───────────────────┐  │                 │
-    │  │ Chart Images (2x) │  │                 │
-    │  │ Orderbook State   │  │                 │
-    │  └───────────────────┘  │                 │
-    │           │             │                 │
-    │           ▼             │                 │
-    │  12 Predictions:        │                 │
-    │  • 6 Fill Probabilities │                 │
-    │  • 6 Delta-Mid Values   │                 │
-    └───────────┬─────────────┘                 │
-                │                               │
-                ▼                               ▼
-    ┌─────────────────────┐       ┌─────────────────────┐
-    │     Predictions     │       │   Ground Truth      │
-    │  • Fill probs       │       │  • Fill events      │
-    │  • Delta-mid values │       │  • Mid prices       │
-    │    (ATR-clipped)    │       │  • ATR per horizon  │
-    └─────────┬───────────┘       └─────────┬───────────┘
-              │                             │
-              └──────────────┬──────────────┘
-                             │
-         ┌───────────────────┼───────────────────┐
-         │                   │                   │
-         ▼                   ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│   LEG 1: Fill   │ │  LEG 2: Delta   │ │   LEG 3: PnL    │
-│   Probability   │ │   Mid Scorer    │ │   Calculator    │
-│  • Brier Score  │ │  • Normalized   │ │  • Per-decision │
-│  • Accuracy     │ │    MAE (÷ATR)   │ │  • Per-side     │
-│                 │ │  • Per-side     │ │                 │
-└────────┬────────┘ └────────┬────────┘ └────────┬────────┘
-         │                   │                   │
-         └───────────────────┼───────────────────┘
-                             │
-                             ▼
-               ┌─────────────────────────┐
-               │    EV Calculator        │
-               │  EV = p_fill × δ_clipped│
-               │       - fees            │
-               └───────────┬─────────────┘
-                           │
-                           ▼
-               ┌─────────────────────────┐
-               │   Quintile Analyzer     │
-               │  Calibration by EV      │
-               │  confidence bucket      │
-               └───────────┬─────────────┘
-                           │
-                           ▼
-               ┌─────────────────────────┐
-               │   Results + Tables      │
-               │  • Main summary         │
-               │  • Per-model quintiles  │
-               └─────────────────────────┘
+        ┌───────────────────┴───────────────────┐
+        │                                       │
+        ▼                                       ▼
+┌───────────────┐                     ┌───────────────┐
+│  Replay Lab   │                     │  Replay Lab   │
+│  Charts API   │                     │  Annotations  │
+│ (2 timeframes)│                     │  (pivots)     │
+└───────┬───────┘                     └───────┬───────┘
+        │                                     │
+        ▼                                     │
+┌─────────────────────────┐                   │
+│     Bottom Caller       │                   │
+│  ┌───────────────────┐  │                   │
+│  │ 4h/5m chart       │  │                   │
+│  │ 24h/15m chart     │  │                   │
+│  └───────────────────┘  │                   │
+│           │             │                   │
+│           ▼             │                   │
+│  4 Predictions:         │                   │
+│  • bottom-15m (0-1)     │                   │
+│  • bottom-1h  (0-1)     │                   │
+│  • bottom-24h (0-1)     │                   │
+│  • bottom-7d  (0-1)     │                   │
+└───────────┬─────────────┘                   │
+            │                                 │
+            ▼                                 ▼
+┌─────────────────────┐         ┌─────────────────────┐
+│    Predictions      │         │   Ground Truth      │
+│  • Confidence 0-1   │         │  • Pivot exists?    │
+│    per horizon      │         │  • Time to pivot    │
+└─────────┬───────────┘         └─────────┬───────────┘
+          │                               │
+          └──────────────┬────────────────┘
+                         │
+                         ▼
+          ┌─────────────────────────┐
+          │      Log Loss Scorer    │
+          │  -log(p) if bottom      │
+          │  -log(1-p) otherwise    │
+          └───────────┬─────────────┘
+                      │
+     ┌────────────────┼────────────────┐
+     │                │                │
+     ▼                ▼                ▼
+┌──────────┐   ┌──────────┐   ┌──────────┐
+│ Phase 0  │   │ Phase 1  │   │ Phase 2  │
+│ Sanity   │──▶│ Relative │──▶│ Stability│
+│ Filter   │   │ Perf     │   │ & Regret │
+└──────────┘   └──────────┘   └──────────┘
+                                   │
+                                   ▼
+                         ┌──────────────┐
+                         │   Phase 3    │
+                         │ Final Rank   │
+                         │  (Top 8)     │
+                         └──────────────┘
 ```
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `src/benchmark.ts` | CLI benchmark entry point |
-| `src/matrix.ts` | Model matrix configuration |
-| `src/market-maker.ts` | Market maker agent definition |
-| `src/results.ts` | Result types and summary calculations |
-| `src/table.ts` | ASCII table formatter with bid/ask split |
-| `src/clock-state.ts` | Simulation time management |
-| `src/ground-truth/fill-checker.ts` | Fill simulation from trade data |
-| `src/replay-lab/atr-calculator.ts` | **ATR calculation for normalization** |
-| `src/replay-lab/trades.ts` | Tick-by-tick trade data |
-| `src/replay-lab/mid-price.ts` | Mid price computation |
-| `src/scorers/delta-mid-scorer.ts` | **Normalized MAE with per-side breakdown** |
-| `src/scorers/pnl-calculator.ts` | PnL calculation logic |
-| `src/scorers/ev-calculator.ts` | **EV with ATR clipping ([-3,+3] ATR)** |
-| `src/scorers/quintile-analyzer.ts` | **EV calibration analysis** |
+| `src/benchmark.ts` | CLI benchmark entry point, phase orchestration |
+| `src/matrix.ts` | Model matrix from models.json |
+| `src/models.json` | 24 verified vision models |
+| `src/bottom-caller.ts` | Bottom prediction agent definition |
+| `src/clock-state.ts` | Simulation time (15-min intervals) |
+| `src/horizon-config.ts` | Horizon durations and annotation methods |
+| `src/ground-truth/bottom-checker.ts` | Pivot detection via annotations |
+| `src/replay-lab/annotations.ts` | Local extrema annotation fetcher |
+| `src/replay-lab/charts.ts` | Chart URL generation |
+| `src/scorers/phase-0-scorer.ts` | Sanity filter (degenerate detection) |
+| `src/scorers/phase-1-scorer.ts` | Relative performance ranking |
+| `src/scorers/phase-2-scorer.ts` | Stability and regret metrics |
+| `src/scorers/phase-3-scorer.ts` | Final composite ranking |
 
 ## Environment Variables
 
 ```bash
-DATABASE_URL=postgresql://localhost:5432/nullagent
 AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
 AI_GATEWAY_API_KEY=your-key
 REPLAY_LAB_API_KEY=rn_...
 REPLAY_LAB_BASE_URL=https://replay-lab-delta.preview.recall.network
-SIMULATION_START_TIME=2025-12-22T14:00:00Z
-SYMBOL_ID=COINBASE_SPOT_ETH_USD
+SIMULATION_START_TIME=2025-01-01T12:00:00Z
 ```
+
+Note: `SYMBOL_ID` is hardcoded to `COINBASE_SPOT_BTC_USD` (Bitcoin only).
 
 ## Test Coverage
 
 ```
-289 tests passing
-94%+ line coverage
+353 tests passing
 ```
 
 ## What This Is Not
 
-This is not:
-- Overengineered
-- Academic
-- A demo
+- Not a backtester (no position sizing or portfolio management)
+- Not a trading system (no execution)
+- Not trying to predict price direction (only structural pivots)
 
-This is a correct, honest system that tells uncomfortable truths about model capability. It's the substrate required for model-vs-model performance learning and meta-allocation systems.
+This is a **selection layer** that identifies which models have genuine skill at detecting structural bottoms—information that can feed into ensemble systems or strategy allocation.
