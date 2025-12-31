@@ -4,43 +4,46 @@ import {
 } from '../replay-lab/annotations.js';
 import { getTimeframeConfig } from '../timeframe-config.js';
 
-import type { TimeframeId } from '../timeframe-config.js';
+import type { TimeframeId, PivotConfig } from '../timeframe-config.js';
 
-export interface GroundTruthResult {
+/** Result for a single pivot method */
+export interface PivotMethodResult {
   /** Did a structural bottom (pivot low) occur in the window? */
   hasStructuralBottom: boolean;
   /** Label for scoring: 1 if bottom occurred, 0 otherwise */
   label: 0 | 1;
-  /** Time to first pivot as ratio of horizon duration (for Phase 3 early bonus) */
+  /** Time to first pivot as ratio of horizon duration */
   timeToPivotRatio?: number;
   /** Timestamp of first pivot low (if any) */
   firstPivotAt?: Date;
+  /** Method used for this result */
+  method: 'fractal' | 'zigzag';
+}
+
+/** Dual ground truth result with both fractal and zigzag labels */
+export interface DualGroundTruthResult {
+  /** Primary method result (used for scoring/elimination) */
+  primary: PivotMethodResult;
+  /** Secondary method result (for comparison data collection) */
+  secondary: PivotMethodResult;
 }
 
 /**
- * Resolve ground truth for a bottom prediction.
- *
- * A prediction is correct (label = 1) if a local_extrema pivot LOW
- * exists within [predictedAt, closesAt].
- *
- * Uses Williams Fractal for short timeframes (15m, 1h) and
- * Zigzag for longer timeframes (24h, 7d).
- *
+ * Resolve ground truth for a single pivot method
  * @param symbolId - Trading symbol
- * @param timeframeId - Prediction timeframe
+ * @param pivotConfig - Pivot configuration with method and params
  * @param predictedAt - Time prediction was made
- * @returns Ground truth result
+ * @param closesAt - Time window closes
+ * @param durationMs - Window duration in milliseconds
+ * @returns Pivot method result with label and timing metrics
  */
-export async function resolveBottomGroundTruth(
+async function resolveWithMethod(
   symbolId: string,
-  timeframeId: TimeframeId,
-  predictedAt: Date
-): Promise<GroundTruthResult> {
-  const config = getTimeframeConfig(timeframeId);
-  const durationMs = config.groundTruth.window.durationMinutes * 60_000;
-  const closesAt = new Date(predictedAt.getTime() + durationMs);
-
-  const pivotConfig = config.groundTruth.pivot;
+  pivotConfig: PivotConfig,
+  predictedAt: Date,
+  closesAt: Date,
+  durationMs: number
+): Promise<PivotMethodResult> {
   const method = pivotConfig.spec.method;
   const candleTimeframe = pivotConfig.barTimeframe;
 
@@ -49,7 +52,10 @@ export async function resolveBottomGroundTruth(
   const annotationParams =
     method === 'fractal'
       ? { L: (params as { L: number }).L, candleTimeframe }
-      : { deviationPct: (params as { deviationPct: number }).deviationPct, candleTimeframe };
+      : {
+          deviationPct: (params as { deviationPct: number }).deviationPct,
+          candleTimeframe,
+        };
 
   // Fetch local_extrema annotations confirmed by closesAt
   const allAnnotations = await getLocalExtremaAnnotations(
@@ -64,7 +70,7 @@ export async function resolveBottomGroundTruth(
   // Filter to pivot LOWs only
   const pivotLows = filterPivotLows(allAnnotations);
   const hasStructuralBottom = pivotLows.length > 0;
-  const label = hasStructuralBottom ? 1 : 0;
+  const label: 0 | 1 = hasStructuralBottom ? 1 : 0;
 
   // Compute timing metrics if pivot occurred
   if (hasStructuralBottom && pivotLows.length > 0) {
@@ -79,11 +85,88 @@ export async function resolveBottomGroundTruth(
       label,
       timeToPivotRatio,
       firstPivotAt,
+      method,
     };
   }
 
   return {
     hasStructuralBottom,
     label,
+    method,
+  };
+}
+
+/**
+ * Resolve dual ground truth for a bottom prediction.
+ *
+ * Returns BOTH fractal and zigzag labels for every prediction,
+ * allowing comparison of methods with real data.
+ *
+ * Primary method is used for scoring/elimination.
+ * Secondary method is captured for analysis.
+ *
+ * @param symbolId - Trading symbol
+ * @param timeframeId - Prediction timeframe
+ * @param predictedAt - Time prediction was made (snapTime)
+ * @returns Dual ground truth result with both method labels
+ */
+export async function resolveDualGroundTruth(
+  symbolId: string,
+  timeframeId: TimeframeId,
+  predictedAt: Date
+): Promise<DualGroundTruthResult> {
+  const config = getTimeframeConfig(timeframeId);
+  const durationMs = config.groundTruth.window.durationMinutes * 60_000;
+  const closesAt = new Date(predictedAt.getTime() + durationMs);
+
+  // Resolve both methods in parallel
+  const [primary, secondary] = await Promise.all([
+    resolveWithMethod(
+      symbolId,
+      config.groundTruth.pivot,
+      predictedAt,
+      closesAt,
+      durationMs
+    ),
+    resolveWithMethod(
+      symbolId,
+      config.groundTruth.secondaryPivot,
+      predictedAt,
+      closesAt,
+      durationMs
+    ),
+  ]);
+
+  return { primary, secondary };
+}
+
+/** @deprecated Use resolveDualGroundTruth instead */
+export interface GroundTruthResult {
+  hasStructuralBottom: boolean;
+  label: 0 | 1;
+  timeToPivotRatio?: number | undefined;
+  firstPivotAt?: Date | undefined;
+}
+
+/**
+ * @deprecated Use resolveDualGroundTruth instead
+ * Resolve ground truth for a bottom prediction using primary method only.
+ * @param symbolId - Trading symbol
+ * @param timeframeId - Prediction timeframe
+ * @param predictedAt - Time prediction was made
+ * @returns Ground truth result with label and timing metrics
+ */
+export async function resolveBottomGroundTruth(
+  symbolId: string,
+  timeframeId: TimeframeId,
+  predictedAt: Date
+// eslint-disable-next-line @typescript-eslint/no-deprecated -- legacy wrapper returns deprecated type
+): Promise<GroundTruthResult> {
+  const result = await resolveDualGroundTruth(symbolId, timeframeId, predictedAt);
+  return {
+    hasStructuralBottom: result.primary.hasStructuralBottom,
+    label: result.primary.label,
+    timeToPivotRatio: result.primary.timeToPivotRatio,
+    firstPivotAt: result.primary.firstPivotAt,
   };
 }

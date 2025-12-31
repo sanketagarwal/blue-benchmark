@@ -244,6 +244,7 @@ async function resolveAllHorizonsGroundTruth(
 
   // Resolve each horizon using annotations (no raw trades needed)
   for (const horizon of HORIZONS) {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- using legacy interface for now
     const result = await resolveBottomGroundTruth(symbolId, horizon, predictionTime);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     labels[horizon] = result.hasStructuralBottom;

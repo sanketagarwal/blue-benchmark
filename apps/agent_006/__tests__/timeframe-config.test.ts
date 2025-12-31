@@ -111,4 +111,55 @@ describe('timeframe-config', () => {
       }
     });
   });
+
+  describe('dual ground truth config', () => {
+    it('should have both primary and secondary pivot configs', () => {
+      for (const id of TIMEFRAME_IDS) {
+        const config = getTimeframeConfig(id);
+        expect(config.groundTruth.pivot).toBeDefined();
+        expect(config.groundTruth.secondaryPivot).toBeDefined();
+      }
+    });
+
+    it('primary and secondary should use different methods', () => {
+      for (const id of TIMEFRAME_IDS) {
+        const config = getTimeframeConfig(id);
+        expect(config.groundTruth.pivot.spec.method).not.toBe(
+          config.groundTruth.secondaryPivot.spec.method
+        );
+      }
+    });
+
+    it('15m and 1h use fractal primary, zigzag secondary', () => {
+      const config15m = getTimeframeConfig('15m');
+      const config1h = getTimeframeConfig('1h');
+
+      expect(config15m.groundTruth.pivot.spec.method).toBe('fractal');
+      expect(config15m.groundTruth.secondaryPivot.spec.method).toBe('zigzag');
+
+      expect(config1h.groundTruth.pivot.spec.method).toBe('fractal');
+      expect(config1h.groundTruth.secondaryPivot.spec.method).toBe('zigzag');
+    });
+
+    it('24h and 7d use zigzag primary, fractal secondary', () => {
+      const config24h = getTimeframeConfig('24h');
+      const config7d = getTimeframeConfig('7d');
+
+      expect(config24h.groundTruth.pivot.spec.method).toBe('zigzag');
+      expect(config24h.groundTruth.secondaryPivot.spec.method).toBe('fractal');
+
+      expect(config7d.groundTruth.pivot.spec.method).toBe('zigzag');
+      expect(config7d.groundTruth.secondaryPivot.spec.method).toBe('fractal');
+    });
+
+    it('secondary pivot should have valid search config', () => {
+      for (const id of TIMEFRAME_IDS) {
+        const config = getTimeframeConfig(id);
+        expect(config.groundTruth.secondaryPivot.search.mode).toBe(
+          'snapTime_to_close'
+        );
+        expect(config.groundTruth.secondaryPivot.search.slackCandles).toBe(0);
+      }
+    });
+  });
 });

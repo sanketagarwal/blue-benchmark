@@ -62,6 +62,24 @@ export interface CandleIndexingConfig {
   snapIntervalMinutes: number;
 }
 
+export interface PivotConfig {
+  /** Data provider for pivot detection */
+  provider: 'replaylab';
+  /** Type of annotation to fetch */
+  annotationType: 'local_extrema';
+  /** When annotation becomes available */
+  availableAtMode: 'closesAt';
+  /** Bar timeframe for pivot detection */
+  barTimeframe: CandleTimeframe;
+  /** Method and params for pivot detection */
+  spec: PivotSpec;
+  /** How we match model's claimed candle to pivots */
+  search: {
+    mode: SearchMode;
+    slackCandles: number;
+  };
+}
+
 export interface GroundTruthConfig {
   window: {
     /** Reference point for window start */
@@ -69,23 +87,10 @@ export interface GroundTruthConfig {
     /** Duration of window in minutes (should equal forwardWindowMinutes) */
     durationMinutes: number;
   };
-  pivot: {
-    /** Data provider for pivot detection */
-    provider: 'replaylab';
-    /** Type of annotation to fetch */
-    annotationType: 'local_extrema';
-    /** When annotation becomes available */
-    availableAtMode: 'closesAt';
-    /** Bar timeframe for pivot detection */
-    barTimeframe: CandleTimeframe;
-    /** Method and params for pivot detection */
-    spec: PivotSpec;
-    /** How we match model's claimed candle to pivots */
-    search: {
-      mode: SearchMode;
-      slackCandles: number;
-    };
-  };
+  /** Primary pivot method (used for scoring/elimination) */
+  pivot: PivotConfig;
+  /** Secondary pivot method (for comparison data collection) */
+  secondaryPivot: PivotConfig;
 }
 
 export interface TimeframeConfig {
@@ -125,6 +130,17 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         spec: { method: 'fractal', params: { L: 3, candleTimeframe: '1m' } },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
+      secondaryPivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '1m',
+        spec: {
+          method: 'zigzag',
+          params: { deviationPct: 0.005, candleTimeframe: '1m' },
+        },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
     },
   },
 
@@ -155,6 +171,17 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         availableAtMode: 'closesAt',
         barTimeframe: '5m',
         spec: { method: 'fractal', params: { L: 3, candleTimeframe: '5m' } },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
+      secondaryPivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '5m',
+        spec: {
+          method: 'zigzag',
+          params: { deviationPct: 0.01, candleTimeframe: '5m' },
+        },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
     },
@@ -192,6 +219,14 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
+      secondaryPivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '15m',
+        spec: { method: 'fractal', params: { L: 5, candleTimeframe: '15m' } },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
     },
   },
 
@@ -225,6 +260,14 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
           method: 'zigzag',
           params: { deviationPct: 0.05, candleTimeframe: '1h' },
         },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
+      secondaryPivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '1h',
+        spec: { method: 'fractal', params: { L: 5, candleTimeframe: '1h' } },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
     },

@@ -164,12 +164,6 @@ Output for each timeframe:
 1. A local extrema pivot LOW must occur (confirmed by future price action)
 2. Max drawdown from prediction time must not exceed threshold:
 ${drawdowns}
-
-**HINTS:**
-- High confidence requires BOTH structural pivot AND bounded drawdown
-- Consider volume exhaustion, momentum divergence, support levels
-- Longer timeframes are harder to predict but more meaningful
-- If price is mid-range with no structure, confidence should be low
 ${compactionSection}`;
     },
 
