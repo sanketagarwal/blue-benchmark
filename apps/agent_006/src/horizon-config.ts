@@ -65,3 +65,15 @@ export function getAnnotationMethod(horizon: Horizon): {
   const config = HORIZON_CONFIG[horizon];
   return { method: config.method, params: config.params };
 }
+
+export interface HorizonChartConfig {
+  candleTimeframe: '5m' | '15m' | '1h' | '4h';
+  lookbackMs: number;
+}
+
+export const HORIZON_CHART_CONFIG: Record<Horizon, HorizonChartConfig> = {
+  '15m': { candleTimeframe: '5m', lookbackMs: 2 * 60 * 60_000 }, // 2h of 5m
+  '1h': { candleTimeframe: '15m', lookbackMs: 4 * 60 * 60_000 }, // 4h of 15m
+  '24h': { candleTimeframe: '1h', lookbackMs: 24 * 60 * 60_000 }, // 24h of 1h
+  '7d': { candleTimeframe: '4h', lookbackMs: 7 * 24 * 60 * 60_000 }, // 7d of 4h
+} as const;

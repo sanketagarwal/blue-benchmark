@@ -21,8 +21,12 @@ describe('bottom-caller', () => {
 
   describe('createBottomCaller', () => {
     const mockContext: BottomCallerContext = {
-      chart4h5mUrl: 'https://example.com/chart1.png',
-      chart24h15mUrl: 'https://example.com/chart2.png',
+      chartByHorizon: {
+        '15m': 'https://example.com/chart-15m.png',
+        '1h': 'https://example.com/chart-1h.png',
+        '24h': 'https://example.com/chart-24h.png',
+        '7d': 'https://example.com/chart-7d.png',
+      },
       currentTime: '2025-01-01T00:00:00Z',
       symbolId: 'COINBASE_SPOT_BTC_USD',
     };
@@ -56,12 +60,14 @@ describe('bottom-caller', () => {
     it('builds prompt with chart URLs and horizon contracts', () => {
       const agent = createBottomCaller('anthropic/claude-haiku-4.5');
       const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
-      expect(prompt).toContain('chart1.png');
-      expect(prompt).toContain('chart2.png');
-      expect(prompt).toContain('bottom-15m');
-      expect(prompt).toContain('bottom-1h');
-      expect(prompt).toContain('bottom-24h');
-      expect(prompt).toContain('bottom-7d');
+      expect(prompt).toContain('chart-15m.png');
+      expect(prompt).toContain('chart-1h.png');
+      expect(prompt).toContain('chart-24h.png');
+      expect(prompt).toContain('chart-7d.png');
+      expect(prompt).toContain('15-Minute Horizon');
+      expect(prompt).toContain('1-Hour Horizon');
+      expect(prompt).toContain('24-Hour Horizon');
+      expect(prompt).toContain('7-Day Horizon');
     });
 
     it('builds compaction prompt with round count', () => {

@@ -184,31 +184,47 @@ describe('Replay Lab Charts', () => {
   });
 
   describe('getForecastingCharts', () => {
-    it('should fetch two signed chart URLs in parallel', async () => {
+    it('should fetch four signed chart URLs for each horizon', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
-      const currentTime = new Date('2025-12-22T14:00:00Z');
+      const snapTime = new Date('2025-12-22T14:00:00Z');
 
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            url: 'https://signed.example.com/chart-4h-5m',
+            url: 'https://signed.example.com/chart-15m',
             expiresAt: '2025-12-22T16:00:00Z',
           }),
         })
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
-            url: 'https://signed.example.com/chart-24h-15m',
+            url: 'https://signed.example.com/chart-1h',
+            expiresAt: '2025-12-22T16:00:00Z',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            url: 'https://signed.example.com/chart-24h',
+            expiresAt: '2025-12-22T16:00:00Z',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            url: 'https://signed.example.com/chart-7d',
             expiresAt: '2025-12-22T16:00:00Z',
           }),
         });
 
-      const result = await getForecastingCharts(symbolId, currentTime);
+      const result = await getForecastingCharts(symbolId, snapTime);
 
-      expect(result.chart4h5m).toBe('https://signed.example.com/chart-4h-5m');
-      expect(result.chart24h15m).toBe('https://signed.example.com/chart-24h-15m');
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.chartByHorizon['15m']).toBe('https://signed.example.com/chart-15m');
+      expect(result.chartByHorizon['1h']).toBe('https://signed.example.com/chart-1h');
+      expect(result.chartByHorizon['24h']).toBe('https://signed.example.com/chart-24h');
+      expect(result.chartByHorizon['7d']).toBe('https://signed.example.com/chart-7d');
+      expect(mockFetch).toHaveBeenCalledTimes(4);
     });
   });
 });

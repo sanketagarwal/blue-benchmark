@@ -38,7 +38,7 @@ import {
   printFinalSummaryTable,
 } from './table.js';
 
-import type { BottomCallerOutput, BottomContractId } from './bottom-caller.js';
+import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
 import type { Horizon } from './horizon-config.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
@@ -50,6 +50,24 @@ const isQuickMode = process.argv.includes('--quick');
 
 const LOG_LOSS_GOOD = 0.5;
 const LOG_LOSS_OK = 0.8;
+
+/**
+ * Convert new prediction format to legacy scorer format
+ * New format: { '15m': { hasBottomed, confidence, candlesBack }, ... }
+ * Legacy format: { 'bottom-15m': number, ... }
+ * @param predictions - Predictions in new per-horizon format
+ * @returns Predictions in legacy scorer format (confidence if hasBottomed, else 0)
+ */
+function convertPredictionsForScorer(
+  predictions: BottomPredictions
+): Record<BottomContractId, number> {
+  return {
+    'bottom-15m': predictions['15m'].hasBottomed ? predictions['15m'].confidence : 0,
+    'bottom-1h': predictions['1h'].hasBottomed ? predictions['1h'].confidence : 0,
+    'bottom-24h': predictions['24h'].hasBottomed ? predictions['24h'].confidence : 0,
+    'bottom-7d': predictions['7d'].hasBottomed ? predictions['7d'].confidence : 0,
+  };
+}
 
 function formatLogLoss(value: number): string {
   const formatted = value.toFixed(3);
@@ -661,8 +679,7 @@ async function runBenchmarkRound(
 
   // Set context
   setBottomCallerContext({
-    chart4h5mUrl: charts.chart4h5m,
-    chart24h15mUrl: charts.chart24h15m,
+    chartByHorizon: charts.chartByHorizon,
     currentTime: currentTime.toISOString(),
     symbolId,
   });
@@ -682,8 +699,9 @@ async function runBenchmarkRound(
 
     try {
       const output = await runModelRound(state.modelId);
+      const legacyPredictions = convertPredictionsForScorer(output.predictions);
       const roundScore = scorePhase0Round(
-        output.predictions as Record<BottomContractId, number>,
+        legacyPredictions,
         labels
       );
       recordModelScore(state, roundScore, timeToPivotRatios);

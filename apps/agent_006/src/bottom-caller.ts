@@ -1,6 +1,7 @@
 import { defineAgent } from '@nullagent/agent-core';
 import { z } from 'zod';
 
+import type { Horizon } from './horizon-config.js';
 import type { Agent } from '@nullagent/agent-core';
 
 /**
@@ -19,10 +20,8 @@ export type BottomContractId = (typeof BOTTOM_CONTRACT_IDS)[number];
  * Context interface for bottom predictions
  */
 export interface BottomCallerContext {
-  /** Chart: 4-hour lookback with 5m candles */
-  chart4h5mUrl: string;
-  /** Chart: 24-hour lookback with 15m candles */
-  chart24h15mUrl: string;
+  /** Per-horizon chart URLs */
+  chartByHorizon: Record<Horizon, string>;
   /** Current prediction time */
   currentTime: string;
   /** Trading symbol identifier */
@@ -49,13 +48,22 @@ export function clearBottomCallerContext(): void {
   currentContext = undefined;
 }
 
-// Output schema: probability for each bottom contract (4 horizons)
-const PredictionSchema = z.object({
-  'bottom-15m': z.number().min(0).max(1),
-  'bottom-1h': z.number().min(0).max(1),
-  'bottom-24h': z.number().min(0).max(1),
-  'bottom-7d': z.number().min(0).max(1),
+// Output schema: structured prediction for each horizon with candlesBack
+const HorizonPredictionSchema = z.object({
+  hasBottomed: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  candlesBack: z.number().int().min(0),
 });
+
+const PredictionSchema = z.object({
+  '15m': HorizonPredictionSchema,
+  '1h': HorizonPredictionSchema,
+  '24h': HorizonPredictionSchema,
+  '7d': HorizonPredictionSchema,
+});
+
+export type HorizonPrediction = z.infer<typeof HorizonPredictionSchema>;
+export type BottomPredictions = z.infer<typeof PredictionSchema>;
 
 const OutputSchema = z.object({
   reasoning: z.string().optional().describe('Brief reasoning for predictions'),
@@ -87,7 +95,7 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
         throw new Error(CONTEXT_NOT_SET_ERROR);
       }
 
-      const { chart4h5mUrl, chart24h15mUrl, currentTime, symbolId } = currentContext;
+      const { chartByHorizon, currentTime, symbolId } = currentContext;
 
       const compactionSection =
         context.compactionSummary !== undefined && context.compactionSummary !== ''
@@ -98,28 +106,34 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
 
 Current Time: ${currentTime}
 
-Chart Analysis (IMPORTANT: Analyze these chart images for pattern recognition):
-- 4-Hour Chart (5m candles): ${chart4h5mUrl}
-- 24-Hour Chart (15m candles): ${chart24h15mUrl}
+**CHART ANALYSIS** (Analyze each chart for its corresponding horizon):
 
-Both charts include: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, SuperTrend(10,3), RSI(14), MACD(12,26,9), Stochastic RSI(14,3,3), ADX(14), CMF(20), Choppiness(14), Volume, and Volume Ratio(20).
+15-Minute Horizon Chart (5m candles, 2h lookback):
+${chartByHorizon['15m']}
+
+1-Hour Horizon Chart (15m candles, 4h lookback):
+${chartByHorizon['1h']}
+
+24-Hour Horizon Chart (1h candles, 24h lookback):
+${chartByHorizon['24h']}
+
+7-Day Horizon Chart (4h candles, 7d lookback):
+${chartByHorizon['7d']}
+
+All charts include: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, Volume.
+
+**CANDLE INDEXING:**
+The rightmost candle in each chart is the most recent closed candle.
+Use this candle as candlesBack = 0.
+candlesBack = 3 means three closed candles before that.
 
 **YOUR TASK:**
-Predict the probability that downside has been structurally exhausted at each time scale.
+For each horizon, predict:
+1. hasBottomed: Has downside selling pressure been structurally exhausted?
+2. confidence: How confident are you (0.0 to 1.0)?
+3. candlesBack: If you believe a bottom formed, which candle? (0 = rightmost, positive integers only)
 
-This is NOT:
-- Predicting the exact pivot candle
-- Predicting price will go up
-- Predicting a reversal
-
-You are assessing: "Has the selling pressure at THIS scale been absorbed?"
-
-**CONTRACTS TO PREDICT (0.0 to 1.0):**
-
-- bottom-15m: Probability a 15-minute structural low forms within next 15 minutes
-- bottom-1h: Probability a 1-hour structural low forms within next hour
-- bottom-24h: Probability a 24-hour structural low forms within next 24 hours
-- bottom-7d: Probability a 7-day structural low forms within next 7 days
+This is NOT predicting price will go up. You are assessing: "Has the selling pressure at THIS scale been absorbed?"
 
 **WHAT MAKES A STRUCTURAL BOTTOM:**
 1. A local extrema pivot LOW must occur (confirmed by future price action)
@@ -133,19 +147,9 @@ You are assessing: "Has the selling pressure at THIS scale been absorbed?"
 - High confidence requires BOTH structural pivot AND bounded drawdown
 - Consider volume exhaustion, momentum divergence, support levels
 - Longer horizons are harder to predict but more meaningful
-- If price is mid-range with no structure, probabilities should be low
-
-${compactionSection}
-Respond with JSON:
-{
-  "reasoning": "Brief analysis (max 100 chars)",
-  "predictions": {
-    "bottom-15m": 0.35,
-    "bottom-1h": 0.25,
-    "bottom-24h": 0.15,
-    "bottom-7d": 0.10
-  }
-}`;
+- If price is mid-range with no structure, confidence should be low
+- candlesBack helps us understand timing - be specific about where you see structure
+${compactionSection}`;
     },
 
     buildCompactionPrompt: (history) => `

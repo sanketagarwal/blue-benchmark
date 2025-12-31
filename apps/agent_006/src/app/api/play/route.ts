@@ -111,9 +111,11 @@ export async function POST(request: Request): Promise<NextResponse<PlayResponse>
       const { bestBid, bestAsk } = getBestBidAsk(orderbook);
 
       // Set context and run agent (bestBid/bestAsk included in orderbookData string)
+      // Map horizon-based charts to market-maker expected format
+      // TODO: Update market-maker to use chartByHorizon directly
       setMarketMakerContext({
-        chart4h5mUrl: charts.chart4h5m,
-        chart24h15mUrl: charts.chart24h15m,
+        chart4h5mUrl: charts.chartByHorizon['15m'],
+        chart24h15mUrl: charts.chartByHorizon['1h'],
         orderbookData,
         currentTime: predictionTime.toISOString(),
         symbolId,

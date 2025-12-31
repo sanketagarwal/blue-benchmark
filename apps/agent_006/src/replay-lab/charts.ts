@@ -1,4 +1,8 @@
-import { replayLabFetch } from './client';
+import { HORIZON_CHART_CONFIG } from '../horizon-config.js';
+
+import { replayLabFetch } from './client.js';
+
+import type { Horizon } from '../horizon-config.js';
 
 export interface ChartParams {
   symbolId: string;
@@ -41,44 +45,33 @@ export async function getSignedChartUrl(params: ChartParams): Promise<string> {
 }
 
 export interface ForecastingCharts {
-  // Chart 1: 4-hour lookback with 5m candles
-  chart4h5m: string;
-  // Chart 2: 24-hour lookback with 15m candles
-  chart24h15m: string;
+  chartByHorizon: Record<Horizon, string>;
 }
 
 export async function getForecastingCharts(
   symbolId: string,
-  currentTime: Date
+  snapTime: Date
 ): Promise<ForecastingCharts> {
-  // Chart 1: 4 hours of 5m candles (ending at current time)
-  const fourHoursAgo = new Date(currentTime);
-  fourHoursAgo.setHours(fourHoursAgo.getHours() - 4);
+  const horizons: Horizon[] = ['15m', '1h', '24h', '7d'];
 
-  // Chart 2: 24 hours of 15m candles (ending at current time)
-  const twentyFourHoursAgo = new Date(currentTime);
-  twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+  const chartPromises = horizons.map(async (horizon) => {
+    // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
+    const config = HORIZON_CHART_CONFIG[horizon];
+    const fromTime = new Date(snapTime.getTime() - config.lookbackMs);
 
-  const [chart4h5m, chart24h15m] = await Promise.all([
-    getSignedChartUrl({
+    const url = await getSignedChartUrl({
       symbolId,
-      timeframe: '5m',
-      from: fourHoursAgo,
-      to: currentTime,
+      timeframe: config.candleTimeframe,
+      from: fromTime,
+      to: snapTime,
       layers: CHART_LAYERS,
-      width: 1200,
-      height: 800,
-    }),
-    getSignedChartUrl({
-      symbolId,
-      timeframe: '15m',
-      from: twentyFourHoursAgo,
-      to: currentTime,
-      layers: CHART_LAYERS,
-      width: 1200,
-      height: 800,
-    }),
-  ]);
+    });
 
-  return { chart4h5m, chart24h15m };
+    return [horizon, url] as const;
+  });
+
+  const results = await Promise.all(chartPromises);
+  const chartByHorizon = Object.fromEntries(results) as Record<Horizon, string>;
+
+  return { chartByHorizon };
 }
