@@ -33,9 +33,12 @@ import {
   median,
 } from './scorers/phase-2-scorer.js';
 import { rankModelsPerHorizon } from './scorers/phase-3-scorer.js';
+import { computeTrackBMetrics } from './scorers/timing-metrics.js';
 import {
   printPerHorizonArenaTable,
   printFinalSummaryTable,
+  printTimingDiagnosticsTable,
+  printCrossHorizonBehaviorMap,
 } from './table.js';
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
@@ -44,6 +47,7 @@ import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
 import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phase-3-scorer.js';
+import type { RoundScore } from './state/model-state.js';
 
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 const isQuickMode = process.argv.includes('--quick');
@@ -137,6 +141,8 @@ interface ModelState {
   eliminatedInPhase?: number;
   eliminationReason?: string;
   roundScores: Phase0RoundScore[];
+  /** Full round data for Track B timing metrics (includes labels and timeToPivotRatio) */
+  trackBRounds: RoundScore[];
   logLossByHorizon: Record<Horizon, number[]>;
   timeToPivotRatios: Record<Horizon, number[]>;
   failedRounds: number[];
@@ -155,6 +161,7 @@ function createModelState(modelId: string): ModelState {
     modelId,
     eliminated: false,
     roundScores: [],
+    trackBRounds: [],
     logLossByHorizon: { '15m': [], '1h': [], '24h': [], '7d': [] },
     timeToPivotRatios: { '15m': [], '1h': [], '24h': [], '7d': [] },
     failedRounds: [],
@@ -181,14 +188,33 @@ async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
  * Record scores for a model after a successful round
  * @param state - Model state to update
  * @param roundScore - Score from this round
+ * @param labels - Ground truth labels for this round
  * @param timeToPivotRatios - Time-to-pivot ratios for each horizon
+ * @param roundNumber - Current round number for Track B tracking
  */
 function recordModelScore(
   state: ModelState,
   roundScore: Phase0RoundScore,
-  timeToPivotRatios: Record<Horizon, number | undefined>
+  labels: Record<Horizon, boolean>,
+  timeToPivotRatios: Record<Horizon, number | undefined>,
+  roundNumber: number
 ): void {
   state.roundScores.push(roundScore);
+
+  // Also store full round data for Track B timing metrics
+  const logLoss = (roundScore.logLossByHorizon['15m'] +
+    roundScore.logLossByHorizon['1h'] +
+    roundScore.logLossByHorizon['24h'] +
+    roundScore.logLossByHorizon['7d']) / 4;
+
+  state.trackBRounds.push({
+    roundNumber,
+    logLoss,
+    logLossByHorizon: roundScore.logLossByHorizon,
+    predictions: roundScore.predictions,
+    labels,
+    timeToPivotRatio: timeToPivotRatios,
+  });
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -723,7 +749,7 @@ async function runBenchmarkRound(
         legacyPredictions,
         labels
       );
-      recordModelScore(state, roundScore, timeToPivotRatios);
+      recordModelScore(state, roundScore, labels, timeToPivotRatios, roundNumber);
       const scoreSummary = formatRoundScore(roundScore);
       logger.succeedSpinner(`${chalk.cyan(state.modelId)}: ${scoreSummary}`);
     } catch (error) {
@@ -824,6 +850,34 @@ async function main(): Promise<void> {
 
   // ========== PHASE 3: Final ranking (no additional rounds) ==========
   const perHorizonRankings = runPhase3(models);
+
+  // ========== Track B: Timing Diagnostics (informational only) ==========
+  logger.newline();
+  logger.log('=== Track B: Timing Diagnostics (Informational) ===');
+
+  // Compute Track B metrics for all non-eliminated models
+  const trackBData = [...models.values()]
+    .filter(state => !state.eliminated && state.trackBRounds.length > 0)
+    .map(state => ({
+      modelId: state.modelId,
+      metrics: computeTrackBMetrics(state.trackBRounds),
+    }));
+
+  if (trackBData.length > 0) {
+    printTimingDiagnosticsTable(trackBData);
+
+    // Print cross-horizon behavior map
+    const behaviorMapData = [...models.values()]
+      .filter(state => !state.eliminated)
+      .map(state => ({
+        modelId: state.modelId,
+        qualifiedHorizons: state.qualifiedHorizons,
+        trackB: computeTrackBMetrics(state.trackBRounds),
+      }));
+    printCrossHorizonBehaviorMap(behaviorMapData);
+  } else {
+    logger.log('  No models with timing data to display');
+  }
 
   // Final persistence
   persistResults(models, {

@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   printPerHorizonArenaTable,
   printFinalSummaryTable,
+  printTimingDiagnosticsTable,
+  printCrossHorizonBehaviorMap,
 } from '../src/table';
 import type { PerHorizonRankings } from '../src/scorers/phase-3-scorer';
 import type { Horizon } from '../src/horizon-config';
+import type { TrackBMetrics } from '../src/scorers/timing-metrics';
 
 describe('table', () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -189,6 +192,199 @@ describe('table', () => {
       // Should not throw - colors are ANSI escape codes
       printFinalSummaryTable(models, computeMeanLogLoss);
       expect(consoleLogSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('printTimingDiagnosticsTable', () => {
+    const createTrackBMetrics = (overrides: Partial<Record<Horizon, Partial<TrackBMetrics['byHorizon']['15m']>>> = {}): TrackBMetrics => ({
+      byHorizon: {
+        '15m': {
+          earliestCorrectPredictionMs: overrides['15m']?.earliestCorrectPredictionMs ?? 60_000,
+          meanTimeToDetectionRatio: overrides['15m']?.meanTimeToDetectionRatio ?? 0.2,
+          redundantConfirmations: overrides['15m']?.redundantConfirmations ?? 1,
+        },
+        '1h': {
+          earliestCorrectPredictionMs: overrides['1h']?.earliestCorrectPredictionMs ?? 120_000,
+          meanTimeToDetectionRatio: overrides['1h']?.meanTimeToDetectionRatio ?? 0.3,
+          redundantConfirmations: overrides['1h']?.redundantConfirmations ?? 2,
+        },
+        '24h': {
+          earliestCorrectPredictionMs: overrides['24h']?.earliestCorrectPredictionMs ?? 300_000,
+          meanTimeToDetectionRatio: overrides['24h']?.meanTimeToDetectionRatio ?? 0.5,
+          redundantConfirmations: overrides['24h']?.redundantConfirmations ?? 0,
+        },
+        '7d': {
+          earliestCorrectPredictionMs: overrides['7d']?.earliestCorrectPredictionMs ?? 600_000,
+          meanTimeToDetectionRatio: overrides['7d']?.meanTimeToDetectionRatio ?? 0.8,
+          redundantConfirmations: overrides['7d']?.redundantConfirmations ?? 3,
+        },
+      },
+    });
+
+    it('should print timing diagnostics for each horizon', () => {
+      const modelMetrics = [
+        { modelId: 'fast-model', metrics: createTrackBMetrics({ '15m': { meanTimeToDetectionRatio: 0.1 } }) },
+        { modelId: 'slow-model', metrics: createTrackBMetrics({ '15m': { meanTimeToDetectionRatio: 0.9 } }) },
+      ];
+
+      printTimingDiagnosticsTable(modelMetrics);
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('15m Timing Diagnostics');
+      expect(output).toContain('1h Timing Diagnostics');
+      expect(output).toContain('24h Timing Diagnostics');
+      expect(output).toContain('7d Timing Diagnostics');
+      expect(output).toContain('fast-model');
+      expect(output).toContain('slow-model');
+    });
+
+    it('should handle undefined earliest prediction', () => {
+      const modelMetrics = [
+        { modelId: 'no-correct', metrics: createTrackBMetrics({ '15m': { earliestCorrectPredictionMs: undefined } }) },
+      ];
+
+      printTimingDiagnosticsTable(modelMetrics);
+
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('no-correct');
+      // Should display dash for undefined earliest
+    });
+
+    it('should sort by mean time to detection ratio', () => {
+      const modelMetrics = [
+        { modelId: 'late', metrics: createTrackBMetrics({ '15m': { meanTimeToDetectionRatio: 0.9 } }) },
+        { modelId: 'early', metrics: createTrackBMetrics({ '15m': { meanTimeToDetectionRatio: 0.1 } }) },
+        { modelId: 'mid', metrics: createTrackBMetrics({ '15m': { meanTimeToDetectionRatio: 0.5 } }) },
+      ];
+
+      printTimingDiagnosticsTable(modelMetrics);
+
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      // Early should appear before late
+      const earlyIndex = output.indexOf('early');
+      const midIndex = output.indexOf('mid');
+      const lateIndex = output.indexOf('late');
+      expect(earlyIndex).toBeLessThan(midIndex);
+      expect(midIndex).toBeLessThan(lateIndex);
+    });
+  });
+
+  describe('printCrossHorizonBehaviorMap', () => {
+    const createTrackBMetrics = (ttdOverrides: Partial<Record<Horizon, number>> = {}): TrackBMetrics => ({
+      byHorizon: {
+        '15m': {
+          earliestCorrectPredictionMs: 60_000,
+          meanTimeToDetectionRatio: ttdOverrides['15m'] ?? 0.2,
+          redundantConfirmations: 1,
+        },
+        '1h': {
+          earliestCorrectPredictionMs: 120_000,
+          meanTimeToDetectionRatio: ttdOverrides['1h'] ?? 0.5,
+          redundantConfirmations: 2,
+        },
+        '24h': {
+          earliestCorrectPredictionMs: 300_000,
+          meanTimeToDetectionRatio: ttdOverrides['24h'] ?? 0.5,
+          redundantConfirmations: 0,
+        },
+        '7d': {
+          earliestCorrectPredictionMs: 600_000,
+          meanTimeToDetectionRatio: ttdOverrides['7d'] ?? 0.8,
+          redundantConfirmations: 3,
+        },
+      },
+    });
+
+    it('should print cross-horizon behavior map', () => {
+      const modelMetrics = [
+        {
+          modelId: 'generalist',
+          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as Horizon[]),
+          trackB: createTrackBMetrics(),
+        },
+        {
+          modelId: 'short-term-only',
+          qualifiedHorizons: new Set(['15m', '1h'] as Horizon[]),
+          trackB: createTrackBMetrics(),
+        },
+      ];
+
+      printCrossHorizonBehaviorMap(modelMetrics);
+
+      expect(consoleLogSpy).toHaveBeenCalled();
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('Cross-Horizon Behavior Map');
+      expect(output).toContain('generalist');
+      expect(output).toContain('short-term-only');
+      expect(output).toContain('Generalist');
+    });
+
+    it('should show X for disqualified horizons', () => {
+      const modelMetrics = [
+        {
+          modelId: 'partial-qualified',
+          qualifiedHorizons: new Set(['15m', '24h'] as Horizon[]),
+          trackB: createTrackBMetrics(),
+        },
+      ];
+
+      printCrossHorizonBehaviorMap(modelMetrics);
+
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('partial-qualified');
+      // Disqualified horizons should show X symbol
+    });
+
+    it('should show timing indicators (E/M/L)', () => {
+      const modelMetrics = [
+        {
+          modelId: 'mixed-timing',
+          qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as Horizon[]),
+          trackB: createTrackBMetrics({ '15m': 0.1, '1h': 0.5, '24h': 0.5, '7d': 0.9 }),
+        },
+      ];
+
+      printCrossHorizonBehaviorMap(modelMetrics);
+
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('mixed-timing');
+      // Should show E for early (<30%), M for mid (30-70%), L for late (>70%)
+    });
+
+    it('should show profile labels for specialists', () => {
+      const modelMetrics = [
+        {
+          modelId: '15m-specialist',
+          qualifiedHorizons: new Set(['15m'] as Horizon[]),
+          trackB: createTrackBMetrics(),
+        },
+      ];
+
+      printCrossHorizonBehaviorMap(modelMetrics);
+
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('15m-specialist');
+      expect(output).toContain('15m Specialist');
+    });
+
+    it('should print legend', () => {
+      const modelMetrics = [
+        {
+          modelId: 'model-a',
+          qualifiedHorizons: new Set(['15m'] as Horizon[]),
+          trackB: createTrackBMetrics(),
+        },
+      ];
+
+      printCrossHorizonBehaviorMap(modelMetrics);
+
+      const output = consoleLogSpy.mock.calls.map(call => String(call[0])).join('\n');
+      expect(output).toContain('Legend');
+      expect(output).toContain('Early');
+      expect(output).toContain('Mid-range');
+      expect(output).toContain('Late');
+      expect(output).toContain('Disqualified');
     });
   });
 });
