@@ -17,6 +17,11 @@ import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 import {
+  generateLeaderboard,
+  formatLeaderboardTable,
+} from './reports/leaderboards.js';
+import { brierScore } from './scorers/brier-scorer.js';
+import {
   scorePhase0Round,
   aggregatePhase0Scores,
   getPhase0DisqualifiedHorizons,
@@ -42,6 +47,7 @@ import {
 } from './table.js';
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
+import type { ModelScoreData } from './reports/leaderboards.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
@@ -599,6 +605,98 @@ function runPhase2(models: Map<string, ModelState>): void {
   logger.log(`Phase 2 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
 }
 
+
+/**
+ * Extract predictions and labels for a specific horizon from track B rounds
+ * @param trackBRounds - Array of round scores with predictions/labels
+ * @param horizon - The timeframe to extract data for
+ * @returns Object containing predictions and labels arrays
+ */
+function extractHorizonPredictionsAndLabels(
+  trackBRounds: RoundScore[],
+  horizon: TimeframeId
+): { predictions: number[]; labels: boolean[] } {
+  const predictions: number[] = [];
+  const labels: boolean[] = [];
+  for (const round of trackBRounds) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const prediction = round.predictions?.[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const label = round.labels?.[horizon];
+    if (prediction !== undefined && label !== undefined) {
+      predictions.push(prediction);
+      labels.push(label);
+    }
+  }
+  return { predictions, labels };
+}
+
+/**
+ * Calculate Brier scores from paired predictions and labels
+ * @param predictionValues - Array of predicted probabilities
+ * @param labelValues - Array of actual outcomes
+ * @returns Array of Brier scores
+ */
+function calculateBrierScores(predictionValues: number[], labelValues: boolean[]): number[] {
+  const briers: number[] = [];
+  for (const [index, prediction] of predictionValues.entries()) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, security/detect-object-injection -- index bounded by entries()
+    const label = labelValues[index]!;
+    briers.push(brierScore(prediction, label));
+  }
+  return briers;
+}
+
+/**
+ * Build ModelScoreData maps for each horizon from model states
+ * @param modelStates - Map of model states
+ * @returns Record of horizon to map of modelId to ModelScoreData
+ */
+function buildLeaderboardScoreData(
+  modelStates: Map<string, ModelState>
+): Record<TimeframeId, Map<string, ModelScoreData>> {
+  const result: Record<TimeframeId, Map<string, ModelScoreData>> = {
+    '15m': new Map(),
+    '1h': new Map(),
+    '4h': new Map(),
+    '24h': new Map(),
+  };
+  for (const state of modelStates.values()) {
+    if (state.eliminated) {
+      continue;
+    }
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const logLosses = state.logLossByHorizon[horizon];
+      const { predictions, labels } = extractHorizonPredictionsAndLabels(state.trackBRounds, horizon);
+      const briers = calculateBrierScores(predictions, labels);
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      result[horizon].set(state.modelId, { logLosses, briers, predictions, labels });
+    }
+  }
+  return result;
+}
+
+/**
+ * Print leaderboards for each horizon
+ * @param modelStates - Map of model states
+ */
+function printHorizonLeaderboards(modelStates: Map<string, ModelState>): void {
+  logger.newline();
+  logger.log('=== Per-Horizon Leaderboards (Fractal Track) ===');
+  const scoreData = buildLeaderboardScoreData(modelStates);
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const horizonScores = scoreData[horizon];
+    if (horizonScores.size === 0) {
+      continue;
+    }
+    const leaderboard = generateLeaderboard(horizon, 'fractal', horizonScores);
+    logger.newline();
+    logger.log(formatLeaderboardTable(leaderboard));
+  }
+}
+
 /**
  * Build horizon metrics for a model
  * @param state - Model state
@@ -723,6 +821,9 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
   logger.newline();
   const allModels = [...models.values()];
   printFinalSummaryTable(allModels, computeMeanLogLoss);
+
+  // Print per-horizon leaderboards
+  printHorizonLeaderboards(models);
 
   return perHorizonRankings;
 }
