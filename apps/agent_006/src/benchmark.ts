@@ -44,6 +44,9 @@ const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 
 const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
 
+// Bitcoin-only benchmark
+const SYMBOL_ID = 'COINBASE_SPOT_BTC_USD';
+
 // Phase round counts
 const PHASE_0_ROUNDS = 6;
 const PHASE_1_ROUNDS = 12;
@@ -524,12 +527,6 @@ async function runBenchmarkRound(
 async function main(): Promise<void> {
   logger.header('agent_006 Bitcoin Bottom Arena Benchmark');
 
-  // Get symbol from env
-  const symbolId = process.env['SYMBOL_ID'];
-  if (symbolId === undefined || symbolId === '') {
-    throw new Error('SYMBOL_ID environment variable is required');
-  }
-
   // Load all vision models
   const modelIds = getModelIds();
   logger.log(`Loaded ${String(modelIds.length)} vision models`);
@@ -545,7 +542,7 @@ async function main(): Promise<void> {
   let clockState = initializeClock();
 
   logger.newline();
-  logger.log(`Symbol: ${symbolId}`);
+  logger.log(`Symbol: ${SYMBOL_ID}`);
   logger.log(`Start time: ${clockState.currentTime.toISOString()}`);
 
   const totalRounds = PHASE_0_ROUNDS + PHASE_1_ROUNDS + PHASE_2_ROUNDS;
@@ -556,7 +553,7 @@ async function main(): Promise<void> {
   logger.log('--- Starting Phase 0 rounds (1-6) ---');
   for (let phase0Round = 1; phase0Round <= PHASE_0_ROUNDS; phase0Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, symbolId, clockState.currentTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
     clockState = advanceClock();
   }
 
@@ -568,7 +565,7 @@ async function main(): Promise<void> {
   logger.log('--- Starting Phase 1 rounds (7-18) ---');
   for (let phase1Round = 1; phase1Round <= PHASE_1_ROUNDS; phase1Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, symbolId, clockState.currentTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
     clockState = advanceClock();
   }
 
@@ -580,7 +577,7 @@ async function main(): Promise<void> {
   logger.log('--- Starting Phase 2 rounds (19-42) ---');
   for (let phase2Round = 1; phase2Round <= PHASE_2_ROUNDS; phase2Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, symbolId, clockState.currentTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
     clockState = advanceClock();
   }
 
