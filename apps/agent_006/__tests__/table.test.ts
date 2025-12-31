@@ -197,23 +197,32 @@ describe('table', () => {
 
   describe('printTimingDiagnosticsTable', () => {
     const createTrackBMetrics = (overrides: Partial<Record<TimeframeId, Partial<TrackBMetrics['byHorizon']['15m']>>> = {}): TrackBMetrics => ({
+      hasAnyTimingData: true,
       byHorizon: {
         '15m': {
+          hasTimingData: overrides['15m']?.hasTimingData ?? true,
+          correctPredictionCount: overrides['15m']?.correctPredictionCount ?? 2,
           earliestCorrectPredictionMs: overrides['15m']?.earliestCorrectPredictionMs ?? 60_000,
           meanTimeToDetectionRatio: overrides['15m']?.meanTimeToDetectionRatio ?? 0.2,
           redundantConfirmations: overrides['15m']?.redundantConfirmations ?? 1,
         },
         '1h': {
+          hasTimingData: overrides['1h']?.hasTimingData ?? true,
+          correctPredictionCount: overrides['1h']?.correctPredictionCount ?? 3,
           earliestCorrectPredictionMs: overrides['1h']?.earliestCorrectPredictionMs ?? 120_000,
           meanTimeToDetectionRatio: overrides['1h']?.meanTimeToDetectionRatio ?? 0.3,
           redundantConfirmations: overrides['1h']?.redundantConfirmations ?? 2,
         },
         '24h': {
+          hasTimingData: overrides['24h']?.hasTimingData ?? true,
+          correctPredictionCount: overrides['24h']?.correctPredictionCount ?? 1,
           earliestCorrectPredictionMs: overrides['24h']?.earliestCorrectPredictionMs ?? 300_000,
           meanTimeToDetectionRatio: overrides['24h']?.meanTimeToDetectionRatio ?? 0.5,
           redundantConfirmations: overrides['24h']?.redundantConfirmations ?? 0,
         },
         '4h': {
+          hasTimingData: overrides['4h']?.hasTimingData ?? true,
+          correctPredictionCount: overrides['4h']?.correctPredictionCount ?? 4,
           earliestCorrectPredictionMs: overrides['4h']?.earliestCorrectPredictionMs ?? 600_000,
           meanTimeToDetectionRatio: overrides['4h']?.meanTimeToDetectionRatio ?? 0.8,
           redundantConfirmations: overrides['4h']?.redundantConfirmations ?? 3,
@@ -272,23 +281,32 @@ describe('table', () => {
 
   describe('printCrossHorizonBehaviorMap', () => {
     const createTrackBMetrics = (ttdOverrides: Partial<Record<TimeframeId, number>> = {}): TrackBMetrics => ({
+      hasAnyTimingData: true,
       byHorizon: {
         '15m': {
+          hasTimingData: true,
+          correctPredictionCount: 2,
           earliestCorrectPredictionMs: 60_000,
           meanTimeToDetectionRatio: ttdOverrides['15m'] ?? 0.2,
           redundantConfirmations: 1,
         },
         '1h': {
+          hasTimingData: true,
+          correctPredictionCount: 3,
           earliestCorrectPredictionMs: 120_000,
           meanTimeToDetectionRatio: ttdOverrides['1h'] ?? 0.5,
           redundantConfirmations: 2,
         },
         '24h': {
+          hasTimingData: true,
+          correctPredictionCount: 1,
           earliestCorrectPredictionMs: 300_000,
           meanTimeToDetectionRatio: ttdOverrides['24h'] ?? 0.5,
           redundantConfirmations: 0,
         },
         '4h': {
+          hasTimingData: true,
+          correctPredictionCount: 4,
           earliestCorrectPredictionMs: 600_000,
           meanTimeToDetectionRatio: ttdOverrides['4h'] ?? 0.8,
           redundantConfirmations: 3,
@@ -384,6 +402,7 @@ describe('table', () => {
       expect(output).toContain('Early');
       expect(output).toContain('Mid-range');
       expect(output).toContain('Late');
+      expect(output).toContain('No timing data');
       expect(output).toContain('Disqualified');
     });
   });

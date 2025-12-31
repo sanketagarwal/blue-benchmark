@@ -217,6 +217,7 @@ async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
  * @param roundScore - Score from this round
  * @param labels - Ground truth labels for this round
  * @param timeToPivotRatios - Time-to-pivot ratios for each horizon
+ * @param firstPivotAts - First pivot timestamps for each horizon
  * @param roundNumber - Current round number for Track B tracking
  */
 function recordModelScore(
@@ -224,6 +225,7 @@ function recordModelScore(
   roundScore: Phase0RoundScore,
   labels: Record<TimeframeId, boolean>,
   timeToPivotRatios: Record<TimeframeId, number | undefined>,
+  firstPivotAts: Record<TimeframeId, Date | undefined>,
   roundNumber: number
 ): void {
   state.roundScores.push(roundScore);
@@ -241,6 +243,7 @@ function recordModelScore(
     predictions: roundScore.predictions,
     labels,
     timeToPivotRatio: timeToPivotRatios,
+    firstPivotAt: firstPivotAts,
   });
 
   for (const horizon of HORIZONS) {
@@ -260,7 +263,7 @@ function recordModelScore(
  * Resolve ground truth for all horizons using dual pivot methods
  * @param symbolId - Trading symbol identifier
  * @param predictionTime - Time of prediction
- * @returns Labels and time-to-pivot ratios for all horizons (using primary method)
+ * @returns Labels, time-to-pivot ratios, and first pivot timestamps for all horizons (using primary method)
  */
 async function resolveAllHorizonsGroundTruth(
   symbolId: string,
@@ -268,11 +271,13 @@ async function resolveAllHorizonsGroundTruth(
 ): Promise<{
   labels: Record<TimeframeId, boolean>;
   timeToPivotRatios: Record<TimeframeId, number | undefined>;
+  firstPivotAts: Record<TimeframeId, Date | undefined>;
   // Secondary labels for analysis (not used for scoring)
   secondaryLabels: Record<TimeframeId, boolean>;
 }> {
   const labels: Record<string, boolean> = {};
   const ratios: Record<string, number | undefined> = {};
+  const firstPivots: Record<string, Date | undefined> = {};
   const secondaryLabels: Record<string, boolean> = {};
 
   // Resolve each horizon using dual ground truth in parallel
@@ -289,6 +294,8 @@ async function resolveAllHorizonsGroundTruth(
     labels[horizon] = dualResult.primary.hasStructuralBottom;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     ratios[horizon] = dualResult.primary.timeToPivotRatio;
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    firstPivots[horizon] = dualResult.primary.firstPivotAt;
     // Secondary for analysis
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     secondaryLabels[horizon] = dualResult.secondary.hasStructuralBottom;
@@ -297,6 +304,7 @@ async function resolveAllHorizonsGroundTruth(
   return {
     labels: labels as Record<TimeframeId, boolean>,
     timeToPivotRatios: ratios as Record<TimeframeId, number | undefined>,
+    firstPivotAts: firstPivots as Record<TimeframeId, Date | undefined>,
     secondaryLabels: secondaryLabels as Record<TimeframeId, boolean>,
   };
 }
@@ -1006,7 +1014,7 @@ async function runBenchmarkRound(
 
   // Get ground truth (secondaryLabels captured for future analysis)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
-  const { labels, timeToPivotRatios, secondaryLabels: _secondaryLabels } = await resolveAllHorizonsGroundTruth(symbolId, currentTime);
+  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels } = await resolveAllHorizonsGroundTruth(symbolId, currentTime);
 
   // Run each active model
   for (const state of models.values()) {
@@ -1023,7 +1031,7 @@ async function runBenchmarkRound(
         legacyPredictions,
         labels
       );
-      recordModelScore(state, roundScore, labels, timeToPivotRatios, roundNumber);
+      recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
       const scoreSummary = formatRoundScore(roundScore);
       logger.succeedSpinner(`${chalk.cyan(state.modelId)}: ${scoreSummary}`);
     } catch (error) {

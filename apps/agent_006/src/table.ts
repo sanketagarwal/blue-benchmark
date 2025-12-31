@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 
 import type { PerHorizonRankings } from './scorers/phase-3-scorer.js';
-import type { TrackBMetrics } from './scorers/timing-metrics.js';
+import type { TimingMetrics, TrackBMetrics } from './scorers/timing-metrics.js';
 import type { TimeframeId } from './timeframe-config.js';
 
 // Quality thresholds for color coding
@@ -207,9 +207,87 @@ export function printFinalSummaryTable<T extends MinimalModelState>(
   console.log(table.toString());
 }
 
+const MS_PER_MINUTE = 60_000;
+
+/**
+ * Format timing row data for display
+ * @param modelId - Model identifier
+ * @param m - Timing metrics for the model
+ * @returns Formatted row data object with string values
+ */
+function formatTimingRow(
+  modelId: string,
+  m: TimingMetrics
+): { modelId: string; correctCount: string; earliest: string; meanTtD: string; redundant: string } {
+  const correctCount = String(m.correctPredictionCount);
+  const earliest = m.earliestCorrectPredictionMs === undefined
+    ? chalk.dim('-')
+    : `${(m.earliestCorrectPredictionMs / MS_PER_MINUTE).toFixed(1)}m`;
+  const meanTtD = m.meanTimeToDetectionRatio === undefined
+    ? chalk.dim('-')
+    : `${(m.meanTimeToDetectionRatio * 100).toFixed(0)}%`;
+  const redundant = String(m.redundantConfirmations);
+  return { modelId, correctCount, earliest, meanTtD, redundant };
+}
+
+/**
+ * Print timing table for a single horizon
+ * @param horizon - The timeframe horizon to print
+ * @param modelsWithData - Models that have timing data for this horizon
+ */
+function printHorizonTimingTable(
+  horizon: TimeframeId,
+  modelsWithData: { modelId: string; metrics: TrackBMetrics }[]
+): void {
+  const table = new Table({
+    chars: {
+      'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
+      'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
+      'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
+      'right': '│', 'right-mid': '┤', 'middle': '│'
+    },
+    style: { head: [], border: [] }
+  });
+
+  table.push([
+    { content: chalk.dim('Model'), hAlign: 'center' as const },
+    { content: chalk.dim('Correct'), hAlign: 'center' as const },
+    { content: chalk.dim('Earliest'), hAlign: 'center' as const },
+    { content: chalk.dim('Mean TtD'), hAlign: 'center' as const },
+    { content: chalk.dim('Redundant'), hAlign: 'center' as const },
+  ]);
+
+  // Sort by mean time to detection (earlier is better)
+  const sorted = [...modelsWithData].sort((a, b) => {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const aRatio = a.metrics.byHorizon[horizon].meanTimeToDetectionRatio ?? 1;
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const bRatio = b.metrics.byHorizon[horizon].meanTimeToDetectionRatio ?? 1;
+    return aRatio - bRatio;
+  });
+
+  for (const { modelId, metrics } of sorted) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const m = metrics.byHorizon[horizon];
+    const row = formatTimingRow(modelId, m);
+
+    table.push([
+      { content: chalk.cyan(row.modelId), hAlign: 'left' as const },
+      { content: row.correctCount, hAlign: 'right' as const },
+      { content: row.earliest, hAlign: 'right' as const },
+      { content: row.meanTtD, hAlign: 'right' as const },
+      { content: row.redundant, hAlign: 'right' as const },
+    ]);
+  }
+
+  // eslint-disable-next-line no-console -- CLI output
+  console.log(table.toString());
+}
+
 /**
  * Print timing diagnostics table per horizon
  * Shows Track B metrics: earliest detection, mean time-to-detection, redundant confirmations
+ * ONLY shows models that have actual timing data (made correct predictions on bottoms)
  *
  * @param modelMetrics - Array of model metrics with modelId and TrackBMetrics
  */
@@ -217,57 +295,33 @@ export function printTimingDiagnosticsTable(
   modelMetrics: { modelId: string; metrics: TrackBMetrics }[]
 ): void {
   const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
-  const MS_PER_MINUTE = 60_000;
+
+  // Check if ANY model has timing data for ANY horizon
+  const anyDataExists = modelMetrics.some(({ metrics }) => metrics.hasAnyTimingData);
+  if (!anyDataExists) {
+    // eslint-disable-next-line no-console -- CLI output
+    console.log(chalk.yellow('\n  No timing data available - no models made correct predictions on actual bottoms'));
+    return;
+  }
 
   for (const horizon of HORIZONS) {
+    // Filter to only models with timing data for this horizon
+    const modelsWithData = modelMetrics.filter(({ metrics }) =>
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      metrics.byHorizon[horizon].hasTimingData
+    );
+
     const title = `${horizon} Timing Diagnostics:`;
     // eslint-disable-next-line no-console -- CLI output
     console.log(`\n${chalk.bold.cyan(title)}`);
 
-    const table = new Table({
-      chars: {
-        'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
-        'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
-        'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
-        'right': '│', 'right-mid': '┤', 'middle': '│'
-      },
-      style: { head: [], border: [] }
-    });
-
-    table.push([
-      { content: chalk.dim('Model'), hAlign: 'center' as const },
-      { content: chalk.dim('Earliest'), hAlign: 'center' as const },
-      { content: chalk.dim('Mean TtD'), hAlign: 'center' as const },
-      { content: chalk.dim('Redundant'), hAlign: 'center' as const },
-    ]);
-
-    // Sort by mean time to detection (earlier is better)
-    const sorted = [...modelMetrics].sort((a, b) =>
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      a.metrics.byHorizon[horizon].meanTimeToDetectionRatio -
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      b.metrics.byHorizon[horizon].meanTimeToDetectionRatio
-    );
-
-    for (const { modelId, metrics } of sorted) {
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      const m = metrics.byHorizon[horizon];
-      const earliest = m.earliestCorrectPredictionMs === undefined
-        ? chalk.dim('-')
-        : `${(m.earliestCorrectPredictionMs / MS_PER_MINUTE).toFixed(1)}m`;
-      const meanTtD = `${(m.meanTimeToDetectionRatio * 100).toFixed(0)}%`;
-      const redundant = String(m.redundantConfirmations);
-
-      table.push([
-        { content: chalk.cyan(modelId), hAlign: 'left' as const },
-        { content: earliest, hAlign: 'right' as const },
-        { content: meanTtD, hAlign: 'right' as const },
-        { content: redundant, hAlign: 'right' as const },
-      ]);
+    if (modelsWithData.length === 0) {
+      // eslint-disable-next-line no-console -- CLI output
+      console.log(chalk.dim('  No timing data - no models made correct predictions on actual bottoms for this horizon'));
+      continue;
     }
 
-    // eslint-disable-next-line no-console -- CLI output
-    console.log(table.toString());
+    printHorizonTimingTable(horizon, modelsWithData);
   }
 }
 
@@ -376,6 +430,10 @@ export function printCrossHorizonBehaviorMap(
       }
       // eslint-disable-next-line security/detect-object-injection -- h from typed array
       const ttd = trackB.byHorizon[h].meanTimeToDetectionRatio;
+      // If no timing data, show question mark instead of timing indicator
+      if (ttd === undefined) {
+        return chalk.dim('?');
+      }
       return getTimingIndicator(ttd);
     });
 
@@ -396,6 +454,6 @@ export function printCrossHorizonBehaviorMap(
   // eslint-disable-next-line no-console -- CLI output
   console.log(table.toString());
   // eslint-disable-next-line no-console -- CLI output
-  console.log(chalk.dim('\nLegend: E=Early (<30%), M=Mid-range, L=Late (>70%), ✗=Disqualified'));
+  console.log(chalk.dim('\nLegend: E=Early (<30%), M=Mid-range, L=Late (>70%), ?=No timing data, ✗=Disqualified'));
 }
 /* eslint-enable no-restricted-syntax -- Re-enable after CLI table output */

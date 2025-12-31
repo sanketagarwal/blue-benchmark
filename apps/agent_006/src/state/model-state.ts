@@ -9,6 +9,8 @@ export interface RoundScore {
   predictions?: Record<TimeframeId, number>;
   labels?: Record<TimeframeId, boolean>;
   timeToPivotRatio?: Record<TimeframeId, number | undefined>;
+  /** Timestamp of first pivot for each horizon (only set when label=true) */
+  firstPivotAt?: Record<TimeframeId, Date | undefined>;
 }
 
 export interface ModelState {
