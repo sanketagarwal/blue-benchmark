@@ -41,6 +41,26 @@ import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
 import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
+const isQuickMode = process.argv.includes('--quick');
+
+// Quick mode constants
+const QUICK_ROUNDS_PER_PHASE = 1;
+const QUICK_MODEL_COUNT = 3;
+
+/**
+ * Shuffle array using Fisher-Yates algorithm
+ * @param array - Array to shuffle
+ * @returns Shuffled copy of the array
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    // eslint-disable-next-line security/detect-object-injection -- bounded integers
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex] as T, shuffled[index] as T];
+  }
+  return shuffled;
+}
 
 const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
 
@@ -51,6 +71,17 @@ const SYMBOL_ID = 'COINBASE_SPOT_BTC_USD';
 const PHASE_0_ROUNDS = 4;
 const PHASE_1_ROUNDS = 4;
 const PHASE_2_ROUNDS = 4;
+
+/**
+ * Get round counts for each phase based on quick mode
+ * @returns Object with round counts for each phase
+ */
+function getPhaseRoundCounts(): { phase0: number; phase1: number; phase2: number } {
+  if (isQuickMode) {
+    return { phase0: QUICK_ROUNDS_PER_PHASE, phase1: QUICK_ROUNDS_PER_PHASE, phase2: QUICK_ROUNDS_PER_PHASE };
+  }
+  return { phase0: PHASE_0_ROUNDS, phase1: PHASE_1_ROUNDS, phase2: PHASE_2_ROUNDS };
+}
 
 type Phase = 0 | 1 | 2 | 3;
 
@@ -666,8 +697,15 @@ async function main(): Promise<void> {
   logger.header('agent_006 Bitcoin Bottom Arena Benchmark');
 
   // Load all vision models
-  const modelIds = getModelIds();
+  let modelIds = getModelIds();
   logger.log(`Loaded ${String(modelIds.length)} vision models`);
+
+  // Quick mode: use only 3 random models
+  if (isQuickMode) {
+    logger.log('🚀 Quick mode: 1 round/phase, 3 random models');
+    modelIds = shuffleArray(modelIds).slice(0, QUICK_MODEL_COUNT);
+    logger.log(`Selected: ${modelIds.join(', ')}`);
+  }
 
   // Initialize model state for all models
   const models = new Map<string, ModelState>();
@@ -684,13 +722,17 @@ async function main(): Promise<void> {
   logger.log(`Symbol: ${SYMBOL_ID}`);
   logger.log(`Start time: ${startTime}`);
 
-  const totalRounds = PHASE_0_ROUNDS + PHASE_1_ROUNDS + PHASE_2_ROUNDS;
+  const roundCounts = getPhaseRoundCounts();
+  const phase0Rounds = roundCounts.phase0;
+  const phase1Rounds = roundCounts.phase1;
+  const phase2Rounds = roundCounts.phase2;
+  const totalRounds = phase0Rounds + phase1Rounds + phase2Rounds;
   let roundNumber = 0;
 
-  // ========== PHASE 0: 4 rounds ==========
+  // ========== PHASE 0 ==========
   logger.newline();
-  logger.log('--- Starting Phase 0 rounds (1-4) ---');
-  for (let phase0Round = 1; phase0Round <= PHASE_0_ROUNDS; phase0Round++) {
+  logger.log(`--- Starting Phase 0 rounds (1-${String(phase0Rounds)}) ---`);
+  for (let phase0Round = 1; phase0Round <= phase0Rounds; phase0Round++) {
     roundNumber++;
     await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, startTime);
     clockState = advanceClock();
@@ -699,10 +741,12 @@ async function main(): Promise<void> {
   // Run Phase 0 elimination
   runPhase0(models);
 
-  // ========== PHASE 1: 4 more rounds (5-8) ==========
+  // ========== PHASE 1 ==========
   logger.newline();
-  logger.log('--- Starting Phase 1 rounds (5-8) ---');
-  for (let phase1Round = 1; phase1Round <= PHASE_1_ROUNDS; phase1Round++) {
+  const phase1Start = phase0Rounds + 1;
+  const phase1End = phase0Rounds + phase1Rounds;
+  logger.log(`--- Starting Phase 1 rounds (${String(phase1Start)}-${String(phase1End)}) ---`);
+  for (let phase1Round = 1; phase1Round <= phase1Rounds; phase1Round++) {
     roundNumber++;
     await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, startTime);
     clockState = advanceClock();
@@ -711,10 +755,12 @@ async function main(): Promise<void> {
   // Run Phase 1 elimination
   runPhase1(models);
 
-  // ========== PHASE 2: 4 more rounds (9-12) ==========
+  // ========== PHASE 2 ==========
   logger.newline();
-  logger.log('--- Starting Phase 2 rounds (9-12) ---');
-  for (let phase2Round = 1; phase2Round <= PHASE_2_ROUNDS; phase2Round++) {
+  const phase2Start = phase0Rounds + phase1Rounds + 1;
+  const phase2End = phase0Rounds + phase1Rounds + phase2Rounds;
+  logger.log(`--- Starting Phase 2 rounds (${String(phase2Start)}-${String(phase2End)}) ---`);
+  for (let phase2Round = 1; phase2Round <= phase2Rounds; phase2Round++) {
     roundNumber++;
     await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, startTime);
     clockState = advanceClock();
