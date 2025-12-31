@@ -169,6 +169,7 @@ export interface ModelWithHorizonMetrics {
   modelId: string;
   metrics: Phase3ModelMetrics;
   horizonMetrics: Record<Horizon, HorizonMetrics>;
+  qualifiedHorizons: Set<Horizon>;
 }
 
 interface HorizonScoreRanges {
@@ -231,8 +232,12 @@ export function rankModelsForHorizon(
   models: ModelWithHorizonMetrics[],
   horizon: Horizon
 ): HorizonRanking[] {
-  // Filter to models that have valid data for this horizon
+  // Filter to models that are qualified for this horizon AND have valid data
   const validModels = models.filter(m => {
+    // Must be qualified for this horizon
+    if (!m.qualifiedHorizons.has(horizon)) {
+      return false;
+    }
     // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
     const hm = m.horizonMetrics[horizon];
     return (

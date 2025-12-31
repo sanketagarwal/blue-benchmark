@@ -33,6 +33,10 @@ import {
   median,
 } from './scorers/phase-2-scorer.js';
 import { rankModelsPerHorizon } from './scorers/phase-3-scorer.js';
+import {
+  printPerHorizonArenaTable,
+  printFinalSummaryTable,
+} from './table.js';
 
 import type { BottomCallerOutput, BottomContractId } from './bottom-caller.js';
 import type { Horizon } from './horizon-config.js';
@@ -612,56 +616,20 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
         avgTimeToPivotRatio: timeToPivotCount > 0 ? totalTimeToPivotRatio / timeToPivotCount : 0.5,
       },
       horizonMetrics,
+      qualifiedHorizons: state.qualifiedHorizons,
     });
   }
 
   // Rank per horizon
   const perHorizonRankings = rankModelsPerHorizon(modelsWithHorizonMetrics);
 
-  // Log per-horizon rankings
-  for (const horizon of HORIZONS) {
-    logger.newline();
-    logger.log(`${chalk.bold(horizon)} Arena Winners:`);
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const rankings = perHorizonRankings[horizon];
-    for (const [index, competitor] of rankings.entries()) {
-      const rank = index + 1;
-      const rankString = rank === 1 ? chalk.green(`${String(rank)}.`) : `${String(rank)}.`;
-      logger.log(`  ${rankString} ${chalk.cyan(competitor.modelId)} (score: ${competitor.score.toFixed(4)})`);
-    }
-  }
+  // Print per-horizon arena tables
+  printPerHorizonArenaTable(perHorizonRankings);
 
-  // Comprehensive final table with all models
+  // Print final summary table with all models
   logger.newline();
-  logger.log(chalk.bold('=== Final Model Summary ==='));
-  logger.log('');
-  logger.log(chalk.dim('Rank  Model                          Status       LL-15m  LL-1h   LL-24h  LL-7d   Mean LL'));
-  logger.log(chalk.dim('─'.repeat(100)));
-
-  // Build sorted list of all models by mean log loss
-  const allModelsSorted: { state: ModelState; meanLL: number; status: string }[] = [];
-  for (const state of models.values()) {
-    const meanLogLoss = computeMeanLogLoss(state);
-    const mean = (meanLogLoss['15m'] + meanLogLoss['1h'] + meanLogLoss['24h'] + meanLogLoss['7d']) / 4;
-    const status = state.eliminated
-      ? `P${String(state.eliminatedInPhase ?? '?')}`
-      : 'WINNER';
-    allModelsSorted.push({ state, meanLL: mean, status });
-  }
-  allModelsSorted.sort((a, b) => a.meanLL - b.meanLL);
-
-  for (const [index, { state, meanLL, status }] of allModelsSorted.entries()) {
-    const rank = String(index + 1).padStart(4);
-    const modelName = state.modelId.padEnd(30);
-    const meanLogLoss = computeMeanLogLoss(state);
-    const statusString = status === 'WINNER' ? chalk.green(status.padEnd(12)) : chalk.red(status.padEnd(12));
-    const ll15m = formatLogLoss(meanLogLoss['15m']).padStart(7);
-    const ll1h = formatLogLoss(meanLogLoss['1h']).padStart(7);
-    const ll24h = formatLogLoss(meanLogLoss['24h']).padStart(7);
-    const ll7d = formatLogLoss(meanLogLoss['7d']).padStart(7);
-    const meanLogLossString = formatLogLoss(meanLL).padStart(7);
-    logger.log(`${rank}  ${chalk.cyan(modelName)} ${statusString} ${ll15m} ${ll1h} ${ll24h} ${ll7d} ${meanLogLossString}`);
-  }
+  const allModels = [...models.values()];
+  printFinalSummaryTable(allModels, computeMeanLogLoss);
 
   return perHorizonRankings;
 }
