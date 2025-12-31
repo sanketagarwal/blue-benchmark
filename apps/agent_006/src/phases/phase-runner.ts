@@ -278,6 +278,7 @@ export function runPhase2(manager: ModelStateManager): void {
   const medianStability = computeMedianStabilityAcrossModels(phase2Scores);
 
   for (const score of phase2Scores) {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- backwards compat, will migrate to getHorizonsToDisqualify
     if (shouldEliminatePhase2(score, medianStability)) {
       manager.eliminateModel(score.modelId, 2, getPhase2Reason(score, medianStability));
     }

@@ -366,6 +366,7 @@ function runPhase2(models: Map<string, ModelState>): void {
       continue;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- backwards compat, will migrate to getHorizonsToDisqualify
     if (shouldEliminatePhase2(score, medianStabilities)) {
       state.eliminated = true;
       state.eliminatedInPhase = 2;

@@ -78,10 +78,43 @@ export function computeRegret(
 }
 
 /**
+ * Determine which horizons a model should be disqualified from in Phase 2
+ * A model is disqualified from a horizon if:
+ * - Regret > 1.5 on that horizon, OR
+ * - Stability > 2x median stability on that horizon
+ * @param modelScore - Model's Phase 2 score
+ * @param medianStability - Median stability values per horizon
+ * @returns Set of horizons to disqualify from
+ */
+export function getHorizonsToDisqualify(
+  modelScore: Phase2ModelScore,
+  medianStability: Record<Horizon, number>
+): Set<Horizon> {
+  const toDisqualify = new Set<Horizon>();
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const regret = modelScore.regretByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const stability = modelScore.stabilityByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const medStab = medianStability[horizon];
+
+    // Disqualify if regret > 1.5 OR stability > 2x median
+    if (regret > 1.5 || stability > 2 * medStab) {
+      toDisqualify.add(horizon);
+    }
+  }
+
+  return toDisqualify;
+}
+
+/**
  * Determine if model should be eliminated in Phase 2
  * @param modelScore - Model's Phase 2 score
  * @param medianStability - Median stability values per horizon
  * @returns True if model should be eliminated
+ * @deprecated Use getHorizonsToDisqualify for per-horizon disqualification instead
  */
 export function shouldEliminatePhase2(
   modelScore: Phase2ModelScore,
