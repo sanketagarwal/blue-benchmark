@@ -1,3 +1,4 @@
+import { brierScore } from './brier-scorer.js';
 import { logLoss } from './log-loss-scorer.js';
 
 import type { BottomContractId } from '../bottom-caller.js';
@@ -7,12 +8,14 @@ export const RANDOM_BASELINE = Math.log(2);
 
 export interface Phase0RoundScore {
   logLossByHorizon: Record<TimeframeId, number>;
+  brierByHorizon: Record<TimeframeId, number>;
   extremeErrors: Record<TimeframeId, boolean>;
   predictions: Record<TimeframeId, number>;
 }
 
 export interface Phase0AggregateScore {
   meanLogLoss: Record<TimeframeId, number>;
+  meanBrier: Record<TimeframeId, number>;
   extremeErrorRate: Record<TimeframeId, number>;
   degenerateByHorizon: Record<TimeframeId, boolean>;
 }
@@ -30,6 +33,7 @@ export function scorePhase0Round(
   labels: Record<TimeframeId, boolean>
 ): Phase0RoundScore {
   const logLossByHorizon: Record<string, number> = {};
+  const brierByHorizon: Record<string, number> = {};
   const extremeErrors: Record<string, boolean> = {};
   const predictionsByHorizon: Record<string, number> = {};
 
@@ -43,6 +47,8 @@ export function scorePhase0Round(
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     logLossByHorizon[horizon] = logLoss(prediction, label);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    brierByHorizon[horizon] = brierScore(prediction, label);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     predictionsByHorizon[horizon] = prediction;
 
     // Extreme error: confident wrong (p > 0.8 when label = false)
@@ -52,6 +58,7 @@ export function scorePhase0Round(
 
   return {
     logLossByHorizon: logLossByHorizon as Record<TimeframeId, number>,
+    brierByHorizon: brierByHorizon as Record<TimeframeId, number>,
     extremeErrors: extremeErrors as Record<TimeframeId, boolean>,
     predictions: predictionsByHorizon as Record<TimeframeId, number>,
   };
@@ -64,6 +71,7 @@ export function scorePhase0Round(
  */
 export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0AggregateScore {
   const meanLogLoss: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
+  const meanBrier: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
   const extremeErrorRate: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '24h': 0, '7d': 0 };
   const degenerateByHorizon: Record<TimeframeId, boolean> = {
     '15m': false,
@@ -76,6 +84,8 @@ export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0Aggrega
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const horizonLosses = rounds.map(r => r.logLossByHorizon[horizon]);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const horizonBriers = rounds.map(r => r.brierByHorizon[horizon]);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const horizonErrors = rounds.map(r => r.extremeErrors[horizon]);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const horizonPredictions = rounds.map(r => r.predictions[horizon]);
@@ -83,6 +93,10 @@ export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0Aggrega
     // Mean log loss per horizon
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     meanLogLoss[horizon] = horizonLosses.reduce((a, b) => a + b, 0) / horizonLosses.length;
+
+    // Mean Brier score per horizon
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    meanBrier[horizon] = horizonBriers.reduce((a, b) => a + b, 0) / horizonBriers.length;
 
     // Extreme error rate per horizon
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -95,7 +109,7 @@ export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0Aggrega
     degenerateByHorizon[horizon] = alwaysHigh || alwaysLow;
   }
 
-  return { meanLogLoss, extremeErrorRate, degenerateByHorizon };
+  return { meanLogLoss, meanBrier, extremeErrorRate, degenerateByHorizon };
 }
 
 /**

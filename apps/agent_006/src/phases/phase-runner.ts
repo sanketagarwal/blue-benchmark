@@ -1,3 +1,4 @@
+import { brierScore } from '../scorers/brier-scorer.js';
 import {
   aggregatePhase0Scores,
   shouldEliminatePhase0,
@@ -94,12 +95,26 @@ function buildExtremeErrors(
   return result as Record<TimeframeId, boolean>;
 }
 
+function buildBrierByHorizon(
+  predictions: Record<TimeframeId, number>,
+  labels: Record<TimeframeId, boolean>
+): Record<TimeframeId, number> {
+  const result: Record<string, number> = {};
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    result[horizon] = brierScore(predictions[horizon], labels[horizon]);
+  }
+  return result as Record<TimeframeId, number>;
+}
+
 function convertToPhase0Round(round: RoundScore): Phase0RoundScore | undefined {
-  if (round.logLossByHorizon === undefined || round.predictions === undefined) {
+  if (round.logLossByHorizon === undefined || round.predictions === undefined || round.labels === undefined) {
     return undefined;
   }
+  const brierByHorizon = buildBrierByHorizon(round.predictions, round.labels);
   return {
     logLossByHorizon: round.logLossByHorizon,
+    brierByHorizon,
     extremeErrors: buildExtremeErrors(round.predictions, round.labels),
     predictions: round.predictions,
   };
