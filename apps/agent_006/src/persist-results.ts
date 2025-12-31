@@ -30,19 +30,34 @@ interface RunMetadata {
 }
 
 /**
- * Model score summary for leaderboard
+ * Comprehensive model metrics for the full results table
  */
-interface ModelScoreSummary {
+interface ModelMetrics {
   modelId: string;
-  meanLogLoss: number;
+  status: string;
   rounds: number;
-  eliminated: boolean;
-  eliminatedInPhase: number | undefined;
   failedRounds: number;
+  // Per-horizon log loss
+  logLoss15m: number;
+  logLoss1h: number;
+  logLoss24h: number;
+  logLoss7d: number;
+  meanLogLoss: number;
+  // Composite score components
+  avgPercentileRank: number;
+  avgBestWindow: number;
+  avgStability: number;
+  avgTimeToPivotRatio: number;
+  // Final composite score
+  compositeScore: number;
 }
 
 const HORIZONS: Horizon[] = ['15m', '1h', '24h', '7d'];
 const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
+
+// Quality thresholds for log loss (lower is better)
+const LOG_LOSS_GOOD = 0.5;
+const LOG_LOSS_OK = 0.8;
 
 /**
  * Format a number to fixed decimal places
@@ -67,17 +82,157 @@ function calculateMean(values: number[]): number {
 }
 
 /**
- * Get log losses for a model across all horizons
- * @param model - Model state
- * @returns Flat array of all log losses
+ * Calculate standard deviation of an array
+ * @param values - Array of numbers
+ * @returns Standard deviation
  */
-function getAllLogLosses(model: ModelState): number[] {
-  const losses: number[] = [];
+function calculateStandardDeviation(values: number[]): number {
+  if (values.length < 2) {
+    return 0;
+  }
+  const mean = calculateMean(values);
+  const squaredDiffs = values.map(v => (v - mean) ** 2);
+  return Math.sqrt(calculateMean(squaredDiffs));
+}
+
+/**
+ * Calculate percentile rank within cohort
+ * @param value - The value to rank
+ * @param allValues - All values in cohort
+ * @returns Percentile rank (0-100)
+ */
+function calculatePercentileRank(value: number, allValues: number[]): number {
+  if (allValues.length === 0) {
+    return 50;
+  }
+  const sorted = [...allValues].sort((a, b) => a - b);
+  const rank = sorted.filter(v => v < value).length;
+  // Invert: lower log loss = higher percentile rank
+  return 100 - (rank / sorted.length) * 100;
+}
+
+/**
+ * Calculate best window log loss (rolling window minimum)
+ * @param values - Array of log loss values
+ * @param windowSize - Rolling window size
+ * @returns Best window average
+ */
+function calculateBestWindow(values: number[], windowSize = 3): number {
+  if (values.length < windowSize) {
+    return calculateMean(values);
+  }
+  let bestAvg = Infinity;
+  for (let windowStart = 0; windowStart <= values.length - windowSize; windowStart++) {
+    const windowSlice = values.slice(windowStart, windowStart + windowSize);
+    const avg = calculateMean(windowSlice);
+    if (avg < bestAvg) {
+      bestAvg = avg;
+    }
+  }
+  return bestAvg;
+}
+
+/**
+ * Get quality emoji based on log loss value
+ * @param value - Log loss value
+ * @returns Emoji indicator
+ */
+function getLogLossEmoji(value: number): string {
+  if (value <= LOG_LOSS_GOOD) {
+    return '🟢';
+  }
+  if (value <= LOG_LOSS_OK) {
+    return '🟡';
+  }
+  return '🔴';
+}
+
+/**
+ * Get status emoji
+ * @param eliminated - Whether model is eliminated
+ * @param phase - Elimination phase
+ * @returns Status string with emoji
+ */
+function getStatusString(eliminated: boolean, phase: number | undefined): string {
+  if (!eliminated) {
+    return '✅ Active';
+  }
+  return `❌ P${phase === undefined ? '?' : String(phase)}`;
+}
+
+/**
+ * Calculate all metrics for a model
+ * @param model - Model state
+ * @param allMeanLogLosses - All models' mean log losses for percentile ranking
+ * @returns Model metrics
+ */
+function calculateModelMetrics(
+  model: ModelState,
+  allMeanLogLosses: number[]
+): ModelMetrics {
+  // Per-horizon log loss averages
+  const logLoss15m = calculateMean(model.logLossByHorizon['15m']);
+  const logLoss1h = calculateMean(model.logLossByHorizon['1h']);
+  const logLoss24h = calculateMean(model.logLossByHorizon['24h']);
+  const logLoss7d = calculateMean(model.logLossByHorizon['7d']);
+
+  // Overall mean log loss
+  const allLosses: number[] = [];
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
-    losses.push(...model.logLossByHorizon[horizon]);
+    allLosses.push(...model.logLossByHorizon[horizon]);
   }
-  return losses;
+  const meanLogLoss = calculateMean(allLosses);
+
+  // Percentile rank (higher is better, lower log loss = higher rank)
+  const avgPercentileRank = calculatePercentileRank(meanLogLoss, allMeanLogLosses);
+
+  // Best window (lower is better)
+  const avgBestWindow = calculateBestWindow(allLosses);
+
+  // Stability (lower std dev is better)
+  const avgStability = calculateStandardDeviation(allLosses);
+
+  // Time to pivot ratio (lower is better = earlier pivot detection)
+  const allRatios: number[] = [];
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
+    allRatios.push(...model.timeToPivotRatios[horizon]);
+  }
+  const avgTimeToPivotRatio = allRatios.length > 0 ? calculateMean(allRatios) : 0.5;
+
+  // Composite score: weighted combination (higher is better)
+  // 40% percentile rank (already 0-100, normalize to 0-1)
+  // 30% best window (lower is better, invert)
+  // 20% stability (lower is better, invert)
+  // 10% time to pivot (lower is better, invert)
+  const normalizedRank = avgPercentileRank / 100;
+  const bestWindowScore = Math.max(0, 1 - avgBestWindow / 2); // Normalize assuming max ~2
+  const stabilityScore = Math.max(0, 1 - avgStability / 1); // Normalize assuming max ~1
+  const pivotScore = 1 - avgTimeToPivotRatio;
+
+  const compositeScore =
+    0.4 * normalizedRank +
+    0.3 * bestWindowScore +
+    0.2 * stabilityScore +
+    0.1 * pivotScore;
+
+  return {
+    modelId: model.modelId,
+    status: getStatusString(model.eliminated, model.eliminatedInPhase),
+    rounds: model.roundScores.length,
+    failedRounds: model.failedRounds?.length ?? 0,
+    logLoss15m,
+    logLoss1h,
+    logLoss24h,
+    logLoss7d,
+    meanLogLoss,
+    avgPercentileRank,
+    avgBestWindow,
+    avgStability,
+    avgTimeToPivotRatio,
+    compositeScore,
+  };
 }
 
 /**
@@ -116,85 +271,101 @@ function generateSummary(activeCount: number, eliminatedCount: number, failedCou
 }
 
 /**
- * Format status string for leaderboard
- * @param score - Model score summary
- * @returns Status string
- */
-function formatStatus(score: ModelScoreSummary): string {
-  if (score.eliminated) {
-    const phase = score.eliminatedInPhase === undefined ? '?' : String(score.eliminatedInPhase);
-    return `Eliminated (Phase ${phase})`;
-  }
-  if (score.failedRounds > 0) {
-    return `${String(score.failedRounds)} failures`;
-  }
-  return 'Active';
-}
-
-/**
- * Generate leaderboard section
- * @param modelScores - Sorted model scores
+ * Generate the comprehensive results table
+ * @param metrics - Array of model metrics sorted by composite score
  * @returns Array of markdown lines
  */
-function generateLeaderboard(modelScores: ModelScoreSummary[]): string[] {
+function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
   const lines: string[] = [
-    '## Leaderboard (by Mean Log Loss)',
+    '## Full Results (All Models)',
     '',
-    '| Rank | Model | Mean Log Loss | Rounds | Status |',
-    '|------|-------|--------------|--------|--------|',
+    '| Rank | Model | Status | Rnds | 15m | 1h | 24h | 7d | Mean | %Rank | BestWin | Stabil | TtP | Score |',
+    '|------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|',
   ];
 
-  for (const [index, score] of modelScores.entries()) {
-    const status = formatStatus(score);
-    lines.push(`| ${String(index + 1)} | ${score.modelId} | ${formatNumber(score.meanLogLoss)} | ${String(score.rounds)} | ${status} |`);
+  for (const [index, m] of metrics.entries()) {
+    const rank = index + 1;
+    const medalOptions = ['🥇', '🥈', '🥉'];
+    const medal = rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
+
+    // Format with quality indicators
+    const ll15m = `${getLogLossEmoji(m.logLoss15m)}${formatNumber(m.logLoss15m, 3)}`;
+    const ll1h = `${getLogLossEmoji(m.logLoss1h)}${formatNumber(m.logLoss1h, 3)}`;
+    const ll24h = `${getLogLossEmoji(m.logLoss24h)}${formatNumber(m.logLoss24h, 3)}`;
+    const ll7d = `${getLogLossEmoji(m.logLoss7d)}${formatNumber(m.logLoss7d, 3)}`;
+    const llMean = `${getLogLossEmoji(m.meanLogLoss)}${formatNumber(m.meanLogLoss, 3)}`;
+
+    // Format composite components
+    const pctRank = formatNumber(m.avgPercentileRank, 1);
+    const bestWin = formatNumber(m.avgBestWindow, 3);
+    const stability = formatNumber(m.avgStability, 3);
+    const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
+    const score = formatNumber(m.compositeScore, 4);
+
+    lines.push(
+      `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${ll15m} | ${ll1h} | ${ll24h} | ${ll7d} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`
+    );
   }
+
   lines.push('');
+  lines.push('**Legend:**');
+  lines.push('- 🟢 Good (≤0.5) | 🟡 OK (≤0.8) | 🔴 Poor (>0.8)');
+  lines.push('- %Rank: Percentile rank (higher=better) | BestWin: Best rolling window avg (lower=better)');
+  lines.push('- Stabil: Std dev of log loss (lower=better) | TtP: Time-to-pivot ratio (lower=better)');
+  lines.push('- Score: Composite (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹)');
+  lines.push('');
+
   return lines;
 }
 
 /**
- * Generate per-horizon section for active models
- * @param activeModels - Active model states
+ * Generate per-horizon breakdown table
+ * @param metrics - Array of model metrics
  * @returns Array of markdown lines
  */
-function generateHorizonBreakdown(activeModels: ModelState[]): string[] {
-  const lines: string[] = ['## Per-Horizon Performance (Active Models)', ''];
+function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
+  const lines: string[] = ['## Per-Horizon Rankings', ''];
+
+  // Sort by each horizon and show top 10
+  const keyMap: Record<Horizon, keyof ModelMetrics> = {
+    '15m': 'logLoss15m',
+    '1h': 'logLoss1h',
+    '24h': 'logLoss24h',
+    '7d': 'logLoss7d',
+  };
 
   for (const horizon of HORIZONS) {
-    lines.push(`### ${horizon}`, '');
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const key = keyMap[horizon];
 
-    const horizonScores = activeModels
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
-      .filter(m => m.logLossByHorizon[horizon].length > 0)
-      .map(m => ({
-        modelId: m.modelId,
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
-        meanLogLoss: calculateMean(m.logLossByHorizon[horizon]),
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
-        samples: m.logLossByHorizon[horizon].length,
-      }))
-      .sort((a, b) => a.meanLogLoss - b.meanLogLoss);
+    // eslint-disable-next-line security/detect-object-injection -- key from typed constant mapping
+    const sorted = [...metrics].sort((a, b) => (a[key] as number) - (b[key] as number));
+    const top10 = sorted.slice(0, 10);
 
-    if (horizonScores.length === 0) {
-      lines.push('No data yet.', '');
-      continue;
-    }
+    lines.push(`### ${horizon} Horizon (Top 10)`);
+    lines.push('');
+    lines.push('| Rank | Model | Log Loss | Status |');
+    lines.push('|------|-------|----------|--------|');
 
-    lines.push('| Model | Mean Log Loss | Samples |', '|-------|--------------|---------|');
-    for (const score of horizonScores) {
-      lines.push(`| ${score.modelId} | ${formatNumber(score.meanLogLoss)} | ${String(score.samples)} |`);
+    for (const [rankIndex, m] of top10.entries()) {
+      // eslint-disable-next-line security/detect-object-injection -- key from typed constant mapping
+      const value = m[key] as number;
+      lines.push(`| ${String(rankIndex + 1)} | ${m.modelId} | ${getLogLossEmoji(value)}${formatNumber(value, 4)} | ${m.status} |`);
     }
     lines.push('');
   }
+
   return lines;
 }
 
 /**
  * Generate eliminated models section
- * @param eliminatedModels - Eliminated model states
+ * @param models - All model states
  * @returns Array of markdown lines
  */
-function generateEliminatedSection(eliminatedModels: ModelState[]): string[] {
+function generateEliminatedSection(models: ModelState[]): string[] {
+  const eliminatedModels = models.filter(m => m.eliminated);
+
   if (eliminatedModels.length === 0) {
     return [];
   }
@@ -216,10 +387,15 @@ function generateEliminatedSection(eliminatedModels: ModelState[]): string[] {
 
 /**
  * Generate failed rounds section
- * @param failedModels - Models with failures
+ * @param models - All model states
  * @returns Array of markdown lines
  */
-function generateFailedSection(failedModels: ModelState[]): string[] {
+function generateFailedSection(models: ModelState[]): string[] {
+  const failedModels = models.filter(m => {
+    const failed = m.failedRounds;
+    return failed !== undefined && failed.length > 0;
+  });
+
   if (failedModels.length === 0) {
     return [];
   }
@@ -257,25 +433,31 @@ function generateMarkdown(
     return failed !== undefined && failed.length > 0;
   });
 
-  const modelScores: ModelScoreSummary[] = allModels
+  // Calculate mean log loss for each model for percentile ranking
+  const allMeanLogLosses = allModels
     .filter(m => m.roundScores.length > 0)
-    .map(m => ({
-      modelId: m.modelId,
-      meanLogLoss: calculateMean(getAllLogLosses(m)),
-      rounds: m.roundScores.length,
-      eliminated: m.eliminated,
-      eliminatedInPhase: m.eliminatedInPhase,
-      failedRounds: m.failedRounds?.length ?? 0,
-    }))
-    .sort((a, b) => a.meanLogLoss - b.meanLogLoss);
+    .map(m => {
+      const losses: number[] = [];
+      for (const horizon of HORIZONS) {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
+        losses.push(...m.logLossByHorizon[horizon]);
+      }
+      return calculateMean(losses);
+    });
+
+  // Calculate metrics for all models with data
+  const modelMetrics = allModels
+    .filter(m => m.roundScores.length > 0)
+    .map(m => calculateModelMetrics(m, allMeanLogLosses))
+    .sort((a, b) => b.compositeScore - a.compositeScore);
 
   const lines: string[] = [
     ...generateHeader(meta),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
-    ...generateLeaderboard(modelScores),
-    ...generateHorizonBreakdown(activeModels),
-    ...generateEliminatedSection(eliminatedModels),
-    ...generateFailedSection(failedModels),
+    ...generateComprehensiveTable(modelMetrics),
+    ...generateHorizonBreakdown(modelMetrics),
+    ...generateEliminatedSection(allModels),
+    ...generateFailedSection(allModels),
     '---',
     '*Auto-generated by agent_006 benchmark*',
   ];
