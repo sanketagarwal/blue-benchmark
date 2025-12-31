@@ -88,7 +88,7 @@ const PredictionSchema = z.object({
 });
 
 const OutputSchema = z.object({
-  reasoning: z.string().max(500).optional().describe('1-2 sentence summary only'),
+  reasoning: z.string().optional().describe('Brief reasoning for predictions'),
   predictions: PredictionSchema,
 });
 

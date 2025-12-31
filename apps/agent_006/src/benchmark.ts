@@ -13,6 +13,7 @@ import {
 } from './clock-state.js';
 import { resolveBottomGroundTruth } from './ground-truth/bottom-checker.js';
 import { getModelIds } from './matrix.js';
+import { persistResults } from './persist-results.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 import {
   scorePhase0Round,
@@ -57,9 +58,11 @@ interface ModelState {
   modelId: string;
   eliminated: boolean;
   eliminatedInPhase?: number;
+  eliminationReason?: string;
   roundScores: Phase0RoundScore[];
   logLossByHorizon: Record<Horizon, number[]>;
   timeToPivotRatios: Record<Horizon, number[]>;
+  failedRounds: number[];
 }
 
 /**
@@ -74,6 +77,7 @@ function createModelState(modelId: string): ModelState {
     roundScores: [],
     logLossByHorizon: { '15m': [], '1h': [], '24h': [], '7d': [] },
     timeToPivotRatios: { '15m': [], '1h': [], '24h': [], '7d': [] },
+    failedRounds: [],
   };
 }
 
@@ -89,6 +93,32 @@ async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
   const bottomCaller = createBottomCaller(modelId);
   const result = await runRound(bottomCaller);
   return result.output;
+}
+
+/**
+ * Record scores for a model after a successful round
+ * @param state - Model state to update
+ * @param roundScore - Score from this round
+ * @param timeToPivotRatios - Time-to-pivot ratios for each horizon
+ */
+function recordModelScore(
+  state: ModelState,
+  roundScore: Phase0RoundScore,
+  timeToPivotRatios: Record<Horizon, number | undefined>
+): void {
+  state.roundScores.push(roundScore);
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    state.logLossByHorizon[horizon].push(roundScore.logLossByHorizon[horizon]);
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const ratio = timeToPivotRatios[horizon];
+    if (ratio !== undefined) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      state.timeToPivotRatios[horizon].push(ratio);
+    }
+  }
 }
 
 /**
@@ -454,13 +484,17 @@ function runPhase3(models: Map<string, ModelState>): { modelId: string; score: n
  * @param totalRounds - Total rounds in benchmark
  * @param symbolId - Trading symbol
  * @param currentTime - Current prediction time
+ * @param currentPhase - Current phase number for persistence
+ * @param startTime - Benchmark start time for persistence
  */
 async function runBenchmarkRound(
   models: Map<string, ModelState>,
   roundNumber: number,
   totalRounds: number,
   symbolId: string,
-  currentTime: Date
+  currentTime: Date,
+  currentPhase: number,
+  startTime: string
 ): Promise<void> {
   logger.logRoundHeader(roundNumber, totalRounds, currentTime);
   logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Fetching market data...`);
@@ -489,30 +523,32 @@ async function runBenchmarkRound(
 
     logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: ${state.modelId} - Calling LLM...`);
 
-    const output = await runModelRound(state.modelId);
-    const roundScore = scorePhase0Round(
-      output.predictions as Record<BottomContractId, number>,
-      labels
-    );
-    state.roundScores.push(roundScore);
-
-    // Track log loss by horizon
-    for (const horizon of HORIZONS) {
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      state.logLossByHorizon[horizon].push(roundScore.logLossByHorizon[horizon]);
-
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      const ratio = timeToPivotRatios[horizon];
-      if (ratio !== undefined) {
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        state.timeToPivotRatios[horizon].push(ratio);
-      }
+    try {
+      const output = await runModelRound(state.modelId);
+      const roundScore = scorePhase0Round(
+        output.predictions as Record<BottomContractId, number>,
+        labels
+      );
+      recordModelScore(state, roundScore, timeToPivotRatios);
+      logger.succeedSpinner(`${state.modelId}: Scored`);
+    } catch (error) {
+      // Record failure but continue with other models
+      state.failedRounds.push(roundNumber);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.failSpinner(`${state.modelId}: Failed - ${errorMessage.slice(0, 100)}`);
     }
-
-    logger.succeedSpinner(`${state.modelId}: Scored`);
   }
 
   clearBottomCallerContext();
+
+  // Persist results after each round
+  persistResults(models, {
+    startTime,
+    symbolId,
+    totalRounds,
+    currentRound: roundNumber,
+    currentPhase,
+  });
 }
 
 async function main(): Promise<void> {
@@ -531,10 +567,11 @@ async function main(): Promise<void> {
   // Initialize clock
   resetClockState();
   let clockState = initializeClock();
+  const startTime = clockState.currentTime.toISOString();
 
   logger.newline();
   logger.log(`Symbol: ${SYMBOL_ID}`);
-  logger.log(`Start time: ${clockState.currentTime.toISOString()}`);
+  logger.log(`Start time: ${startTime}`);
 
   const totalRounds = PHASE_0_ROUNDS + PHASE_1_ROUNDS + PHASE_2_ROUNDS;
   let roundNumber = 0;
@@ -544,7 +581,7 @@ async function main(): Promise<void> {
   logger.log('--- Starting Phase 0 rounds (1-4) ---');
   for (let phase0Round = 1; phase0Round <= PHASE_0_ROUNDS; phase0Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, startTime);
     clockState = advanceClock();
   }
 
@@ -556,7 +593,7 @@ async function main(): Promise<void> {
   logger.log('--- Starting Phase 1 rounds (5-8) ---');
   for (let phase1Round = 1; phase1Round <= PHASE_1_ROUNDS; phase1Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, startTime);
     clockState = advanceClock();
   }
 
@@ -568,7 +605,7 @@ async function main(): Promise<void> {
   logger.log('--- Starting Phase 2 rounds (9-12) ---');
   for (let phase2Round = 1; phase2Round <= PHASE_2_ROUNDS; phase2Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, startTime);
     clockState = advanceClock();
   }
 
@@ -577,6 +614,15 @@ async function main(): Promise<void> {
 
   // ========== PHASE 3: Final ranking (no additional rounds) ==========
   const arenaCompetitors = runPhase3(models);
+
+  // Final persistence
+  persistResults(models, {
+    startTime,
+    symbolId: SYMBOL_ID,
+    totalRounds,
+    currentRound: roundNumber,
+    currentPhase: 3,
+  });
 
   logger.newline();
   logger.log('=== Benchmark Complete ===');
