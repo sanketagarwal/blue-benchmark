@@ -1,3 +1,5 @@
+import type { Horizon } from '../horizon-config.js';
+
 export interface Phase3ModelMetrics {
   avgPercentileRank: number;
   avgBestWindow: number;
@@ -105,6 +107,7 @@ export function computeCompositeScore(
  * Rank models and return top 8 arena competitors
  * @param models - Array of models with metrics
  * @returns Top 8 models sorted by composite score descending
+ * @deprecated Use rankModelsForHorizon or rankModelsPerHorizon for per-horizon rankings
  */
 export function rankModels(
   models: { modelId: string; metrics: Phase3ModelMetrics }[]
@@ -139,4 +142,170 @@ export function rankModels(
 
   // Return top 8
   return scored.slice(0, ARENA_SIZE);
+}
+
+export interface HorizonMetrics {
+  logLoss: number;
+  bestWindow: number;
+  stability: number;
+}
+
+export interface HorizonRanking {
+  modelId: string;
+  score: number;
+  logLoss: number;
+  bestWindow: number;
+  stability: number;
+}
+
+export interface PerHorizonRankings {
+  '15m': HorizonRanking[];
+  '1h': HorizonRanking[];
+  '24h': HorizonRanking[];
+  '7d': HorizonRanking[];
+}
+
+export interface ModelWithHorizonMetrics {
+  modelId: string;
+  metrics: Phase3ModelMetrics;
+  horizonMetrics: Record<Horizon, HorizonMetrics>;
+}
+
+interface HorizonScoreRanges {
+  logLossRange: { min: number; max: number };
+  bestWindowRange: { min: number; max: number };
+  stabilityRange: { min: number; max: number };
+}
+
+/**
+ * Compute score for a model at a specific horizon
+ *
+ * Weights:
+ * - 50% logLoss (lower is better, inverted)
+ * - 30% bestWindow (lower is better, inverted)
+ * - 20% stability (lower is better, inverted)
+ *
+ * @param horizonMetrics - Metrics for the specific horizon
+ * @param ranges - Normalization ranges from cohort
+ * @returns Score (0-1, higher is better)
+ */
+function computeHorizonScore(
+  horizonMetrics: HorizonMetrics,
+  ranges: HorizonScoreRanges
+): number {
+  // Normalize and invert log loss (lower is better)
+  const logLossNorm =
+    ranges.logLossRange.max === ranges.logLossRange.min
+      ? 0.5
+      : (horizonMetrics.logLoss - ranges.logLossRange.min) /
+        (ranges.logLossRange.max - ranges.logLossRange.min);
+  const logLossScore = 1 - Math.max(0, Math.min(1, logLossNorm));
+
+  // Normalize and invert best window (lower is better)
+  const bestWindowNorm =
+    ranges.bestWindowRange.max === ranges.bestWindowRange.min
+      ? 0.5
+      : (horizonMetrics.bestWindow - ranges.bestWindowRange.min) /
+        (ranges.bestWindowRange.max - ranges.bestWindowRange.min);
+  const bestWindowScore = 1 - Math.max(0, Math.min(1, bestWindowNorm));
+
+  // Normalize and invert stability (lower is better)
+  const stabilityNorm =
+    ranges.stabilityRange.max === ranges.stabilityRange.min
+      ? 0.5
+      : (horizonMetrics.stability - ranges.stabilityRange.min) /
+        (ranges.stabilityRange.max - ranges.stabilityRange.min);
+  const stabilityScore = 1 - Math.max(0, Math.min(1, stabilityNorm));
+
+  // Weighted composite
+  return 0.5 * logLossScore + 0.3 * bestWindowScore + 0.2 * stabilityScore;
+}
+
+/**
+ * Rank models for a specific horizon
+ * @param models - Array of model metrics
+ * @param horizon - The horizon to rank for
+ * @returns Sorted array of rankings for that horizon (best first)
+ */
+export function rankModelsForHorizon(
+  models: ModelWithHorizonMetrics[],
+  horizon: Horizon
+): HorizonRanking[] {
+  // Filter to models that have valid data for this horizon
+  const validModels = models.filter(m => {
+    // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
+    const hm = m.horizonMetrics[horizon];
+    return (
+      Number.isFinite(hm.logLoss) &&
+      Number.isFinite(hm.bestWindow) &&
+      Number.isFinite(hm.stability)
+    );
+  });
+
+  if (validModels.length === 0) {
+    return [];
+  }
+
+  // Extract metrics for this horizon
+  // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
+  const logLosses = validModels.map(m => m.horizonMetrics[horizon].logLoss);
+  // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
+  const bestWindows = validModels.map(m => m.horizonMetrics[horizon].bestWindow);
+  // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
+  const stabilities = validModels.map(m => m.horizonMetrics[horizon].stability);
+
+  // Winsorize before computing ranges
+  const winsorizedLL = winsorize(logLosses);
+  const winsorizedBW = winsorize(bestWindows);
+  const winsorizedStab = winsorize(stabilities);
+
+  const ranges = {
+    logLossRange: {
+      min: Math.min(...winsorizedLL),
+      max: Math.max(...winsorizedLL),
+    },
+    bestWindowRange: {
+      min: Math.min(...winsorizedBW),
+      max: Math.max(...winsorizedBW),
+    },
+    stabilityRange: {
+      min: Math.min(...winsorizedStab),
+      max: Math.max(...winsorizedStab),
+    },
+  };
+
+  // Score each model
+  const scored = validModels.map(m => {
+    // eslint-disable-next-line security/detect-object-injection -- Horizon is a typed union, not user input
+    const hm = m.horizonMetrics[horizon];
+    return {
+      modelId: m.modelId,
+      score: computeHorizonScore(hm, ranges),
+      logLoss: hm.logLoss,
+      bestWindow: hm.bestWindow,
+      stability: hm.stability,
+    };
+  });
+
+  // Sort by score descending
+  scored.sort((a, b) => b.score - a.score);
+
+  // Return top 8
+  return scored.slice(0, ARENA_SIZE);
+}
+
+/**
+ * Rank models for all horizons
+ * @param models - Array of models with horizon metrics
+ * @returns Rankings for each horizon
+ */
+export function rankModelsPerHorizon(
+  models: ModelWithHorizonMetrics[]
+): PerHorizonRankings {
+  return {
+    '15m': rankModelsForHorizon(models, '15m'),
+    '1h': rankModelsForHorizon(models, '1h'),
+    '24h': rankModelsForHorizon(models, '24h'),
+    '7d': rankModelsForHorizon(models, '7d'),
+  };
 }

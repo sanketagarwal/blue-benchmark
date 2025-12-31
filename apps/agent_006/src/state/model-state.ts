@@ -17,6 +17,9 @@ export interface ModelState {
   eliminatedInPhase?: Phase;
   eliminationReason?: string;
   roundScores: RoundScore[];
+  // NEW: per-horizon qualification
+  qualifiedHorizons: Set<Horizon>;
+  disqualifiedHorizons: Map<Horizon, { phase: Phase; reason: string }>;
 }
 
 /**
@@ -35,6 +38,8 @@ export class ModelStateManager {
         modelId,
         isActive: true,
         roundScores: [],
+        qualifiedHorizons: new Set(['15m', '1h', '24h', '7d'] as Horizon[]),
+        disqualifiedHorizons: new Map(),
       });
     }
   }
@@ -80,7 +85,12 @@ export class ModelStateManager {
    * @returns True if the model has been eliminated, false otherwise
    */
   isEliminated(modelId: string): boolean {
-    return this.models.get(modelId)?.isActive === false;
+    const state = this.models.get(modelId);
+    if (state === undefined) {
+      return false;
+    }
+    // Model is eliminated if explicitly inactive OR has no qualified horizons left
+    return !state.isActive || state.qualifiedHorizons.size === 0;
   }
 
   /**
@@ -125,5 +135,72 @@ export class ModelStateManager {
    */
   getAllModelStates(): ModelState[] {
     return [...this.models.values()];
+  }
+
+  /**
+   * Get models that are qualified for a specific horizon
+   * @param horizon - The horizon to check qualification for
+   * @returns Array of model IDs qualified for the horizon
+   */
+  getModelsForHorizon(horizon: Horizon): string[] {
+    return [...this.models.values()]
+      .filter(m => m.qualifiedHorizons.has(horizon))
+      .map(m => m.modelId);
+  }
+
+  /**
+   * Check if a model is qualified for a specific horizon
+   * @param modelId - The ID of the model to check
+   * @param horizon - The horizon to check qualification for
+   * @returns True if the model is qualified for the horizon
+   */
+  isQualifiedForHorizon(modelId: string, horizon: Horizon): boolean {
+    const state = this.models.get(modelId);
+    if (state === undefined) {
+      return false;
+    }
+    return state.qualifiedHorizons.has(horizon);
+  }
+
+  /**
+   * Disqualify a model from a specific horizon
+   * @param modelId - The ID of the model to disqualify
+   * @param horizon - The horizon to disqualify from
+   * @param phase - The phase in which disqualification occurred
+   * @param reason - The reason for disqualification
+   */
+  disqualifyFromHorizon(
+    modelId: string,
+    horizon: Horizon,
+    phase: Phase,
+    reason: string,
+  ): void {
+    const state = this.models.get(modelId);
+    if (state !== undefined) {
+      state.qualifiedHorizons.delete(horizon);
+      state.disqualifiedHorizons.set(horizon, { phase, reason });
+    }
+  }
+
+  /**
+   * Qualify a model for a specific horizon (re-qualification)
+   * @param modelId - The ID of the model to qualify
+   * @param horizon - The horizon to qualify for
+   */
+  qualifyForHorizon(modelId: string, horizon: Horizon): void {
+    const state = this.models.get(modelId);
+    if (state !== undefined) {
+      state.qualifiedHorizons.add(horizon);
+      state.disqualifiedHorizons.delete(horizon);
+    }
+  }
+
+  /**
+   * Get the set of horizons a model is qualified for
+   * @param modelId - The ID of the model to check
+   * @returns Set of qualified horizons, or undefined if model not found
+   */
+  getQualifiedHorizonsForModel(modelId: string): Set<Horizon> | undefined {
+    return this.models.get(modelId)?.qualifiedHorizons;
   }
 }

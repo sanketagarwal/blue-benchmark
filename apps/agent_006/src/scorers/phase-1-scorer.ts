@@ -54,7 +54,35 @@ export function computePercentileRanks(
 }
 
 /**
+ * Determine which horizons a model qualifies for in Phase 1
+ * A model qualifies for a horizon if it's in the top 70% (not bottom 30%)
+ * @param percentiles - Percentile ranks by horizon
+ * @returns Set of horizons the model qualifies for
+ */
+export function getQualifiedHorizons(percentiles: Record<Horizon, number>): Set<Horizon> {
+  const qualified = new Set<Horizon>();
+  for (const horizon of HORIZONS) {
+    // Top 70% qualifies (percentile >= 30)
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    if (percentiles[horizon] >= 30) {
+      qualified.add(horizon);
+    }
+  }
+  return qualified;
+}
+
+/**
+ * Check if model should be completely eliminated (qualifies for 0 horizons)
+ * @param qualifiedHorizons - Set of horizons the model qualifies for
+ * @returns True if model qualifies for no horizons
+ */
+export function hasNoQualifiedHorizons(qualifiedHorizons: Set<Horizon>): boolean {
+  return qualifiedHorizons.size === 0;
+}
+
+/**
  * Determine if model should be eliminated in Phase 1
+ * @deprecated Use getQualifiedHorizons for per-horizon qualification instead
  * @param percentiles - Percentile ranks by horizon
  * @returns True if model should be eliminated
  */

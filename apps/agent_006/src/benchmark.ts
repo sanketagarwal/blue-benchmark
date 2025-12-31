@@ -22,22 +22,23 @@ import {
 } from './scorers/phase-0-scorer.js';
 import {
   computePercentileRanks,
-  shouldEliminatePhase1,
+  getQualifiedHorizons,
+  hasNoQualifiedHorizons,
 } from './scorers/phase-1-scorer.js';
 import {
   computeStabilityMetrics,
   computeRegret,
-  shouldEliminatePhase2,
+  getHorizonsToDisqualify,
   median,
 } from './scorers/phase-2-scorer.js';
-import { rankModels } from './scorers/phase-3-scorer.js';
+import { rankModelsPerHorizon } from './scorers/phase-3-scorer.js';
 
 import type { BottomCallerOutput, BottomContractId } from './bottom-caller.js';
 import type { Horizon } from './horizon-config.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
-import type { Phase3ModelMetrics } from './scorers/phase-3-scorer.js';
+import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 
@@ -51,6 +52,8 @@ const PHASE_0_ROUNDS = 4;
 const PHASE_1_ROUNDS = 4;
 const PHASE_2_ROUNDS = 4;
 
+type Phase = 0 | 1 | 2 | 3;
+
 /**
  * Model state for tracking across phases
  */
@@ -63,6 +66,9 @@ interface ModelState {
   logLossByHorizon: Record<Horizon, number[]>;
   timeToPivotRatios: Record<Horizon, number[]>;
   failedRounds: number[];
+  // Per-horizon qualification tracking
+  qualifiedHorizons: Set<Horizon>;
+  disqualifiedHorizons: Map<Horizon, { phase: Phase; reason: string }>;
 }
 
 /**
@@ -78,6 +84,8 @@ function createModelState(modelId: string): ModelState {
     logLossByHorizon: { '15m': [], '1h': [], '24h': [], '7d': [] },
     timeToPivotRatios: { '15m': [], '1h': [], '24h': [], '7d': [] },
     failedRounds: [],
+    qualifiedHorizons: new Set<Horizon>(['15m', '1h', '24h', '7d']),
+    disqualifiedHorizons: new Map(),
   };
 }
 
@@ -197,12 +205,30 @@ function runPhase0(models: Map<string, ModelState>): void {
 }
 
 /**
- * Run Phase 1 elimination - relative performance
+ * Disqualify a model from a horizon
+ * @param state - Model state to update
+ * @param horizon - Horizon to disqualify from
+ * @param phase - Phase in which disqualification occurred
+ * @param reason - Reason for disqualification
+ */
+function disqualifyFromHorizon(
+  state: ModelState,
+  horizon: Horizon,
+  phase: Phase,
+  reason: string
+): void {
+  state.qualifiedHorizons.delete(horizon);
+  state.disqualifiedHorizons.set(horizon, { phase, reason });
+}
+
+/**
+ * Run Phase 1 elimination - relative performance with per-horizon qualification
  * @param models - Map of model states
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic is inherently complex
 function runPhase1(models: Map<string, ModelState>): void {
   logger.newline();
-  logger.log('=== Phase 1: Relative Performance ===');
+  logger.log('=== Phase 1: Relative Performance (Per-Horizon Qualification) ===');
 
   // Build scores for active models
   const activeModels: Phase1ModelScore[] = [];
@@ -226,16 +252,44 @@ function runPhase1(models: Map<string, ModelState>): void {
     }
 
     const percentiles = percentileRanks.get(state.modelId);
-    if (percentiles !== undefined && shouldEliminatePhase1(percentiles)) {
+    if (percentiles === undefined) {
+      continue;
+    }
+
+    // Get qualified horizons for this model
+    const qualifiedHorizons = getQualifiedHorizons(percentiles);
+
+    // Disqualify from horizons the model didn't qualify for
+    const disqualifiedHorizonsForModel: Horizon[] = [];
+    for (const horizon of HORIZONS) {
+      if (!qualifiedHorizons.has(horizon)) {
+        disqualifyFromHorizon(state, horizon, 1, 'bottom 30% percentile');
+        disqualifiedHorizonsForModel.push(horizon);
+      }
+    }
+
+    // Log qualification status
+    if (disqualifiedHorizonsForModel.length > 0) {
+      logger.log(
+        `  ${state.modelId}: disqualified from [${disqualifiedHorizonsForModel.join(', ')}]`
+      );
+    }
+
+    // Fully eliminate if no horizons qualify
+    if (hasNoQualifiedHorizons(qualifiedHorizons)) {
       state.eliminated = true;
       state.eliminatedInPhase = 1;
+      state.eliminationReason = 'qualifies for 0 horizons';
       eliminated++;
-      logger.log(`  ELIMINATED: ${state.modelId} (bottom quartile performance)`);
+      logger.log(`  ELIMINATED: ${state.modelId} (qualifies for 0 horizons)`);
+    } else {
+      const qualifiedList = [...qualifiedHorizons].join(', ');
+      logger.log(`  ${state.modelId}: qualified for [${qualifiedList}]`);
     }
   }
 
   const remaining = [...models.values()].filter((model) => !model.eliminated).length;
-  logger.log(`Phase 1 complete: ${String(eliminated)} eliminated, ${String(remaining)} remaining`);
+  logger.log(`Phase 1 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
 }
 
 /**
@@ -333,12 +387,13 @@ function computeAllRegrets(
 }
 
 /**
- * Run Phase 2 elimination - stability and regret
+ * Run Phase 2 elimination - stability and regret with per-horizon disqualification
  * @param models - Map of model states
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic is inherently complex
 function runPhase2(models: Map<string, ModelState>): void {
   logger.newline();
-  logger.log('=== Phase 2: Stability & Regret ===');
+  logger.log('=== Phase 2: Stability & Regret (Per-Horizon Disqualification) ===');
 
   const { modelScores, allWorstWindows, allStabilities } = collectPhase2Metrics(models);
 
@@ -358,7 +413,7 @@ function runPhase2(models: Map<string, ModelState>): void {
 
   computeAllRegrets(modelScores, medianWorstWindows);
 
-  // Eliminate models
+  // Disqualify models per horizon
   let eliminated = 0;
   for (const score of modelScores) {
     const state = models.get(score.modelId);
@@ -366,75 +421,88 @@ function runPhase2(models: Map<string, ModelState>): void {
       continue;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- backwards compat, will migrate to getHorizonsToDisqualify
-    if (shouldEliminatePhase2(score, medianStabilities)) {
+    // Get horizons to disqualify for this model
+    const horizonsToDisqualify = getHorizonsToDisqualify(score, medianStabilities);
+
+    // Disqualify from each failing horizon
+    const disqualifiedHorizonsForModel: Horizon[] = [];
+    for (const horizon of horizonsToDisqualify) {
+      // Only disqualify if still qualified
+      if (state.qualifiedHorizons.has(horizon)) {
+        disqualifyFromHorizon(state, horizon, 2, 'high regret or instability');
+        disqualifiedHorizonsForModel.push(horizon);
+      }
+    }
+
+    // Log disqualification status
+    if (disqualifiedHorizonsForModel.length > 0) {
+      logger.log(
+        `  ${state.modelId}: disqualified from [${disqualifiedHorizonsForModel.join(', ')}]`
+      );
+    }
+
+    // Fully eliminate if no horizons remain
+    if (state.qualifiedHorizons.size === 0) {
       state.eliminated = true;
       state.eliminatedInPhase = 2;
+      state.eliminationReason = 'no qualified horizons remaining';
       eliminated++;
-      logger.log(`  ELIMINATED: ${score.modelId} (high regret or instability)`);
+      logger.log(`  ELIMINATED: ${state.modelId} (no qualified horizons remaining)`);
+    } else {
+      const qualifiedList = [...state.qualifiedHorizons].join(', ');
+      logger.log(`  ${state.modelId}: still qualified for [${qualifiedList}]`);
     }
   }
 
   const remaining = [...models.values()].filter((model) => !model.eliminated).length;
-  logger.log(`Phase 2 complete: ${String(eliminated)} eliminated, ${String(remaining)} remaining`);
+  logger.log(`Phase 2 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
 }
 
 /**
- * Compute Phase 3 metrics for a model
+ * Build horizon metrics for a model
  * @param state - Model state
- * @param percentiles - Percentile ranks by horizon
- * @returns Phase 3 metrics
+ * @returns Horizon metrics for each horizon
  */
-function computePhase3Metrics(
-  state: ModelState,
-  percentiles: Record<Horizon, number>
-): Phase3ModelMetrics {
-  let percentileSum = 0;
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    percentileSum += percentiles[horizon];
-  }
-  const avgPercentileRank = percentileSum / HORIZONS.length;
-
-  let totalBestWindow = 0;
-  let totalStability = 0;
-  let totalTimeToPivotRatio = 0;
-  let timeToPivotCount = 0;
+function buildHorizonMetrics(
+  state: ModelState
+): Record<Horizon, { logLoss: number; bestWindow: number; stability: number }> {
+  const horizonMetrics: Record<string, { logLoss: number; bestWindow: number; stability: number }> = {};
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const losses = state.logLossByHorizon[horizon];
     const metrics = computeStabilityMetrics(losses);
-    totalBestWindow += metrics.bestWindow;
-    totalStability += metrics.variance;
+
+    // Compute mean log loss for this horizon
+    let sum = 0;
+    for (const loss of losses) {
+      sum += loss;
+    }
+    const meanLogLoss = losses.length > 0 ? sum / losses.length : 0;
 
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const ratios = state.timeToPivotRatios[horizon];
-    for (const ratio of ratios) {
-      totalTimeToPivotRatio += ratio;
-      timeToPivotCount++;
-    }
+    horizonMetrics[horizon] = {
+      logLoss: meanLogLoss,
+      bestWindow: metrics.bestWindow,
+      stability: metrics.variance,
+    };
   }
 
-  return {
-    avgPercentileRank,
-    avgBestWindow: totalBestWindow / HORIZONS.length,
-    avgStability: totalStability / HORIZONS.length,
-    avgTimeToPivotRatio: timeToPivotCount > 0 ? totalTimeToPivotRatio / timeToPivotCount : 0.5,
-  };
+  return horizonMetrics as Record<Horizon, { logLoss: number; bestWindow: number; stability: number }>;
 }
 
 /**
- * Run Phase 3 ranking - final selection
+ * Run Phase 3 ranking - final selection with per-horizon rankings
  * @param models - Map of model states
- * @returns Array of arena competitors with scores
+ * @returns Per-horizon rankings
  */
-function runPhase3(models: Map<string, ModelState>): { modelId: string; score: number }[] {
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic is inherently complex
+function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
   logger.newline();
-  logger.log('=== Phase 3: Final Ranking ===');
+  logger.log('=== Phase 3: Final Ranking (Per-Horizon) ===');
 
-  // Build metrics for surviving models
-  const modelMetrics: { modelId: string; metrics: Phase3ModelMetrics }[] = [];
+  // Build model metrics for ranking
+  const modelsWithHorizonMetrics: ModelWithHorizonMetrics[] = [];
 
   // Need percentile ranks from surviving models
   const activeModels: Phase1ModelScore[] = [];
@@ -460,22 +528,64 @@ function runPhase3(models: Map<string, ModelState>): { modelId: string; score: n
       continue;
     }
 
-    modelMetrics.push({
+    // Build horizon metrics for this model
+    const horizonMetrics = buildHorizonMetrics(state);
+
+    // Compute avg percentile rank for Phase3ModelMetrics
+    let percentileSum = 0;
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      percentileSum += percentiles[horizon];
+    }
+    const avgPercentileRank = percentileSum / HORIZONS.length;
+
+    // Compute avg metrics
+    let totalBestWindow = 0;
+    let totalStability = 0;
+    let totalTimeToPivotRatio = 0;
+    let timeToPivotCount = 0;
+
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      totalBestWindow += horizonMetrics[horizon].bestWindow;
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      totalStability += horizonMetrics[horizon].stability;
+
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const ratios = state.timeToPivotRatios[horizon];
+      for (const ratio of ratios) {
+        totalTimeToPivotRatio += ratio;
+        timeToPivotCount++;
+      }
+    }
+
+    modelsWithHorizonMetrics.push({
       modelId: state.modelId,
-      metrics: computePhase3Metrics(state, percentiles),
+      metrics: {
+        avgPercentileRank,
+        avgBestWindow: totalBestWindow / HORIZONS.length,
+        avgStability: totalStability / HORIZONS.length,
+        avgTimeToPivotRatio: timeToPivotCount > 0 ? totalTimeToPivotRatio / timeToPivotCount : 0.5,
+      },
+      horizonMetrics,
     });
   }
 
-  // Rank and return top 8
-  const arenaCompetitors = rankModels(modelMetrics);
+  // Rank per horizon
+  const perHorizonRankings = rankModelsPerHorizon(modelsWithHorizonMetrics);
 
-  logger.newline();
-  logger.log('Arena Competitors (Top 8):');
-  for (const [index, competitor] of arenaCompetitors.entries()) {
-    logger.log(`  ${String(index + 1)}. ${competitor.modelId} (score: ${competitor.score.toFixed(4)})`);
+  // Log per-horizon rankings
+  for (const horizon of HORIZONS) {
+    logger.newline();
+    logger.log(`${horizon} Arena Winners:`);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const rankings = perHorizonRankings[horizon];
+    for (const [index, competitor] of rankings.entries()) {
+      logger.log(`  ${String(index + 1)}. ${competitor.modelId} (score: ${competitor.score.toFixed(4)})`);
+    }
   }
 
-  return arenaCompetitors;
+  return perHorizonRankings;
 }
 
 /**
@@ -614,7 +724,7 @@ async function main(): Promise<void> {
   runPhase2(models);
 
   // ========== PHASE 3: Final ranking (no additional rounds) ==========
-  const arenaCompetitors = runPhase3(models);
+  const perHorizonRankings = runPhase3(models);
 
   // Final persistence
   persistResults(models, {
@@ -628,7 +738,16 @@ async function main(): Promise<void> {
   logger.newline();
   logger.log('=== Benchmark Complete ===');
   logger.log(`Total rounds: ${String(roundNumber)}`);
-  logger.log(`Final arena size: ${String(arenaCompetitors.length)}`);
+
+  // Count total unique models across all horizons
+  const uniqueModels = new Set<string>();
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    for (const ranking of perHorizonRankings[horizon]) {
+      uniqueModels.add(ranking.modelId);
+    }
+  }
+  logger.log(`Total unique arena models: ${String(uniqueModels.size)}`);
 }
 
 // Use top-level await pattern for CLI

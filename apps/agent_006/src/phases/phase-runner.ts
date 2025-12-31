@@ -188,6 +188,7 @@ export function runPhase1(manager: ModelStateManager): void {
 
   for (const modelId of activeModels) {
     const percentiles = percentileRanks.get(modelId);
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Legacy usage, will migrate
     if (percentiles !== undefined && shouldEliminatePhase1(percentiles)) {
       manager.eliminateModel(modelId, 1, getPhase1Reason(percentiles));
     }
@@ -354,5 +355,6 @@ export function runPhase3(manager: ModelStateManager): { modelId: string; score:
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Legacy usage, will migrate
   return rankModels(phase3Models);
 }

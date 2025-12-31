@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { Horizon } from './horizon-config.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
+import type { HorizonRanking, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 
 /**
  * Model state for persistence
@@ -319,12 +320,146 @@ function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
 }
 
 /**
- * Generate per-horizon breakdown table
+ * Generate arena results by horizon section
+ * Shows the top 8 arena competitors for each horizon with full metrics
+ * @param rankings - Per-horizon rankings from phase-3-scorer
+ * @returns Array of markdown lines
+ */
+function generateArenaResultsByHorizon(rankings: PerHorizonRankings | undefined): string[] {
+  if (rankings === undefined) {
+    return [];
+  }
+
+  const lines: string[] = ['## Arena Results by Horizon', ''];
+
+  const horizonLabels: Record<Horizon, string> = {
+    '15m': '15m Arena Winners',
+    '1h': '1h Arena Winners',
+    '24h': '24h Arena Winners',
+    '7d': '7d Arena Winners',
+  };
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const horizonRankings: HorizonRanking[] = rankings[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const label = horizonLabels[horizon];
+
+    lines.push(`### ${label}`);
+    lines.push('');
+
+    if (horizonRankings.length === 0) {
+      lines.push('*No models qualified for this arena*');
+      lines.push('');
+      continue;
+    }
+
+    lines.push('| Rank | Model | Score | Log Loss | Best Window | Stability |');
+    lines.push('|------|-------|-------|----------|-------------|-----------|');
+
+    for (const [index, ranking] of horizonRankings.entries()) {
+      const rank = index + 1;
+      const medalOptions = ['🥇', '🥈', '🥉'];
+      const medal = rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
+
+      const score = formatNumber(ranking.score, 2);
+      const logLoss = `${getLogLossEmoji(ranking.logLoss)}${formatNumber(ranking.logLoss, 2)}`;
+      const bestWindow = formatNumber(ranking.bestWindow, 2);
+      const stability = formatNumber(ranking.stability, 3);
+
+      lines.push(
+        `| ${medal} | ${ranking.modelId} | ${score} | ${logLoss} | ${bestWindow} | ${stability} |`
+      );
+    }
+    lines.push('');
+  }
+
+  return lines;
+}
+
+/**
+ * Generate cross-horizon strength analysis
+ * Shows models that appear in multiple horizon arenas
+ * @param rankings - Per-horizon rankings from phase-3-scorer
+ * @returns Array of markdown lines
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Complex multi-horizon aggregation logic
+function generateCrossHorizonStrength(rankings: PerHorizonRankings | undefined): string[] {
+  if (rankings === undefined) {
+    return [];
+  }
+
+  // Count appearances per model across all horizons
+  const modelAppearances = new Map<string, { horizons: Horizon[]; avgRank: number }>();
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const horizonRankings: HorizonRanking[] = rankings[horizon];
+
+    for (const [index, ranking] of horizonRankings.entries()) {
+      const existing = modelAppearances.get(ranking.modelId);
+      const rank = index + 1;
+
+      if (existing === undefined) {
+        modelAppearances.set(ranking.modelId, { horizons: [horizon], avgRank: rank });
+      } else {
+        existing.horizons.push(horizon);
+        // Update average rank
+        const totalRank = existing.avgRank * (existing.horizons.length - 1) + rank;
+        existing.avgRank = totalRank / existing.horizons.length;
+      }
+    }
+  }
+
+  // Filter to models appearing in 2+ arenas
+  const multiHorizonModels = [...modelAppearances.entries()]
+    .filter(([, data]) => data.horizons.length >= 2)
+    .sort((a, b) => {
+      // Sort by number of horizons descending, then by avg rank ascending
+      if (b[1].horizons.length !== a[1].horizons.length) {
+        return b[1].horizons.length - a[1].horizons.length;
+      }
+      return a[1].avgRank - b[1].avgRank;
+    });
+
+  if (multiHorizonModels.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '## Cross-Horizon Strength',
+    '',
+    '*Models appearing in multiple horizon arenas demonstrate consistent performance.*',
+    '',
+    '| Model | Arenas | Horizons | Avg Rank |',
+    '|-------|--------|----------|----------|',
+  ];
+
+  for (const [modelId, data] of multiHorizonModels) {
+    const arenaCount = String(data.horizons.length);
+    const horizonsList = data.horizons.join(', ');
+    const avgRank = formatNumber(data.avgRank, 1);
+
+    // Add indicator for models in all 4 arenas
+    const strengthIndicator = data.horizons.length === 4 ? '⭐ ' : '';
+
+    lines.push(`| ${strengthIndicator}${modelId} | ${arenaCount}/4 | ${horizonsList} | ${avgRank} |`);
+  }
+
+  lines.push('');
+  lines.push('**Legend:** ⭐ = Top performer across all horizons');
+  lines.push('');
+
+  return lines;
+}
+
+/**
+ * Generate per-horizon breakdown table (legacy format for backward compatibility)
  * @param metrics - Array of model metrics
  * @returns Array of markdown lines
  */
 function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
-  const lines: string[] = ['## Per-Horizon Rankings', ''];
+  const lines: string[] = ['## Per-Horizon Rankings (All Models)', ''];
 
   // Sort by each horizon and show top 10
   const keyMap: Record<Horizon, keyof ModelMetrics> = {
@@ -419,11 +554,13 @@ function generateFailedSection(models: ModelState[]): string[] {
  * Generate markdown content for current benchmark state
  * @param models - Map of model states
  * @param meta - Run metadata
+ * @param perHorizonRankings - Optional per-horizon rankings from phase-3-scorer
  * @returns Markdown string
  */
 function generateMarkdown(
   models: Map<string, ModelState>,
-  meta: RunMetadata
+  meta: RunMetadata,
+  perHorizonRankings?: PerHorizonRankings
 ): string {
   const allModels = [...models.values()];
   const activeModels = allModels.filter(m => !m.eliminated);
@@ -454,6 +591,8 @@ function generateMarkdown(
   const lines: string[] = [
     ...generateHeader(meta),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
+    ...generateArenaResultsByHorizon(perHorizonRankings),
+    ...generateCrossHorizonStrength(perHorizonRankings),
     ...generateComprehensiveTable(modelMetrics),
     ...generateHorizonBreakdown(modelMetrics),
     ...generateEliminatedSection(allModels),
@@ -469,12 +608,14 @@ function generateMarkdown(
  * Persist current benchmark results to markdown file
  * @param models - Map of model states
  * @param meta - Run metadata
+ * @param perHorizonRankings - Optional per-horizon rankings from phase-3-scorer
  */
 export function persistResults(
   models: Map<string, ModelState>,
-  meta: RunMetadata
+  meta: RunMetadata,
+  perHorizonRankings?: PerHorizonRankings
 ): void {
-  const markdown = generateMarkdown(models, meta);
+  const markdown = generateMarkdown(models, meta, perHorizonRankings);
   const filePath = join(process.cwd(), RESULTS_FILE);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
   writeFileSync(filePath, markdown, 'utf8');
