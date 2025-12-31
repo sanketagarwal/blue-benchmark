@@ -23,8 +23,6 @@ export interface BottomCallerContext {
   chart4h5mUrl: string;
   /** Chart: 24-hour lookback with 15m candles */
   chart24h15mUrl: string;
-  /** Orderbook data including mid_price, spread, imbalance */
-  orderbookData: string;
   /** Current prediction time */
   currentTime: string;
   /** Trading symbol identifier */
@@ -89,7 +87,7 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
         throw new Error(CONTEXT_NOT_SET_ERROR);
       }
 
-      const { chart4h5mUrl, chart24h15mUrl, orderbookData, currentTime, symbolId } = currentContext;
+      const { chart4h5mUrl, chart24h15mUrl, currentTime, symbolId } = currentContext;
 
       const compactionSection =
         context.compactionSummary !== undefined && context.compactionSummary !== ''
@@ -99,7 +97,6 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
       return `You are predicting structural market bottoms for ${symbolId}.
 
 Current Time: ${currentTime}
-Orderbook State: ${orderbookData}
 
 Chart Analysis (IMPORTANT: Analyze these chart images for pattern recognition):
 - 4-Hour Chart (5m candles): ${chart4h5mUrl}

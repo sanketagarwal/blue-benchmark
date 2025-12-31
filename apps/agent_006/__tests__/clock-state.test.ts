@@ -38,13 +38,10 @@ describe('clock-state', () => {
       expect(state.roundNumber).toBe(0);
     });
 
-    test('uses default BTC start time when SIMULATION_START_TIME is missing', () => {
-      const state = initializeClock();
-
-      // Default is 2025-12-28T00:00:00.000Z for BTC data availability
-      expect(state.currentTime).toEqual(new Date('2025-12-28T00:00:00.000Z'));
-      expect(state.startTime).toEqual(new Date('2025-12-28T00:00:00.000Z'));
-      expect(state.roundNumber).toBe(0);
+    test('throws error when SIMULATION_START_TIME is missing', () => {
+      expect(() => initializeClock()).toThrow(
+        'SIMULATION_START_TIME environment variable is required'
+      );
     });
 
     test('throws error when SIMULATION_START_TIME is invalid', () => {

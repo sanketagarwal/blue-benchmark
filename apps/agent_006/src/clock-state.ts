@@ -13,21 +13,19 @@ const CLOCK_NOT_INITIALIZED_ERROR = 'Clock not initialized';
 
 let clockState: ClockState | undefined;
 
-// BTC-only benchmark: hardcoded start time when BTC data is available
-// Override with SIMULATION_START_TIME env var for testing
-const DEFAULT_BTC_START_TIME = '2025-12-28T00:00:00.000Z';
-
 export function initializeClock(): ClockState {
   if (clockState !== undefined) {
     return clockState;
   }
 
-  const startTimeString = process.env['SIMULATION_START_TIME'] ?? DEFAULT_BTC_START_TIME;
+  const startTimeString = process.env['SIMULATION_START_TIME'];
+  if (startTimeString === undefined || startTimeString === '') {
+    throw new Error('SIMULATION_START_TIME environment variable is required');
+  }
+
   const startTime = new Date(startTimeString);
   if (Number.isNaN(startTime.getTime())) {
-    throw new TypeError(
-      'SIMULATION_START_TIME must be a valid ISO 8601 date string'
-    );
+    throw new TypeError('SIMULATION_START_TIME must be a valid ISO 8601 date string');
   }
 
   clockState = {

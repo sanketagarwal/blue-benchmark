@@ -23,7 +23,6 @@ describe('bottom-caller', () => {
     const mockContext: BottomCallerContext = {
       chart4h5mUrl: 'https://example.com/chart1.png',
       chart24h15mUrl: 'https://example.com/chart2.png',
-      orderbookData: 'mid=100,spread=0.1',
       currentTime: '2025-01-01T00:00:00Z',
       symbolId: 'COINBASE_SPOT_BTC_USD',
     };
@@ -54,12 +53,11 @@ describe('bottom-caller', () => {
       );
     });
 
-    it('builds prompt with chart URLs and orderbook', () => {
+    it('builds prompt with chart URLs and horizon contracts', () => {
       const agent = createBottomCaller('anthropic/claude-haiku-4.5');
       const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
       expect(prompt).toContain('chart1.png');
       expect(prompt).toContain('chart2.png');
-      expect(prompt).toContain('mid=100');
       expect(prompt).toContain('bottom-15m');
       expect(prompt).toContain('bottom-1h');
       expect(prompt).toContain('bottom-24h');

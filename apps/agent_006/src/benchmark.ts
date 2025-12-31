@@ -14,7 +14,6 @@ import {
 import { resolveBottomGroundTruth } from './ground-truth/bottom-checker.js';
 import { getModelIds } from './matrix.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
-import { getOrderbookSnapshot, formatOrderbookForPrompt } from './replay-lab/orderbook.js';
 import { getTrades } from './replay-lab/trades.js';
 import {
   scorePhase0Round,
@@ -471,16 +470,13 @@ async function runBenchmarkRound(
   logger.logRoundHeader(roundNumber, totalRounds, currentTime);
   logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Fetching market data...`);
 
-  // Fetch data for this round
+  // Fetch chart data for this round (no orderbook needed for bottom prediction)
   const charts = await getForecastingCharts(symbolId, currentTime);
-  const orderbook = await getOrderbookSnapshot(symbolId, currentTime);
-  const orderbookData = formatOrderbookForPrompt(orderbook);
 
   // Set context
   setBottomCallerContext({
     chart4h5mUrl: charts.chart4h5m,
     chart24h15mUrl: charts.chart24h15m,
-    orderbookData,
     currentTime: currentTime.toISOString(),
     symbolId,
   });
