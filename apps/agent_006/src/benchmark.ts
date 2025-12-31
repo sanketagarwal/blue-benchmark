@@ -91,7 +91,7 @@ function formatRoundScore(roundScore: Phase0RoundScore): string {
 }
 
 // Quick mode constants
-const QUICK_ROUNDS_PER_PHASE = 1;
+const QUICK_ROUNDS_PER_PHASE = 3;
 const QUICK_MODEL_COUNT = 3;
 
 /**
