@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { HorizonRanking, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 import type { TimeframeId } from './timeframe-config.js';
+import type { BenchmarkLogger } from '@nullagent/cli-utils';
 
 /**
  * Model state for persistence
@@ -605,16 +606,32 @@ function generateMarkdown(
 }
 
 /**
+ * Options for persisting results
+ */
+interface PersistOptions {
+  /** Skip writing the results file (used in quick mode) */
+  skipWrite?: boolean;
+  /** Logger instance for output messages */
+  logger?: BenchmarkLogger;
+}
+
+/**
  * Persist current benchmark results to markdown file
  * @param models - Map of model states
  * @param meta - Run metadata
  * @param perHorizonRankings - Optional per-horizon rankings from phase-3-scorer
+ * @param options - Optional persist options
  */
 export function persistResults(
   models: Map<string, ModelState>,
   meta: RunMetadata,
-  perHorizonRankings?: PerHorizonRankings
+  perHorizonRankings?: PerHorizonRankings,
+  options?: PersistOptions
 ): void {
+  if (options?.skipWrite === true) {
+    options.logger?.log('Skipping results file update in quick mode');
+    return;
+  }
   const markdown = generateMarkdown(models, meta, perHorizonRankings);
   const filePath = join(process.cwd(), RESULTS_FILE);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants

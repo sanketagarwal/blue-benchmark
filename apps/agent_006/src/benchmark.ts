@@ -901,7 +901,7 @@ async function runBenchmarkRound(
     totalRounds,
     currentRound: roundNumber,
     currentPhase,
-  });
+  }, undefined, { skipWrite: isQuickMode, logger });
 }
 
 async function main(): Promise<void> {
@@ -1018,7 +1018,7 @@ async function main(): Promise<void> {
     totalRounds,
     currentRound: roundNumber,
     currentPhase: 3,
-  });
+  }, perHorizonRankings, { skipWrite: isQuickMode, logger });
 
   logger.newline();
   logger.log('=== Benchmark Complete ===');
