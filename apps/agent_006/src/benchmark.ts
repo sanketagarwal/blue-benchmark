@@ -56,20 +56,33 @@ const LOG_LOSS_GOOD = 0.5;
 const LOG_LOSS_OK = 0.8;
 
 /**
+ * Convert prediction to probability of bottom occurring.
+ * If hasBottomed=true: p = confidence (model believes bottom occurred)
+ * If hasBottomed=false: p = 1 - confidence (model believes no bottom, so low p)
+ * @param pred - Single horizon prediction object
+ * @param pred.hasBottomed - Whether model predicts bottom occurred
+ * @param pred.confidence - Model's confidence in its prediction (0-1)
+ * @returns Probability of bottom occurring (0-1)
+ */
+function predictionToProbability(pred: { hasBottomed: boolean; confidence: number }): number {
+  return pred.hasBottomed ? pred.confidence : (1 - pred.confidence);
+}
+
+/**
  * Convert new prediction format to legacy scorer format
  * New format: { '15m': { hasBottomed, confidence, candlesBack }, ... }
  * Legacy format: { 'bottom-15m': number, ... }
  * @param predictions - Predictions in new per-horizon format
- * @returns Predictions in legacy scorer format (confidence if hasBottomed, else 0)
+ * @returns Predictions in legacy scorer format (probability of bottom)
  */
 function convertPredictionsForScorer(
   predictions: BottomPredictions
 ): Record<BottomContractId, number> {
   return {
-    'bottom-15m': predictions['15m'].hasBottomed ? predictions['15m'].confidence : 0,
-    'bottom-1h': predictions['1h'].hasBottomed ? predictions['1h'].confidence : 0,
-    'bottom-24h': predictions['24h'].hasBottomed ? predictions['24h'].confidence : 0,
-    'bottom-7d': predictions['7d'].hasBottomed ? predictions['7d'].confidence : 0,
+    'bottom-15m': predictionToProbability(predictions['15m']),
+    'bottom-1h': predictionToProbability(predictions['1h']),
+    'bottom-24h': predictionToProbability(predictions['24h']),
+    'bottom-7d': predictionToProbability(predictions['7d']),
   };
 }
 
