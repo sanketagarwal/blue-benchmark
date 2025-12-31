@@ -1,5 +1,6 @@
 import { runRound } from '@nullagent/agent-core';
 import { createBenchmarkLogger } from '@nullagent/cli-utils';
+import chalk from 'chalk';
 
 import {
   createBottomCaller,
@@ -42,6 +43,26 @@ import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phas
 
 const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
 const isQuickMode = process.argv.includes('--quick');
+
+const LOG_LOSS_GOOD = 0.5;
+const LOG_LOSS_OK = 0.8;
+
+function formatLogLoss(value: number): string {
+  const formatted = value.toFixed(3);
+  if (value <= LOG_LOSS_GOOD) {
+    return chalk.green(formatted);
+  }
+  if (value <= LOG_LOSS_OK) {
+    return chalk.yellow(formatted);
+  }
+  return chalk.red(formatted);
+}
+
+function formatRoundScore(roundScore: Phase0RoundScore): string {
+  const ll = roundScore.logLossByHorizon;
+  const mean = (ll['15m'] + ll['1h'] + ll['24h'] + ll['7d']) / 4;
+  return `LL[15m:${formatLogLoss(ll['15m'])} 1h:${formatLogLoss(ll['1h'])} 24h:${formatLogLoss(ll['24h'])} 7d:${formatLogLoss(ll['7d'])}] mean:${formatLogLoss(mean)}`;
+}
 
 // Quick mode constants
 const QUICK_ROUNDS_PER_PHASE = 1;
@@ -291,20 +312,16 @@ function runPhase1(models: Map<string, ModelState>): void {
     const qualifiedHorizons = getQualifiedHorizons(percentiles);
 
     // Disqualify from horizons the model didn't qualify for
-    const disqualifiedHorizonsForModel: Horizon[] = [];
     for (const horizon of HORIZONS) {
       if (!qualifiedHorizons.has(horizon)) {
         disqualifyFromHorizon(state, horizon, 1, 'bottom 30% percentile');
-        disqualifiedHorizonsForModel.push(horizon);
       }
     }
 
-    // Log qualification status
-    if (disqualifiedHorizonsForModel.length > 0) {
-      logger.log(
-        `  ${state.modelId}: disqualified from [${disqualifiedHorizonsForModel.join(', ')}]`
-      );
-    }
+    // Log percentiles and qualification status
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const percentileString = HORIZONS.map(h => `${h}:${percentiles[h].toFixed(0)}%`).join(' ');
+    const qualified = [...qualifiedHorizons];
 
     // Fully eliminate if no horizons qualify
     if (hasNoQualifiedHorizons(qualifiedHorizons)) {
@@ -312,10 +329,9 @@ function runPhase1(models: Map<string, ModelState>): void {
       state.eliminatedInPhase = 1;
       state.eliminationReason = 'qualifies for 0 horizons';
       eliminated++;
-      logger.log(`  ELIMINATED: ${state.modelId} (qualifies for 0 horizons)`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: [${percentileString}] → ${chalk.red('ELIMINATED')} (qualifies for 0 horizons)`);
     } else {
-      const qualifiedList = [...qualifiedHorizons].join(', ');
-      logger.log(`  ${state.modelId}: qualified for [${qualifiedList}]`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: [${percentileString}] → qualified for [${chalk.green(qualified.join(', '))}]`);
     }
   }
 
@@ -456,21 +472,18 @@ function runPhase2(models: Map<string, ModelState>): void {
     const horizonsToDisqualify = getHorizonsToDisqualify(score, medianStabilities);
 
     // Disqualify from each failing horizon
-    const disqualifiedHorizonsForModel: Horizon[] = [];
     for (const horizon of horizonsToDisqualify) {
       // Only disqualify if still qualified
       if (state.qualifiedHorizons.has(horizon)) {
         disqualifyFromHorizon(state, horizon, 2, 'high regret or instability');
-        disqualifiedHorizonsForModel.push(horizon);
       }
     }
 
-    // Log disqualification status
-    if (disqualifiedHorizonsForModel.length > 0) {
-      logger.log(
-        `  ${state.modelId}: disqualified from [${disqualifiedHorizonsForModel.join(', ')}]`
-      );
-    }
+    // Log regret/stability values and qualification status
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const regretString = HORIZONS.map(h => `${h}:${score.regretByHorizon[h].toFixed(2)}`).join(' ');
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const stabilityString = HORIZONS.map(h => `${h}:${score.stabilityByHorizon[h].toFixed(3)}`).join(' ');
 
     // Fully eliminate if no horizons remain
     if (state.qualifiedHorizons.size === 0) {
@@ -478,10 +491,10 @@ function runPhase2(models: Map<string, ModelState>): void {
       state.eliminatedInPhase = 2;
       state.eliminationReason = 'no qualified horizons remaining';
       eliminated++;
-      logger.log(`  ELIMINATED: ${state.modelId} (no qualified horizons remaining)`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: regret[${regretString}] stability[${stabilityString}] → ${chalk.red('ELIMINATED')}`);
     } else {
       const qualifiedList = [...state.qualifiedHorizons].join(', ');
-      logger.log(`  ${state.modelId}: still qualified for [${qualifiedList}]`);
+      logger.log(`  ${chalk.cyan(state.modelId)}: regret[${regretString}] stability[${stabilityString}] → qualified for [${chalk.green(qualifiedList)}]`);
     }
   }
 
@@ -608,12 +621,46 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
   // Log per-horizon rankings
   for (const horizon of HORIZONS) {
     logger.newline();
-    logger.log(`${horizon} Arena Winners:`);
+    logger.log(`${chalk.bold(horizon)} Arena Winners:`);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const rankings = perHorizonRankings[horizon];
     for (const [index, competitor] of rankings.entries()) {
-      logger.log(`  ${String(index + 1)}. ${competitor.modelId} (score: ${competitor.score.toFixed(4)})`);
+      const rank = index + 1;
+      const rankString = rank === 1 ? chalk.green(`${String(rank)}.`) : `${String(rank)}.`;
+      logger.log(`  ${rankString} ${chalk.cyan(competitor.modelId)} (score: ${competitor.score.toFixed(4)})`);
     }
+  }
+
+  // Comprehensive final table with all models
+  logger.newline();
+  logger.log(chalk.bold('=== Final Model Summary ==='));
+  logger.log('');
+  logger.log(chalk.dim('Rank  Model                          Status       LL-15m  LL-1h   LL-24h  LL-7d   Mean LL'));
+  logger.log(chalk.dim('─'.repeat(100)));
+
+  // Build sorted list of all models by mean log loss
+  const allModelsSorted: { state: ModelState; meanLL: number; status: string }[] = [];
+  for (const state of models.values()) {
+    const meanLogLoss = computeMeanLogLoss(state);
+    const mean = (meanLogLoss['15m'] + meanLogLoss['1h'] + meanLogLoss['24h'] + meanLogLoss['7d']) / 4;
+    const status = state.eliminated
+      ? `P${String(state.eliminatedInPhase ?? '?')}`
+      : 'WINNER';
+    allModelsSorted.push({ state, meanLL: mean, status });
+  }
+  allModelsSorted.sort((a, b) => a.meanLL - b.meanLL);
+
+  for (const [index, { state, meanLL, status }] of allModelsSorted.entries()) {
+    const rank = String(index + 1).padStart(4);
+    const modelName = state.modelId.padEnd(30);
+    const meanLogLoss = computeMeanLogLoss(state);
+    const statusString = status === 'WINNER' ? chalk.green(status.padEnd(12)) : chalk.red(status.padEnd(12));
+    const ll15m = formatLogLoss(meanLogLoss['15m']).padStart(7);
+    const ll1h = formatLogLoss(meanLogLoss['1h']).padStart(7);
+    const ll24h = formatLogLoss(meanLogLoss['24h']).padStart(7);
+    const ll7d = formatLogLoss(meanLogLoss['7d']).padStart(7);
+    const meanLogLossString = formatLogLoss(meanLL).padStart(7);
+    logger.log(`${rank}  ${chalk.cyan(modelName)} ${statusString} ${ll15m} ${ll1h} ${ll24h} ${ll7d} ${meanLogLossString}`);
   }
 
   return perHorizonRankings;
@@ -672,7 +719,8 @@ async function runBenchmarkRound(
         labels
       );
       recordModelScore(state, roundScore, timeToPivotRatios);
-      logger.succeedSpinner(`${state.modelId}: Scored`);
+      const scoreSummary = formatRoundScore(roundScore);
+      logger.succeedSpinner(`${chalk.cyan(state.modelId)}: ${scoreSummary}`);
     } catch (error) {
       // Record failure but continue with other models
       state.failedRounds.push(roundNumber);

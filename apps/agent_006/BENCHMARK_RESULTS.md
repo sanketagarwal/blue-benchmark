@@ -2,110 +2,68 @@
 
 **Symbol:** COINBASE_SPOT_BTC_USD
 **Start Time:** 2025-12-29T14:00:00.000Z
-**Progress:** Round 12/12 (Phase 3)
-**Last Updated:** 2025-12-31T05:05:53.831Z
+**Progress:** Round 3/3 (Phase 3)
+**Last Updated:** 2025-12-31T16:52:59.003Z
 
 ## Summary
 
-- **Active Models:** 4
-- **Eliminated:** 19
-- **Models with Failures:** 1
+- **Active Models:** 2
+- **Eliminated:** 1
+- **Models with Failures:** 0
 
-## Leaderboard (by Mean Log Loss)
+## Full Results (All Models)
 
-| Rank | Model | Mean Log Loss | Rounds | Status |
-|------|-------|--------------|--------|--------|
-| 1 | google/gemini-2.5-flash | 0.0255 | 4 | Eliminated (Phase 0) |
-| 2 | openai/gpt-4.1 | 0.1585 | 12 | Active |
-| 3 | xai/grok-2-vision | 0.1947 | 12 | Active |
-| 4 | openai/gpt-5-nano | 0.2457 | 12 | Active |
-| 5 | mistral/pixtral-12b-2409 | 0.2466 | 12 | Active |
-| 6 | google/gemini-3-pro-preview | 0.2519 | 12 | Eliminated (Phase 2) |
-| 7 | anthropic/claude-haiku-4-5 | 0.2536 | 12 | Eliminated (Phase 2) |
-| 8 | google/gemini-2.0-flash | 0.3344 | 8 | Eliminated (Phase 1) |
-| 9 | xai/grok-4-fast-non-reasoning | 0.3578 | 8 | Eliminated (Phase 1) |
-| 10 | openai/gpt-4o | 0.4138 | 8 | Eliminated (Phase 1) |
-| 11 | anthropic/claude-3-5-sonnet-20241022 | 0.4796 | 8 | Eliminated (Phase 1) |
-| 12 | openai/gpt-5-mini | 0.4811 | 8 | Eliminated (Phase 1) |
-| 13 | anthropic/claude-3-7-sonnet-latest | 0.4830 | 8 | Eliminated (Phase 1) |
-| 14 | google/gemini-2.5-flash-lite | 0.4919 | 8 | Eliminated (Phase 1) |
-| 15 | openai/gpt-5 | 0.4983 | 8 | Eliminated (Phase 1) |
-| 16 | mistral/pixtral-large-latest | 0.5284 | 8 | Eliminated (Phase 1) |
-| 17 | openai/gpt-4o-mini | 0.5947 | 8 | Eliminated (Phase 1) |
-| 18 | anthropic/claude-sonnet-4-5 | 0.7488 | 4 | Eliminated (Phase 0) |
-| 19 | openai/gpt-4.1-mini | 0.7657 | 8 | Eliminated (Phase 1) |
-| 20 | anthropic/claude-3-5-haiku-latest | 0.8516 | 4 | Eliminated (Phase 0) |
-| 21 | google/gemini-2.5-pro | 0.8539 | 4 | Eliminated (Phase 0) |
-| 22 | mistral/ministral-3b-latest | 0.9136 | 3 | Eliminated (Phase 0) |
-| 23 | mistral/ministral-8b-latest | 0.9403 | 4 | Eliminated (Phase 0) |
+| Rank | Model | Status | Rnds | 15m | 1h | 24h | 7d | Mean | %Rank | BestWin | Stabil | TtP | Score |
+|------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|
+| 🥇 | xai/grok-4-fast-non-reasoning | ✅ Active | 3 | 🟢0.381 | 🟢0.311 | 🟢0.223 | 🟢0.163 | 🟢0.269 | 100.0 | 0.163 | 0.087 | 0.50 | **0.9083** |
+| 🥈 | anthropic/claude-3-5-sonnet-20241022 | ✅ Active | 3 | 🟡0.503 | 🟢0.353 | 🟢0.187 | 🟢0.099 | 🟢0.286 | 66.7 | 0.099 | 0.248 | 0.50 | **0.7521** |
+| 🥉 | openai/gpt-4o-mini | ❌ P1 | 2 | 🔴0.983 | 🟡0.693 | 🟢0.471 | 🟢0.288 | 🟡0.609 | 33.3 | 0.335 | 0.262 | 0.50 | **0.5805** |
 
-## Per-Horizon Performance (Active Models)
+**Legend:**
+- 🟢 Good (≤0.5) | 🟡 OK (≤0.8) | 🔴 Poor (>0.8)
+- %Rank: Percentile rank (higher=better) | BestWin: Best rolling window avg (lower=better)
+- Stabil: Std dev of log loss (lower=better) | TtP: Time-to-pivot ratio (lower=better)
+- Score: Composite (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹)
 
-### 15m
+## Per-Horizon Rankings (All Models)
 
-| Model | Mean Log Loss | Samples |
-|-------|--------------|---------|
-| openai/gpt-4.1 | 0.2170 | 12 |
-| xai/grok-2-vision | 0.2877 | 12 |
-| openai/gpt-5-nano | 0.4282 | 12 |
-| mistral/pixtral-12b-2409 | 0.4308 | 12 |
+### 15m Horizon (Top 10)
 
-### 1h
+| Rank | Model | Log Loss | Status |
+|------|-------|----------|--------|
+| 1 | xai/grok-4-fast-non-reasoning | 🟢0.3814 | ✅ Active |
+| 2 | anthropic/claude-3-5-sonnet-20241022 | 🟡0.5032 | ✅ Active |
+| 3 | openai/gpt-4o-mini | 🔴0.9831 | ❌ P1 |
 
-| Model | Mean Log Loss | Samples |
-|-------|--------------|---------|
-| openai/gpt-4.1 | 0.1499 | 12 |
-| xai/grok-2-vision | 0.2231 | 12 |
-| openai/gpt-5-nano | 0.2866 | 12 |
-| mistral/pixtral-12b-2409 | 0.2877 | 12 |
+### 1h Horizon (Top 10)
 
-### 24h
+| Rank | Model | Log Loss | Status |
+|------|-------|----------|--------|
+| 1 | xai/grok-4-fast-non-reasoning | 🟢0.3107 | ✅ Active |
+| 2 | anthropic/claude-3-5-sonnet-20241022 | 🟢0.3533 | ✅ Active |
+| 3 | openai/gpt-4o-mini | 🟡0.6931 | ❌ P1 |
 
-| Model | Mean Log Loss | Samples |
-|-------|--------------|---------|
-| openai/gpt-4.1 | 0.1393 | 12 |
-| openai/gpt-5-nano | 0.1625 | 12 |
-| xai/grok-2-vision | 0.1625 | 12 |
-| mistral/pixtral-12b-2409 | 0.1625 | 12 |
+### 24h Horizon (Top 10)
 
-### 7d
+| Rank | Model | Log Loss | Status |
+|------|-------|----------|--------|
+| 1 | anthropic/claude-3-5-sonnet-20241022 | 🟢0.1874 | ✅ Active |
+| 2 | xai/grok-4-fast-non-reasoning | 🟢0.2231 | ✅ Active |
+| 3 | openai/gpt-4o-mini | 🟢0.4708 | ❌ P1 |
 
-| Model | Mean Log Loss | Samples |
-|-------|--------------|---------|
-| openai/gpt-5-nano | 0.1054 | 12 |
-| xai/grok-2-vision | 0.1054 | 12 |
-| mistral/pixtral-12b-2409 | 0.1054 | 12 |
-| openai/gpt-4.1 | 0.1278 | 12 |
+### 7d Horizon (Top 10)
+
+| Rank | Model | Log Loss | Status |
+|------|-------|----------|--------|
+| 1 | anthropic/claude-3-5-sonnet-20241022 | 🟢0.0994 | ✅ Active |
+| 2 | xai/grok-4-fast-non-reasoning | 🟢0.1625 | ✅ Active |
+| 3 | openai/gpt-4o-mini | 🟢0.2877 | ❌ P1 |
 
 ## Eliminated Models
 
 | Model | Phase | Reason |
 |-------|-------|--------|
-| anthropic/claude-haiku-4-5 | 2 | Unknown |
-| anthropic/claude-sonnet-4-5 | 0 | Unknown |
-| anthropic/claude-3-5-sonnet-20241022 | 1 | Unknown |
-| anthropic/claude-3-5-haiku-latest | 0 | Unknown |
-| anthropic/claude-3-7-sonnet-latest | 1 | Unknown |
-| openai/gpt-4o | 1 | Unknown |
-| openai/gpt-4o-mini | 1 | Unknown |
-| openai/gpt-4.1-mini | 1 | Unknown |
-| openai/gpt-5 | 1 | Unknown |
-| openai/gpt-5-mini | 1 | Unknown |
-| google/gemini-2.0-flash | 1 | Unknown |
-| google/gemini-2.5-flash | 0 | Unknown |
-| google/gemini-2.5-flash-lite | 1 | Unknown |
-| google/gemini-2.5-pro | 0 | Unknown |
-| google/gemini-3-pro-preview | 2 | Unknown |
-| xai/grok-4-fast-non-reasoning | 1 | Unknown |
-| mistral/pixtral-large-latest | 1 | Unknown |
-| mistral/ministral-3b-latest | 0 | Unknown |
-| mistral/ministral-8b-latest | 0 | Unknown |
-
-## Model Failures
-
-| Model | Failed Rounds |
-|-------|---------------|
-| mistral/ministral-3b-latest | 3 |
+| openai/gpt-4o-mini | 1 | qualifies for 0 horizons |
 
 ---
 *Auto-generated by agent_006 benchmark*
