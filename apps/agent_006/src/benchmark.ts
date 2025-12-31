@@ -32,6 +32,7 @@ import {
 import {
   analyzeMetricSeparability,
   formatSeparabilityTable,
+  MIN_MODELS_FOR_SEPARABILITY,
 } from './reports/separability.js';
 import { brierScore } from './scorers/brier-scorer.js';
 import {
@@ -62,6 +63,7 @@ import {
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
 import type { ModelScoreData } from './reports/leaderboards.js';
+import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
@@ -1251,6 +1253,171 @@ async function runBenchmarkRound(
   }, undefined, { skipWrite: isQuickMode, logger });
 }
 
+/**
+ * Find the best model for a specific horizon based on log loss
+ * @param modelStates - Map of model states
+ * @param horizon - The horizon to find best model for
+ * @returns Best model info or undefined if no qualified models
+ */
+function findBestModelForHorizon(
+  modelStates: Map<string, ModelState>,
+  horizon: TimeframeId
+): { modelId: string; logLoss: number; roundCount: number } | undefined {
+  let bestModel: { modelId: string; logLoss: number; roundCount: number } | undefined;
+
+  for (const state of modelStates.values()) {
+    // Only consider non-eliminated models that are qualified for this horizon
+    if (state.eliminated || !state.qualifiedHorizons.has(horizon)) {
+      continue;
+    }
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const losses = state.logLossByHorizon[horizon];
+    if (losses.length === 0) {
+      continue;
+    }
+
+    // Calculate mean log loss for this horizon
+    let sum = 0;
+    for (const loss of losses) {
+      sum += loss;
+    }
+    const meanLogLoss = sum / losses.length;
+
+    if (bestModel === undefined || meanLogLoss < bestModel.logLoss) {
+      bestModel = {
+        modelId: state.modelId,
+        logLoss: meanLogLoss,
+        roundCount: losses.length,
+      };
+    }
+  }
+
+  return bestModel;
+}
+
+/**
+ * Format a single separability metric line for the recommendations block
+ * @param metric - The metric separability result
+ * @param cohortSize - Number of models in the cohort
+ * @param minSamplesForCalibration - Minimum samples required for calibration metrics
+ * @returns Formatted line string
+ */
+function formatSeparabilityMetricLine(
+  metric: MetricSeparability,
+  cohortSize: number,
+  minSamplesForCalibration: number
+): string {
+  // Handle calibration-specific insufficient samples check
+  if (metric.metricName === 'expectedCalibrationError' && cohortSize < minSamplesForCalibration) {
+    return chalk.yellow(`  - ${metric.metricName}: insufficient samples (n=${String(cohortSize)}, need ${String(minSamplesForCalibration)})`);
+  }
+
+  // Handle insufficient cohort for separability analysis
+  if (metric.separates === undefined) {
+    return chalk.yellow(`  - ${metric.metricName}: insufficient cohort (n=${String(cohortSize)}, need ${String(MIN_MODELS_FOR_SEPARABILITY)})`);
+  }
+
+  // Format based on whether metric separates
+  if (metric.separates) {
+    return chalk.green(`  [check] ${metric.metricName}: separates (range=${metric.range.toFixed(2)}, s=${metric.stdDev.toFixed(2)})`);
+  }
+  return chalk.red(`  [x] ${metric.metricName}: does not separate (range=${metric.range.toFixed(2)})`);
+}
+
+/**
+ * Print the recommendations block summarizing key findings
+ * Answers: 1) Which agents are best per timeframe? 2) Which metrics separate models?
+ * @param modelStates - Map of model states
+ * @param baselines - Baseline log loss values per horizon
+ * @param separabilityAnalysis - Results from metric separability analysis
+ * @param cohortSize - Number of models in the analysis cohort
+ * @param totalRounds - Total number of rounds in the benchmark
+ */
+function printRecommendationsBlock(
+  modelStates: Map<string, ModelState>,
+  baselines: Record<TimeframeId, BaselineLogLoss>,
+  separabilityAnalysis: MetricSeparability[],
+  cohortSize: number,
+  totalRounds: number
+): void {
+  logger.newline();
+  logger.log('=== Recommendations ===');
+  logger.newline();
+
+  // Section 1: Per-Horizon Best Models
+  logger.log('Per-Horizon Best Models (with sample size):');
+
+  for (const horizon of HORIZONS) {
+    const best = findBestModelForHorizon(modelStates, horizon);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const baseline = baselines[horizon];
+
+    if (best === undefined) {
+      logger.log(chalk.yellow(`  ${horizon}: insufficient data (0 qualified models)`));
+    } else {
+      const baselineLL = baseline.trivialBest;
+      const modelLL = best.logLoss.toFixed(2);
+      const baselineFormatted = baselineLL.toFixed(2);
+      logger.log(
+        `  ${horizon}: ${chalk.cyan(best.modelId)} (n=${String(best.roundCount)} rounds, LL=${modelLL} vs baseline ${baselineFormatted})`
+      );
+    }
+  }
+
+  logger.newline();
+
+  // Section 2: Separative Metrics
+  logger.log(`Separative Metrics (cohort=${String(cohortSize)}):`);
+
+  if (cohortSize < MIN_MODELS_FOR_SEPARABILITY) {
+    logger.log(chalk.yellow(`  insufficient cohort for separability analysis (need ${String(MIN_MODELS_FOR_SEPARABILITY)}, have ${String(cohortSize)})`));
+  } else {
+    const minSamplesForCalibration = 20; // Same constant used in leaderboards.ts and model-profiles.ts
+    for (const metric of separabilityAnalysis) {
+      logger.log(formatSeparabilityMetricLine(metric, cohortSize, minSamplesForCalibration));
+    }
+  }
+
+  // Section 3: Quick Mode Notice
+  if (isQuickMode) {
+    logger.newline();
+    logger.log(chalk.yellow('Quick Mode Notice:'));
+    logger.log(chalk.yellow(`  Results based on ${String(totalRounds)} rounds. Run full benchmark for reliable rankings.`));
+  }
+}
+
+/**
+ * Build separability data and analysis from model states
+ * @param modelStates - Map of model states
+ * @returns Object with profiles, analysis, and cohort size
+ */
+function buildSeparabilityData(
+  modelStates: Map<string, ModelState>
+): { profiles: ModelProfile[]; analysis: MetricSeparability[]; cohortSize: number } {
+  // Build profiles for non-eliminated models with round data
+  const profiles = [...modelStates.values()]
+    .filter((state) => !state.eliminated && state.trackBRounds.length > 0 && state.qualifiedHorizons.size > 0)
+    .map((state) => {
+      const roundData = buildRoundDataForProfile(state.trackBRounds, state.qualifiedHorizons);
+      return buildModelProfile(state.modelId, roundData);
+    });
+
+  // Run separability analysis
+  const separabilityData: ModelProfile[] = profiles.map((p) => ({
+    modelId: p.modelId,
+    meanLogLoss: p.meanLogLoss,
+    meanBrier: p.meanBrier,
+    expectedCalibrationError: p.expectedCalibrationError,
+    tpRate: p.tpRate,
+    fpRate: p.fpRate,
+  }));
+
+  const analysis = analyzeMetricSeparability(separabilityData);
+
+  return { profiles: separabilityData, analysis, cohortSize: profiles.length };
+}
+
 async function main(): Promise<void> {
   logger.header('agent_006 Bitcoin Bottom Arena Benchmark');
 
@@ -1371,6 +1538,11 @@ async function main(): Promise<void> {
   } else {
     logger.log('  No models with timing data to display');
   }
+
+  // Print Recommendations block (answers the two key questions)
+  const baselines = computeBaselinesFromModels(models);
+  const { analysis: separabilityAnalysis, cohortSize } = buildSeparabilityData(models);
+  printRecommendationsBlock(models, baselines, separabilityAnalysis, cohortSize, totalRounds);
 
   // Final persistence
   persistResults(models, {
