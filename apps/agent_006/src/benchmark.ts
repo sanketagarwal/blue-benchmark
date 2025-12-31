@@ -19,7 +19,7 @@ import { getForecastingCharts } from './replay-lab/charts.js';
 import {
   scorePhase0Round,
   aggregatePhase0Scores,
-  shouldEliminatePhase0,
+  getPhase0DisqualifiedHorizons,
 } from './scorers/phase-0-scorer.js';
 import {
   computePercentileRanks,
@@ -252,33 +252,6 @@ function computeMeanLogLoss(state: ModelState): Record<Horizon, number> {
 }
 
 /**
- * Run Phase 0 elimination - sanity filter
- * @param models - Map of model states
- */
-function runPhase0(models: Map<string, ModelState>): void {
-  logger.newline();
-  logger.log('=== Phase 0: Sanity Filter ===');
-
-  let eliminated = 0;
-  for (const state of models.values()) {
-    if (state.eliminated) {
-      continue;
-    }
-
-    const aggregate = aggregatePhase0Scores(state.roundScores);
-    if (shouldEliminatePhase0(aggregate)) {
-      state.eliminated = true;
-      state.eliminatedInPhase = 0;
-      eliminated++;
-      logger.log(`  ELIMINATED: ${state.modelId} (degenerate or worse than random)`);
-    }
-  }
-
-  const remaining = [...models.values()].filter((model) => !model.eliminated).length;
-  logger.log(`Phase 0 complete: ${String(eliminated)} eliminated, ${String(remaining)} remaining`);
-}
-
-/**
  * Disqualify a model from a horizon
  * @param state - Model state to update
  * @param horizon - Horizon to disqualify from
@@ -293,6 +266,52 @@ function disqualifyFromHorizon(
 ): void {
   state.qualifiedHorizons.delete(horizon);
   state.disqualifiedHorizons.set(horizon, { phase, reason });
+}
+
+/**
+ * Run Phase 0 elimination - sanity filter with per-horizon disqualification
+ * @param models - Map of model states
+ */
+function runPhase0(models: Map<string, ModelState>): void {
+  logger.newline();
+  logger.log('=== Phase 0: Sanity Filter (Per-Horizon Disqualification) ===');
+
+  let eliminated = 0;
+  for (const state of models.values()) {
+    if (state.eliminated) {
+      continue;
+    }
+
+    const aggregate = aggregatePhase0Scores(state.roundScores);
+    const disqualifiedHorizons = getPhase0DisqualifiedHorizons(aggregate);
+
+    // Disqualify from specific horizons
+    for (const horizon of disqualifiedHorizons) {
+      disqualifyFromHorizon(
+        state,
+        horizon,
+        0 as Phase,
+        `Phase 0: Failed sanity check on ${horizon}`
+      );
+    }
+
+    // Only fully eliminate if disqualified from ALL horizons (all 4)
+    if (disqualifiedHorizons.size === 4) {
+      state.eliminated = true;
+      state.eliminatedInPhase = 0;
+      state.eliminationReason = 'Failed sanity check on all horizons';
+      eliminated++;
+      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] → ${chalk.red('ELIMINATED')} (all horizons)`);
+    } else if (disqualifiedHorizons.size > 0) {
+      const qualifiedList = [...state.qualifiedHorizons].join(', ');
+      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] → qualified for [${chalk.green(qualifiedList)}]`);
+    } else {
+      logger.log(`  ${chalk.cyan(state.modelId)}: passed sanity check → qualified for [${chalk.green([...state.qualifiedHorizons].join(', '))}]`);
+    }
+  }
+
+  const remaining = [...models.values()].filter((model) => !model.eliminated).length;
+  logger.log(`Phase 0 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
 }
 
 /**
@@ -837,7 +856,7 @@ await main()
     process.exit(0);
   })
   .catch((error: unknown) => {
-     
+
     console.error('Benchmark failed:', error);
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);
