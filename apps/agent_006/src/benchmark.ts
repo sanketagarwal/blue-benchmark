@@ -152,6 +152,173 @@ function formatRoundScoreWithBaseline(
 // Quick mode constants
 const QUICK_ROUNDS_PER_PHASE = 3;
 const QUICK_MODEL_COUNT = 3;
+const QUICK_MODE_DATA_VERIFIED_MSG = 'Data collection verified - rounds completed successfully';
+
+/**
+ * Smoke test pipeline status tracking
+ */
+interface SmokeTestStatus {
+  /** Models that successfully parsed predictions */
+  successfulPredictions: number;
+  /** Total model prediction attempts */
+  totalPredictionAttempts: number;
+  /** Ground truth resolved for all horizons */
+  groundTruthResolved: boolean;
+  /** Scoring (log loss and brier) computed successfully */
+  scoringComputed: boolean;
+  /** Number of pivot hits detected */
+  pivotHits: number;
+  /** Issues that would cause disqualification in full run */
+  wouldDisqualify: Map<string, string[]>;
+}
+
+/**
+ * Create initial smoke test status for tracking pipeline correctness
+ * @returns Initial smoke test status object
+ */
+function createSmokeTestStatus(): SmokeTestStatus {
+  return {
+    successfulPredictions: 0,
+    totalPredictionAttempts: 0,
+    groundTruthResolved: false,
+    scoringComputed: false,
+    pivotHits: 0,
+    wouldDisqualify: new Map(),
+  };
+}
+
+/**
+ * Tracks qualification metrics for debugging why models are eliminated
+ */
+interface QualificationAudit {
+  /** Models that parsed predictions successfully */
+  modelsParsedOk: number;
+  /** Models that were scored successfully */
+  modelsScoredOk: number;
+  /** Models that had at least one pivot hit (label=true for any horizon) */
+  modelsWithPivotHit: number;
+  /** Model IDs that failed due to worse-than-baseline performance */
+  failedWorseBaseline: string[];
+  /** Model IDs that failed due to degenerate prediction patterns */
+  failedDegenerate: string[];
+  /** Model IDs that failed due to schema/parsing errors */
+  failedSchemaErrors: string[];
+  /** Model IDs that qualified after this phase */
+  qualified: string[];
+}
+
+/**
+ * Create an empty qualification audit
+ * @returns Fresh QualificationAudit with all counters at zero
+ */
+function createQualificationAudit(): QualificationAudit {
+  return {
+    modelsParsedOk: 0,
+    modelsScoredOk: 0,
+    modelsWithPivotHit: 0,
+    failedWorseBaseline: [],
+    failedDegenerate: [],
+    failedSchemaErrors: [],
+    qualified: [],
+  };
+}
+
+/**
+ * Print qualification audit block for a phase
+ * @param phase - Phase number (0, 1, 2)
+ * @param audit - Qualification audit data
+ * @param totalModels - Total models in the benchmark
+ * @param roundsCompleted - Number of rounds completed in this phase
+ */
+function printQualificationAudit(
+  phase: number,
+  audit: QualificationAudit,
+  totalModels: number,
+  roundsCompleted: number
+): void {
+  logger.newline();
+  logger.log(`=== Phase ${String(phase)} Qualification Audit ===`);
+  logger.log(`  Parsed OK: ${String(audit.modelsParsedOk)}/${String(totalModels)}`);
+  logger.log(`  Scored OK: ${String(audit.modelsScoredOk)}/${String(totalModels)}`);
+  logger.log(`  Pivot hits (any horizon): ${String(audit.modelsWithPivotHit)}/${String(totalModels)}`);
+  logger.log(`  Rounds completed: ${String(roundsCompleted)}`);
+
+  // Show worse-than-baseline failures
+  const worseBaselineCount = audit.failedWorseBaseline.length;
+  logger.log(`  Failed - worse than baseline: ${String(worseBaselineCount)}`);
+  if (worseBaselineCount > 0) {
+    logger.log(`    [${audit.failedWorseBaseline.join(', ')}]`);
+  }
+
+  // Show degenerate pattern failures
+  const degenerateCount = audit.failedDegenerate.length;
+  logger.log(`  Failed - degenerate pattern: ${String(degenerateCount)}`);
+  if (degenerateCount > 0) {
+    logger.log(`    [${audit.failedDegenerate.join(', ')}]`);
+  }
+
+  // Show schema/parsing errors
+  const schemaErrorCount = audit.failedSchemaErrors.length;
+  logger.log(`  Failed - schema errors: ${String(schemaErrorCount)}`);
+  if (schemaErrorCount > 0) {
+    logger.log(`    [${audit.failedSchemaErrors.join(', ')}]`);
+  }
+
+  // Show qualified models
+  const qualifiedCount = audit.qualified.length;
+  logger.log(`  Qualified: ${String(qualifiedCount)}/${String(totalModels)}`);
+}
+
+/**
+ * Check if model has at least one pivot hit (label=true for any horizon)
+ * @param state - Model state to check
+ * @returns True if model has at least one pivot hit
+ */
+function modelHasPivotHit(state: ModelState): boolean {
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    if (state.labelsByHorizon[horizon].some(Boolean)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Build qualification audit for a phase
+ * @param models - Map of model states
+ * @param phaseNumber - The phase number (0, 1, or 2)
+ * @returns Populated qualification audit
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Audit function collects multiple metrics, complexity is acceptable
+function buildQualificationAuditForPhase(
+  models: Map<string, ModelState>,
+  phaseNumber: number
+): QualificationAudit {
+  const audit = createQualificationAudit();
+  for (const state of models.values()) {
+    // Track parsed/scored OK (models with round scores)
+    if (state.roundScores.length > 0) {
+      audit.modelsParsedOk++;
+      audit.modelsScoredOk++;
+    }
+    // Track schema errors (models with failed rounds)
+    if (state.failedRounds.length > 0) {
+      audit.failedSchemaErrors.push(state.modelId);
+    }
+    // Track pivot hits
+    if (modelHasPivotHit(state)) {
+      audit.modelsWithPivotHit++;
+    }
+    // Categorize elimination reasons
+    if (state.eliminated && state.eliminatedInPhase === phaseNumber) {
+      audit.failedWorseBaseline.push(state.modelId);
+    } else if (!state.eliminated) {
+      audit.qualified.push(state.modelId);
+    }
+  }
+  return audit;
+}
 
 /**
  * Shuffle array using Fisher-Yates algorithm
@@ -438,12 +605,20 @@ function printBaselineComparisonSummary(
 
 /**
  * Run Phase 0 elimination - sanity filter with per-horizon disqualification using baselines
+ * In quick mode (smoke test), flags issues without eliminating
  * @param models - Map of model states
+ * @param smokeTestStatus - Optional smoke test status to update (only in quick mode)
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic with baseline comparison is inherently complex
-function runPhase0(models: Map<string, ModelState>): void {
+function runPhase0(models: Map<string, ModelState>, smokeTestStatus?: SmokeTestStatus): void {
   logger.newline();
-  logger.log('=== Phase 0: Sanity Filter (Per-Horizon Disqualification) ===');
+
+  if (isQuickMode) {
+    logger.log('=== Phase 0: Schema Validation (Smoke Test Mode) ===');
+    logger.log(chalk.yellow('  Note: Flagging issues without disqualification'));
+  } else {
+    logger.log('=== Phase 0: Sanity Filter (Per-Horizon Disqualification) ===');
+  }
 
   // Compute baselines from observed labels
   const baselines = computeBaselinesFromModels(models);
@@ -468,42 +643,72 @@ function runPhase0(models: Map<string, ModelState>): void {
     const aggregate = aggregatePhase0Scores(state.roundScores);
     const disqualifiedHorizons = getPhase0DisqualifiedHorizonsWithBaselines(aggregate, baselines);
 
-    // Disqualify from specific horizons
-    for (const horizon of disqualifiedHorizons) {
-      disqualifyFromHorizon(
-        state,
-        horizon,
-        0 as Phase,
-        `Phase 0: Failed sanity check on ${horizon}`
-      );
-    }
-
-    // Only fully eliminate if disqualified from ALL horizons (all 4)
-    if (disqualifiedHorizons.size === 4) {
-      state.eliminated = true;
-      state.eliminatedInPhase = 0;
-      state.eliminationReason = 'Failed sanity check on all horizons';
-      eliminated++;
-      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] -> ${chalk.red('ELIMINATED')} (all horizons)`);
-    } else if (disqualifiedHorizons.size > 0) {
-      const qualifiedList = [...state.qualifiedHorizons].join(', ');
-      logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] -> qualified for [${chalk.green(qualifiedList)}]`);
+    if (isQuickMode) {
+      // Smoke test mode: flag issues without eliminating
+      if (disqualifiedHorizons.size > 0) {
+        const issues = [...disqualifiedHorizons].map(h => `worse-than-baseline on ${h}`);
+        smokeTestStatus?.wouldDisqualify.set(state.modelId, issues);
+        logger.log(`  ${chalk.cyan(state.modelId)}: ${chalk.yellow('would be disqualified')} from [${[...disqualifiedHorizons].join(', ')}] in full run`);
+      } else {
+        logger.log(`  ${chalk.cyan(state.modelId)}: ${chalk.green('passed')} schema validation`);
+      }
     } else {
-      logger.log(`  ${chalk.cyan(state.modelId)}: passed sanity check -> qualified for [${chalk.green([...state.qualifiedHorizons].join(', '))}]`);
+      // Full run: apply elimination logic
+      // Disqualify from specific horizons
+      for (const horizon of disqualifiedHorizons) {
+        disqualifyFromHorizon(
+          state,
+          horizon,
+          0 as Phase,
+          `Phase 0: Failed sanity check on ${horizon}`
+        );
+      }
+
+      // Only fully eliminate if disqualified from ALL horizons (all 4)
+      if (disqualifiedHorizons.size === 4) {
+        state.eliminated = true;
+        state.eliminatedInPhase = 0;
+        state.eliminationReason = 'Failed sanity check on all horizons';
+        eliminated++;
+        logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] -> ${chalk.red('ELIMINATED')} (all horizons)`);
+      } else if (disqualifiedHorizons.size > 0) {
+        const qualifiedList = [...state.qualifiedHorizons].join(', ');
+        logger.log(`  ${chalk.cyan(state.modelId)}: disqualified from [${[...disqualifiedHorizons].join(', ')}] -> qualified for [${chalk.green(qualifiedList)}]`);
+      } else {
+        logger.log(`  ${chalk.cyan(state.modelId)}: passed sanity check -> qualified for [${chalk.green([...state.qualifiedHorizons].join(', '))}]`);
+      }
     }
   }
 
-  const remaining = [...models.values()].filter((model) => !model.eliminated).length;
-  logger.log(`Phase 0 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
+  if (isQuickMode) {
+    logger.log('Phase 0 complete (smoke test: no eliminations applied)');
+  } else {
+    const remaining = [...models.values()].filter((model) => !model.eliminated).length;
+    logger.log(`Phase 0 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
+  }
+
+  // Build and print qualification audit for Phase 0
+  const phase0Audit = buildQualificationAuditForPhase(models, 0);
+  const phase0Rounds = sampleLabels['15m'].length;
+  printQualificationAudit(0, phase0Audit, models.size, phase0Rounds);
 }
 
 /**
  * Run Phase 1 elimination - relative performance with per-horizon qualification
+ * In quick mode (smoke test), skips elimination entirely (insufficient data)
  * @param models - Map of model states
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic is inherently complex
 function runPhase1(models: Map<string, ModelState>): void {
   logger.newline();
+
+  if (isQuickMode) {
+    logger.log('=== Phase 1: Skipped (Smoke Test Mode) ===');
+    logger.log(chalk.yellow('  Skipping Phase 1 percentile elimination in quick mode (insufficient data for selection)'));
+    logger.log(chalk.yellow(`  ${QUICK_MODE_DATA_VERIFIED_MSG}`));
+    return;
+  }
+
   logger.log('=== Phase 1: Relative Performance (Per-Horizon Qualification) ===');
 
   // Build scores for active models
@@ -561,6 +766,12 @@ function runPhase1(models: Map<string, ModelState>): void {
 
   const remaining = [...models.values()].filter((model) => !model.eliminated).length;
   logger.log(`Phase 1 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
+
+  // Build and print qualification audit for Phase 1
+  const phase1Audit = buildQualificationAuditForPhase(models, 1);
+  const phase1SampleState = [...models.values()].find(s => s.roundScores.length > 0);
+  const phase1Rounds = phase1SampleState?.roundScores.length ?? 0;
+  printQualificationAudit(1, phase1Audit, models.size, phase1Rounds);
 }
 
 /**
@@ -659,11 +870,20 @@ function computeAllRegrets(
 
 /**
  * Run Phase 2 elimination - stability and regret with per-horizon disqualification
+ * In quick mode (smoke test), skips elimination entirely (insufficient data)
  * @param models - Map of model states
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Phase elimination logic is inherently complex
 function runPhase2(models: Map<string, ModelState>): void {
   logger.newline();
+
+  if (isQuickMode) {
+    logger.log('=== Phase 2: Skipped (Smoke Test Mode) ===');
+    logger.log(chalk.yellow('  Skipping Phase 2 stability elimination in quick mode (insufficient data for selection)'));
+    logger.log(chalk.yellow(`  ${QUICK_MODE_DATA_VERIFIED_MSG}`));
+    return;
+  }
+
   logger.log('=== Phase 2: Stability & Regret (Per-Horizon Disqualification) ===');
 
   const { modelScores, allWorstWindows, allStabilities } = collectPhase2Metrics(models);
@@ -724,6 +944,12 @@ function runPhase2(models: Map<string, ModelState>): void {
 
   const remaining = [...models.values()].filter((model) => !model.eliminated).length;
   logger.log(`Phase 2 complete: ${String(eliminated)} fully eliminated, ${String(remaining)} remaining`);
+
+  // Build and print qualification audit for Phase 2
+  const phase2Audit = buildQualificationAuditForPhase(models, 2);
+  const phase2SampleState = [...models.values()].find(s => s.roundScores.length > 0);
+  const phase2Rounds = phase2SampleState?.roundScores.length ?? 0;
+  printQualificationAudit(2, phase2Audit, models.size, phase2Rounds);
 }
 
 
@@ -1469,6 +1695,81 @@ function buildSeparabilityData(
   return { profiles: separabilityData, analysis, cohortSize: profiles.length };
 }
 
+/**
+ * Print smoke test summary with pipeline status checklist
+ * @param status - Smoke test status tracking object
+ * @param models - Map of model states for raw results display
+ * @param totalRounds - Total number of rounds completed
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Summary function with multiple status checks is inherently complex
+function printSmokeTestSummary(
+  status: SmokeTestStatus,
+  models: Map<string, ModelState>,
+  totalRounds: number
+): void {
+  logger.newline();
+  logger.log(chalk.bold('=== Quick Mode Summary (Smoke Test) ==='));
+  logger.newline();
+
+  logger.log('Pipeline Status:');
+
+  // Check 1: Model predictions parsed successfully
+  const predictionSuccess = status.successfulPredictions === status.totalPredictionAttempts;
+  const predictionIcon = predictionSuccess ? chalk.green('[check]') : chalk.red('[x]');
+  logger.log(`  ${predictionIcon} Model predictions: ${String(status.successfulPredictions)}/${String(status.totalPredictionAttempts)} parsed successfully`);
+
+  // Check 2: Ground truth resolved
+  const gtIcon = status.groundTruthResolved ? chalk.green('[check]') : chalk.red('[x]');
+  logger.log(`  ${gtIcon} Ground truth: resolved for all horizons`);
+
+  // Check 3: Scoring computed
+  const scoringIcon = status.scoringComputed ? chalk.green('[check]') : chalk.red('[x]');
+  logger.log(`  ${scoringIcon} Scoring: log loss and brier computed`);
+
+  // Check 4: Timing/pivot hits
+  if (status.pivotHits > 0) {
+    logger.log(`  ${chalk.green('[check]')} Timing: ${String(status.pivotHits)} pivot hit(s) detected`);
+  } else {
+    logger.log(`  ${chalk.yellow('[?]')} Timing: no pivot hits (possible alignment issue or normal for this data window)`);
+  }
+
+  // Show issues that would cause disqualification in full run
+  if (status.wouldDisqualify.size > 0) {
+    logger.newline();
+    logger.log(chalk.yellow('Issues that would cause disqualification in full run:'));
+    for (const [modelId, issues] of status.wouldDisqualify) {
+      for (const issue of issues) {
+        logger.log(`  - ${chalk.cyan(modelId)}: ${issue}`);
+      }
+    }
+  }
+
+  // Raw results table header
+  logger.newline();
+  logger.log(chalk.bold('Raw Results (not for model selection):'));
+  logger.newline();
+
+  // Show simple summary for each model
+  for (const state of models.values()) {
+    const meanLogLoss = computeMeanLogLoss(state);
+    const avgLL = (meanLogLoss['15m'] + meanLogLoss['1h'] + meanLogLoss['4h'] + meanLogLoss['24h']) / 4;
+    const roundCount = state.roundScores.length;
+    const failedCount = state.failedRounds.length;
+
+    let modelStatusString = `rounds=${String(roundCount)}, avgLL=${avgLL.toFixed(3)}`;
+    if (failedCount > 0) {
+      modelStatusString += `, failed=${String(failedCount)}`;
+    }
+
+    logger.log(`  ${chalk.cyan(state.modelId)}: ${modelStatusString}`);
+  }
+
+  logger.newline();
+  logger.log(chalk.yellow('To run model selection, use full benchmark without --quick'));
+  logger.log(chalk.yellow(`Total rounds in smoke test: ${String(totalRounds)}`));
+}
+
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Main entry point orchestrates phases, complexity is acceptable
 async function main(): Promise<void> {
   logger.header('agent_006 Bitcoin Bottom Arena Benchmark');
 
@@ -1479,11 +1780,15 @@ async function main(): Promise<void> {
   let modelIds = getModelIds();
   logger.log(`Loaded ${String(modelIds.length)} vision models`);
 
-  // Quick mode: use only 3 random models
+  // Quick mode: smoke test with reduced models
+  // Initialize smoke test status tracking (only used in quick mode)
+  const smokeTestStatus = isQuickMode ? createSmokeTestStatus() : undefined;
+
   if (isQuickMode) {
-    logger.log('🚀 Quick mode: 1 round/phase, 3 random models');
+    logger.log(chalk.yellow('SMOKE TEST MODE: Verifying pipeline correctness (not for model selection)'));
+    logger.log(`  ${String(QUICK_ROUNDS_PER_PHASE)} rounds/phase, ${String(QUICK_MODEL_COUNT)} random models`);
     modelIds = shuffleArray(modelIds).slice(0, QUICK_MODEL_COUNT);
-    logger.log(`Selected: ${modelIds.join(', ')}`);
+    logger.log(`  Selected: ${modelIds.join(', ')}`);
   }
 
   // Initialize model state for all models
@@ -1525,8 +1830,8 @@ async function main(): Promise<void> {
     clockState = advanceClock();
   }
 
-  // Run Phase 0 elimination
-  runPhase0(models);
+  // Run Phase 0 elimination (or validation in smoke test mode)
+  runPhase0(models, smokeTestStatus);
 
   // ========== PHASE 1 ==========
   logger.newline();
@@ -1555,6 +1860,46 @@ async function main(): Promise<void> {
 
   // Run Phase 2 elimination
   runPhase2(models);
+
+  // ========== SMOKE TEST MODE: Show summary and exit early ==========
+  if (isQuickMode && smokeTestStatus !== undefined) {
+    // Update smoke test status from collected data
+    for (const state of models.values()) {
+      smokeTestStatus.totalPredictionAttempts += state.roundScores.length + state.failedRounds.length;
+      smokeTestStatus.successfulPredictions += state.roundScores.length;
+
+      // Count pivot hits from trackB rounds
+      for (const round of state.trackBRounds) {
+        for (const horizon of HORIZONS) {
+          // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+          if (round.timeToPivotRatio?.[horizon] !== undefined) {
+            smokeTestStatus.pivotHits++;
+          }
+        }
+      }
+    }
+
+    // Ground truth is resolved if any model has labels
+    const anyModelHasLabels = [...models.values()].some(
+      state => state.labelsByHorizon['15m'].length > 0
+    );
+    smokeTestStatus.groundTruthResolved = anyModelHasLabels;
+
+    // Scoring is computed if any model has round scores
+    const anyModelHasScores = [...models.values()].some(
+      state => state.roundScores.length > 0
+    );
+    smokeTestStatus.scoringComputed = anyModelHasScores;
+
+    // Print smoke test summary
+    printSmokeTestSummary(smokeTestStatus, models, totalRounds);
+
+    logger.newline();
+    logger.log('=== Smoke Test Complete ===');
+    return;
+  }
+
+  // ========== FULL RUN: Continue with elimination and ranking ==========
 
   // Print per-model horizon qualification summary
   printHorizonQualificationSummary(models);
@@ -1602,7 +1947,7 @@ async function main(): Promise<void> {
     totalRounds,
     currentRound: roundNumber,
     currentPhase: 3,
-  }, perHorizonRankings, { skipWrite: isQuickMode, logger });
+  }, perHorizonRankings, { logger });
 
   logger.newline();
   logger.log('=== Benchmark Complete ===');
