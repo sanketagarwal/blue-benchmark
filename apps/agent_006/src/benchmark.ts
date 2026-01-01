@@ -620,11 +620,8 @@ function createModelState(modelId: string): ModelState {
  * @returns Bottom caller output with predictions
  */
 async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
-  // eslint-disable-next-line turbo/no-undeclared-env-vars -- MODEL_ID is set dynamically per model in benchmark
-  process.env['MODEL_ID'] = modelId;
-
   const bottomCaller = createBottomCaller(modelId);
-  const result = await runRound(bottomCaller);
+  const result = await runRound(bottomCaller, { modelId });
   return result.output;
 }
 

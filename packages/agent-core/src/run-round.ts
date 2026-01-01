@@ -26,10 +26,11 @@ export function defineAgent<TOutput>(definition: AgentDefinition<TOutput>): Agen
  * @param agent - The agent to execute
  * @param options - Optional configuration
  * @param options.traceId - Optional trace ID for correlation (auto-generated if not provided)
+ * @param options.modelId - Optional model ID override for parallel execution (avoids env race condition)
  */
 export async function runRound<TOutput>(
   agent: Agent<TOutput>,
-  options?: { traceId?: string }
+  options?: { traceId?: string; modelId?: string }
 ): Promise<RoundResult<TOutput>> {
   const { definition } = agent;
   const traceId = options?.traceId ?? crypto.randomUUID();
@@ -44,11 +45,12 @@ export async function runRound<TOutput>(
     const shouldTriggerCompaction = await shouldCompact(
       definition.compactionTrigger,
       definition.id,
-      messages
+      messages,
+      options?.modelId
     );
 
     if (shouldTriggerCompaction) {
-      compactionSummary = await runCompaction(definition);
+      compactionSummary = await runCompaction(definition, options?.modelId);
       wasCompacted = true;
     }
   }
@@ -78,7 +80,7 @@ export async function runRound<TOutput>(
   await saveRoundPrompt(definition.id, prompt, roundNumber, traceId);
 
   const client = getLLMClient();
-  const modelId = getModelId();
+  const modelId = options?.modelId ?? getModelId();
 
   // Use .chat() explicitly to force chat completions API (not responses API)
   // This is required for AI Gateway compatibility

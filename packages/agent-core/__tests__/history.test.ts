@@ -87,6 +87,52 @@ describe('history', () => {
       expect(messages[0]).toEqual({ role: 'user', content: 'Hello' });
       expect(messages[1]).toEqual({ role: 'assistant', content: 'Hi there' });
     });
+
+    it('returns messages ordered by createdAt ascending', async () => {
+      const { getDatabase } = await import('@nullagent/database');
+      const mockDb = getDatabase();
+      const whereMock = vi.fn().mockReturnValue({
+        orderBy: vi.fn().mockResolvedValue([
+          { role: 'user', content: 'First', kind: 'prompt', createdAt: new Date('2024-01-01T00:00:00Z') },
+          { role: 'assistant', content: 'Second', kind: 'output', createdAt: new Date('2024-01-01T00:01:00Z') },
+          { role: 'user', content: 'Third', kind: 'prompt', createdAt: new Date('2024-01-01T00:02:00Z') },
+        ]),
+      });
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: whereMock,
+        }),
+      });
+
+      const messages = await loadMessageHistory('test-agent');
+
+      expect(messages).toHaveLength(3);
+      expect(messages[0]).toEqual({ role: 'user', content: 'First' });
+      expect(messages[1]).toEqual({ role: 'assistant', content: 'Second' });
+      expect(messages[2]).toEqual({ role: 'user', content: 'Third' });
+      expect(whereMock().orderBy).toHaveBeenCalled();
+    });
+
+    it('filters messages by since option when provided', async () => {
+      const { getDatabase } = await import('@nullagent/database');
+      const mockDb = getDatabase();
+      const sinceDate = new Date('2024-01-01T00:01:00Z');
+      const whereMock = vi.fn().mockReturnValue({
+        orderBy: vi.fn().mockResolvedValue([
+          { role: 'user', content: 'After since', kind: 'prompt', createdAt: new Date('2024-01-01T00:02:00Z') },
+        ]),
+      });
+      mockDb.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: whereMock,
+        }),
+      });
+
+      const messages = await loadMessageHistory('test-agent', { since: sinceDate });
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({ role: 'user', content: 'After since' });
+    });
   });
 
   describe('saveRoundPrompt', () => {

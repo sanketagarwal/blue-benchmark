@@ -86,6 +86,7 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
 
   return defineAgent({
     id: agentId,
+    systemPrompt: 'You are an expert technical analyst specializing in identifying structural market bottoms across multiple timeframes.',
     outputSchema: OutputSchema,
 
     compactionTrigger: {

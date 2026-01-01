@@ -253,7 +253,7 @@ describe('run-round', () => {
 
       const result = await runRound(agent);
 
-      expect(runCompaction).toHaveBeenCalledWith(definition);
+      expect(runCompaction).toHaveBeenCalledWith(definition, undefined);
       expect(result.wasCompacted).toBe(true);
     });
 

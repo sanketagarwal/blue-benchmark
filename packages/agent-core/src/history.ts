@@ -1,5 +1,5 @@
 import { getDatabase, agentMessages } from '@nullagent/database';
-import { eq, desc, and, ne, isNotNull } from 'drizzle-orm';
+import { eq, desc, and, ne, isNotNull, asc, gte } from 'drizzle-orm';
 
 import type { RoundHistory } from './types.js';
 
