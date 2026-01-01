@@ -7,6 +7,7 @@ import {
   setBottomCallerContext,
   clearBottomCallerContext,
 } from './bottom-caller.js';
+import { parseModelArgument } from './cli-arguments.js';
 import {
   initializeClock,
   advanceClock,
@@ -1777,8 +1778,26 @@ async function main(): Promise<void> {
   initAuditFile();
 
   // Load all vision models
-  let modelIds = getModelIds();
-  logger.log(`Loaded ${String(modelIds.length)} vision models`);
+  const allModelIds = getModelIds();
+  logger.log(`Loaded ${String(allModelIds.length)} vision models`);
+
+  // Parse --model argument for specific model selection
+  const specifiedModels = parseModelArgument(process.argv);
+  let modelIds = specifiedModels ?? allModelIds;
+
+  // Validate specified models exist
+  if (specifiedModels !== undefined) {
+    const invalidModels = specifiedModels.filter(m => !allModelIds.includes(m));
+    if (invalidModels.length > 0) {
+      logger.log(chalk.yellow(`Warning: Unknown models specified: ${invalidModels.join(', ')}`));
+      // Filter to only valid models
+      modelIds = specifiedModels.filter(m => allModelIds.includes(m));
+      if (modelIds.length === 0) {
+        throw new Error('No valid models specified');
+      }
+    }
+    logger.log(`Using specified models: ${modelIds.join(', ')}`);
+  }
 
   // Quick mode: smoke test with reduced models
   // Initialize smoke test status tracking (only used in quick mode)
@@ -1786,9 +1805,14 @@ async function main(): Promise<void> {
 
   if (isQuickMode) {
     logger.log(chalk.yellow('SMOKE TEST MODE: Verifying pipeline correctness (not for model selection)'));
-    logger.log(`  ${String(QUICK_ROUNDS_PER_PHASE)} rounds/phase, ${String(QUICK_MODEL_COUNT)} random models`);
-    modelIds = shuffleArray(modelIds).slice(0, QUICK_MODEL_COUNT);
-    logger.log(`  Selected: ${modelIds.join(', ')}`);
+    // Only random select if no specific models were requested
+    if (specifiedModels === undefined) {
+      logger.log(`  ${String(QUICK_ROUNDS_PER_PHASE)} rounds/phase, ${String(QUICK_MODEL_COUNT)} random models`);
+      modelIds = shuffleArray(modelIds).slice(0, QUICK_MODEL_COUNT);
+      logger.log(`  Selected: ${modelIds.join(', ')}`);
+    } else {
+      logger.log(`  ${String(QUICK_ROUNDS_PER_PHASE)} rounds/phase, ${String(modelIds.length)} specified models`);
+    }
   }
 
   // Initialize model state for all models
