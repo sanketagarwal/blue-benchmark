@@ -1,0 +1,3642 @@
+{
+  "openapi": "3.0.3",
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "components": {
+    "schemas": {
+      "SymbolId": {
+        "type": "string",
+        "enum": [
+          "COINBASE_SPOT_BTC_USD",
+          "COINBASE_SPOT_ETH_USD",
+          "COINBASE_SPOT_SOL_USD",
+          "COINBASE_SPOT_AERO_USD",
+          "COINBASE_SPOT_RECALL_USD"
+        ],
+        "example": "COINBASE_SPOT_BTC_USD",
+        "examples": [
+          "COINBASE_SPOT_BTC_USD",
+          "COINBASE_SPOT_ETH_USD",
+          "COINBASE_SPOT_SOL_USD",
+          "COINBASE_SPOT_AERO_USD",
+          "COINBASE_SPOT_RECALL_USD"
+        ]
+      },
+      "Timeframe": {
+        "type": "string",
+        "enum": [
+          "1m",
+          "5m",
+          "15m",
+          "1h",
+          "4h",
+          "1d"
+        ],
+        "example": "1h"
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable error message"
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable error code"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Candle": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "description": "ISO 8601 datetime"
+          },
+          "open": {
+            "type": "number",
+            "description": "Opening price"
+          },
+          "high": {
+            "type": "number",
+            "description": "Highest price"
+          },
+          "low": {
+            "type": "number",
+            "description": "Lowest price"
+          },
+          "close": {
+            "type": "number",
+            "description": "Closing price"
+          },
+          "volume": {
+            "type": "number",
+            "description": "Trading volume"
+          },
+          "trades_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of trades"
+          }
+        },
+        "required": [
+          "timestamp",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ]
+      },
+      "OHLCVResponse": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "description": "Candle interval"
+          },
+          "candles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "description": "ISO 8601 datetime"
+                },
+                "open": {
+                  "type": "number",
+                  "description": "Opening price"
+                },
+                "high": {
+                  "type": "number",
+                  "description": "Highest price"
+                },
+                "low": {
+                  "type": "number",
+                  "description": "Lowest price"
+                },
+                "close": {
+                  "type": "number",
+                  "description": "Closing price"
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Trading volume"
+                },
+                "trades_count": {
+                  "type": "integer",
+                  "nullable": true,
+                  "description": "Number of trades"
+                }
+              },
+              "required": [
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+              ]
+            },
+            "description": "OHLCV candles"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "timeframe",
+          "candles"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Health status"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "OrderbookResponse": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair symbol"
+          },
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "description": "ISO 8601 datetime"
+                },
+                "mid_price": {
+                  "type": "number",
+                  "description": "(best_bid + best_ask) / 2"
+                },
+                "spread": {
+                  "type": "number",
+                  "description": "best_ask - best_bid"
+                },
+                "spread_bps": {
+                  "type": "number",
+                  "description": "Spread in basis points"
+                },
+                "imbalance": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1,
+                  "description": "(bid_depth - ask_depth) / (bid_depth + ask_depth)"
+                },
+                "bid_depth": {
+                  "type": "number",
+                  "description": "Total size on bid side"
+                },
+                "ask_depth": {
+                  "type": "number",
+                  "description": "Total size on ask side"
+                }
+              },
+              "required": [
+                "timestamp",
+                "mid_price",
+                "spread",
+                "spread_bps",
+                "imbalance",
+                "bid_depth",
+                "ask_depth"
+              ]
+            },
+            "description": "Orderbook snapshots"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "snapshots"
+        ]
+      },
+      "IndicatorsResponse": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair symbol"
+          },
+          "timeframe": {
+            "type": "string",
+            "description": "Candle interval"
+          },
+          "candles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "description": "ISO 8601 datetime"
+                },
+                "open": {
+                  "type": "number",
+                  "description": "Opening price"
+                },
+                "high": {
+                  "type": "number",
+                  "description": "Highest price"
+                },
+                "low": {
+                  "type": "number",
+                  "description": "Lowest price"
+                },
+                "close": {
+                  "type": "number",
+                  "description": "Closing price"
+                },
+                "volume": {
+                  "type": "number",
+                  "description": "Trading volume"
+                },
+                "trades_count": {
+                  "type": "integer",
+                  "nullable": true,
+                  "description": "Number of trades"
+                }
+              },
+              "required": [
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+              ]
+            },
+            "description": "OHLCV candles"
+          },
+          "indicators": {
+            "type": "object",
+            "properties": {
+              "bbw": {
+                "type": "number",
+                "nullable": true,
+                "description": "Bollinger Band Width (20-period, 2 std dev)"
+              },
+              "realized_vol": {
+                "type": "number",
+                "nullable": true,
+                "description": "Rolling standard deviation of log returns"
+              },
+              "recent_returns": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Last N log returns"
+              },
+              "rsi": {
+                "type": "number",
+                "nullable": true,
+                "description": "Relative Strength Index (14-period)"
+              },
+              "atr": {
+                "type": "number",
+                "nullable": true,
+                "description": "Average True Range (14-period)"
+              },
+              "macd": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "macd": {
+                    "type": "number",
+                    "description": "MACD line"
+                  },
+                  "signal": {
+                    "type": "number",
+                    "description": "Signal line"
+                  },
+                  "histogram": {
+                    "type": "number",
+                    "description": "MACD histogram (MACD - Signal)"
+                  }
+                },
+                "required": [
+                  "macd",
+                  "signal",
+                  "histogram"
+                ],
+                "description": "MACD indicator (12, 26, 9 periods)"
+              },
+              "stoch_rsi": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "stoch_rsi": {
+                    "type": "number",
+                    "description": "Stochastic RSI value (0-100)"
+                  },
+                  "k": {
+                    "type": "number",
+                    "description": "%K line (0-100)"
+                  },
+                  "d": {
+                    "type": "number",
+                    "description": "%D line (0-100)"
+                  }
+                },
+                "required": [
+                  "stoch_rsi",
+                  "k",
+                  "d"
+                ],
+                "description": "Stochastic RSI (14, 14, 3, 3 periods)"
+              },
+              "adx": {
+                "type": "number",
+                "nullable": true,
+                "description": "Average Directional Index (14-period, 0-100)"
+              },
+              "cmf": {
+                "type": "number",
+                "nullable": true,
+                "description": "Chaikin Money Flow (20-period, -1 to 1)"
+              },
+              "supertrend": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "value": {
+                    "type": "number",
+                    "description": "SuperTrend line value"
+                  },
+                  "advice": {
+                    "type": "string",
+                    "enum": [
+                      "long",
+                      "short"
+                    ],
+                    "description": "Trading signal based on price vs SuperTrend"
+                  }
+                },
+                "required": [
+                  "value",
+                  "advice"
+                ],
+                "description": "SuperTrend indicator (10-period ATR, 3x multiplier)"
+              },
+              "price": {
+                "type": "number",
+                "description": "Latest close price"
+              }
+            },
+            "required": [
+              "bbw",
+              "realized_vol",
+              "recent_returns",
+              "rsi",
+              "atr",
+              "macd",
+              "stoch_rsi",
+              "adx",
+              "cmf",
+              "supertrend",
+              "price"
+            ],
+            "description": "Computed indicators for latest candle"
+          },
+          "vwap": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "vwap": {
+                "type": "number",
+                "description": "Volume-weighted average price"
+              },
+              "upper_band": {
+                "type": "number",
+                "description": "VWAP + 1 std dev"
+              },
+              "lower_band": {
+                "type": "number",
+                "description": "VWAP - 1 std dev"
+              },
+              "std_dev": {
+                "type": "number",
+                "description": "Standard deviation"
+              }
+            },
+            "required": [
+              "vwap",
+              "upper_band",
+              "lower_band",
+              "std_dev"
+            ],
+            "description": "VWAP with bands"
+          },
+          "rolling_vwap": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "vwap_per_bar": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "description": "Cumulative VWAP at each candle"
+              },
+              "close_above_vwap": {
+                "type": "array",
+                "items": {
+                  "type": "boolean"
+                },
+                "description": "Whether close was above VWAP at each bar"
+              },
+              "acceptance_count": {
+                "type": "integer",
+                "description": "Count of bars where close > VWAP"
+              },
+              "acceptance_ratio": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Ratio of bars above VWAP (0-1)"
+              },
+              "price_to_vwap_bp": {
+                "type": "integer",
+                "description": "Current price distance from VWAP in basis points"
+              }
+            },
+            "required": [
+              "vwap_per_bar",
+              "close_above_vwap",
+              "acceptance_count",
+              "acceptance_ratio",
+              "price_to_vwap_bp"
+            ],
+            "description": "Per-bar VWAP evolution and acceptance analysis"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "timeframe",
+          "candles",
+          "indicators",
+          "vwap",
+          "rolling_vwap"
+        ]
+      },
+      "ReplaysListResponse": {
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol_id": {
+                  "type": "string",
+                  "description": "Trading pair symbol"
+                },
+                "timeframe": {
+                  "type": "string",
+                  "description": "Candle timeframe (e.g., 1m)"
+                },
+                "earliest": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Earliest available data (ISO 8601)"
+                },
+                "latest": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Latest available data (ISO 8601)"
+                },
+                "candle_count": {
+                  "type": "integer",
+                  "description": "Total number of candles"
+                },
+                "duration_minutes": {
+                  "type": "integer",
+                  "description": "Duration in minutes"
+                }
+              },
+              "required": [
+                "symbol_id",
+                "timeframe",
+                "earliest",
+                "latest",
+                "candle_count",
+                "duration_minutes"
+              ]
+            },
+            "description": "Available replay data per symbol"
+          },
+          "generated_at": {
+            "type": "string",
+            "description": "When this data was generated (ISO 8601)"
+          }
+        },
+        "required": [
+          "symbols",
+          "generated_at"
+        ]
+      },
+      "AnnotationsResponse": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair symbol"
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Unique annotation identifier"
+                },
+                "time_start": {
+                  "type": "string",
+                  "description": "Start time (ISO 8601)"
+                },
+                "time_end": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "End time (ISO 8601), null for point-in-time events"
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Annotation type (e.g., dump_event, pump_event, local_extrema)"
+                },
+                "method": {
+                  "type": "string",
+                  "description": "Detection method (e.g., simple-threshold, fractal, zigzag)"
+                },
+                "schema_version": {
+                  "type": "string",
+                  "description": "Payload schema version"
+                },
+                "payload": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  },
+                  "description": "Type-specific annotation data"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Internal annotator source string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "description": "Creation timestamp (ISO 8601)"
+                }
+              },
+              "required": [
+                "id",
+                "time_start",
+                "time_end",
+                "type",
+                "method",
+                "schema_version",
+                "payload",
+                "source"
+              ]
+            },
+            "description": "List of annotations"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "annotations"
+        ]
+      },
+      "AnnotatorsListResponse": {
+        "type": "object",
+        "properties": {
+          "annotators": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Unique annotator identifier"
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Annotator version"
+                },
+                "annotation_type": {
+                  "type": "string",
+                  "description": "Type of annotations produced"
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Source identifier for created annotations"
+                },
+                "window_size": {
+                  "type": "string",
+                  "description": "Processing window size (e.g., 1m, 15m, 1h)"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "backfilling",
+                    "active",
+                    "deprecated"
+                  ],
+                  "description": "Current operational status"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Human-readable description"
+                }
+              },
+              "required": [
+                "name",
+                "version",
+                "annotation_type",
+                "source",
+                "window_size",
+                "status",
+                "description"
+              ]
+            },
+            "description": "List of registered annotators"
+          }
+        },
+        "required": [
+          "annotators"
+        ]
+      },
+      "AnnotatorDetailResponse": {
+        "type": "object",
+        "properties": {
+          "annotator": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Unique annotator identifier"
+              },
+              "version": {
+                "type": "string",
+                "description": "Annotator version"
+              },
+              "annotation_type": {
+                "type": "string",
+                "description": "Type of annotations produced"
+              },
+              "source": {
+                "type": "string",
+                "description": "Source identifier for created annotations"
+              },
+              "window_size": {
+                "type": "string",
+                "description": "Processing window size"
+              },
+              "start_time": {
+                "type": "string",
+                "description": "Start time for processing"
+              },
+              "status": {
+                "type": "string",
+                "description": "Current operational status"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description"
+              },
+              "config": {
+                "type": "object",
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "Annotator configuration"
+              },
+              "registered_at": {
+                "type": "string",
+                "description": "Registration timestamp"
+              }
+            },
+            "required": [
+              "name",
+              "version",
+              "annotation_type",
+              "source",
+              "window_size",
+              "status",
+              "description",
+              "config"
+            ],
+            "description": "Annotator details"
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "windows_processed": {
+                "type": "integer",
+                "description": "Total windows processed"
+              },
+              "annotations_created": {
+                "type": "integer",
+                "description": "Total annotations created"
+              },
+              "last_processed_at": {
+                "type": "string",
+                "nullable": true,
+                "description": "Last processing timestamp (ISO 8601)"
+              }
+            },
+            "required": [
+              "windows_processed",
+              "annotations_created",
+              "last_processed_at"
+            ],
+            "description": "Processing progress"
+          }
+        },
+        "required": [
+          "annotator",
+          "progress"
+        ]
+      },
+      "AnnotatorRunResponse": {
+        "type": "object",
+        "properties": {
+          "annotator": {
+            "type": "string",
+            "description": "Annotator name"
+          },
+          "symbol_id": {
+            "type": "string",
+            "description": "Symbol processed"
+          },
+          "from": {
+            "type": "string",
+            "description": "Start time (ISO 8601)"
+          },
+          "to": {
+            "type": "string",
+            "description": "End time (ISO 8601)"
+          },
+          "windows_processed": {
+            "type": "integer",
+            "description": "Number of windows processed"
+          },
+          "annotations_created": {
+            "type": "integer",
+            "description": "Number of annotations created"
+          }
+        },
+        "required": [
+          "annotator",
+          "symbol_id",
+          "from",
+          "to",
+          "windows_processed",
+          "annotations_created"
+        ]
+      },
+      "IngestionResult": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string",
+            "description": "Unique batch identifier"
+          },
+          "ohlcvCount": {
+            "type": "integer",
+            "description": "Number of OHLCV candles ingested"
+          },
+          "orderbookCount": {
+            "type": "integer",
+            "description": "Number of orderbook snapshots ingested"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Symbols processed in this ingestion run"
+          }
+        },
+        "required": [
+          "batchId",
+          "ohlcvCount",
+          "orderbookCount",
+          "symbols"
+        ]
+      },
+      "TradeTick": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair identifier"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Trade timestamp (ISO 8601)"
+          },
+          "price": {
+            "type": "number",
+            "description": "Trade price"
+          },
+          "size": {
+            "type": "number",
+            "description": "Trade size"
+          },
+          "taker_side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "description": "Taker/aggressor side"
+          },
+          "uuid": {
+            "type": "string",
+            "description": "CoinAPI trade UUID"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "timestamp",
+          "price",
+          "size",
+          "taker_side",
+          "uuid"
+        ]
+      },
+      "TradesResponse": {
+        "type": "object",
+        "properties": {
+          "symbol_id": {
+            "type": "string",
+            "description": "Trading pair symbol"
+          },
+          "trades": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "symbol_id": {
+                  "type": "string",
+                  "description": "Trading pair identifier"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Trade timestamp (ISO 8601)"
+                },
+                "price": {
+                  "type": "number",
+                  "description": "Trade price"
+                },
+                "size": {
+                  "type": "number",
+                  "description": "Trade size"
+                },
+                "taker_side": {
+                  "type": "string",
+                  "enum": [
+                    "BUY",
+                    "SELL"
+                  ],
+                  "description": "Taker/aggressor side"
+                },
+                "uuid": {
+                  "type": "string",
+                  "description": "CoinAPI trade UUID"
+                }
+              },
+              "required": [
+                "symbol_id",
+                "timestamp",
+                "price",
+                "size",
+                "taker_side",
+                "uuid"
+              ]
+            },
+            "description": "Trade ticks"
+          }
+        },
+        "required": [
+          "symbol_id",
+          "trades"
+        ]
+      },
+      "HindsightSpec": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of hindsight requirements"
+              }
+            },
+            "required": [
+              "mode",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "fixed_bars"
+                ]
+              },
+              "fixedFutureBars": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Fixed number of future bars needed"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of hindsight requirements"
+              }
+            },
+            "required": [
+              "mode",
+              "fixedFutureBars",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "variable"
+                ]
+              },
+              "maxFutureBars": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum future bars that might be needed"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of hindsight requirements"
+              }
+            },
+            "required": [
+              "mode",
+              "maxFutureBars",
+              "description"
+            ]
+          }
+        ]
+      },
+      "EventSpec": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "dump_event",
+              "pump_event",
+              "local_extrema",
+              "regime",
+              "vol_spike",
+              "sweep_reclaim"
+            ],
+            "description": "High-level event category"
+          },
+          "method": {
+            "type": "string",
+            "description": "Detection method identifier (e.g., simple-threshold, drawdown)"
+          },
+          "candleTimeframe": {
+            "type": "string",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "description": "Native detection candle timeframe"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Fully normalized detection parameters"
+          },
+          "hindsight": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "none"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Human-readable description of hindsight requirements"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "description"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "fixed_bars"
+                    ]
+                  },
+                  "fixedFutureBars": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Fixed number of future bars needed"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Human-readable description of hindsight requirements"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "fixedFutureBars",
+                  "description"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "variable"
+                    ]
+                  },
+                  "maxFutureBars": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum future bars that might be needed"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Human-readable description of hindsight requirements"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "maxFutureBars",
+                  "description"
+                ]
+              }
+            ],
+            "description": "Hindsight/availability semantics"
+          },
+          "id": {
+            "type": "string",
+            "description": "Canonical stable identifier for caching and reproducibility"
+          }
+        },
+        "required": [
+          "type",
+          "method",
+          "candleTimeframe",
+          "params",
+          "hindsight",
+          "id"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "info": {
+    "title": "Replay Lab API",
+    "version": "2.0.0",
+    "description": "**Replayable market data lab for AI agent evaluation.**\n\nReplay Lab is a specialized microservice for **generating labeled training data** for ML models that predict market events. It employs a **hybrid storage strategy** - eager storage for raw market data, lazy computation for derived indicators and annotations.\n\n## Quick Start\n\n```bash\n# Get recent BTC candles\ncurl \"/api/ohlcv/COINBASE_SPOT_BTC_USD?limit=100\"\n\n# Get candles with technical indicators\ncurl \"/api/indicators/COINBASE_SPOT_BTC_USD?limit=50\"\n\n# Get ground truth annotations for agent scoring\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?type=dump_event\"\n\n# Generate a chart image with SMA indicator and fractal annotations\ncurl \"/api/charts/COINBASE_SPOT_BTC_USD/image?layers=candles,sma:20&type=local_extrema&method=fractal&params=%7B%22L%22:3,%22candleTimeframe%22:%221m%22%7D\" > chart.png\n```\n\n## Architecture: Hybrid Computation\n\n### Eager Storage (OHLCV Candles)\nRaw candlestick data is ingested immediately and persisted forever:\n- **Source of truth** for all downstream computations\n- **Immutable** - historical candles never change\n- **Gap healing** - automatic detection and backfill of missing data\n\n### Lazy Computation (Indicators & Annotations)\nDerived data is computed on-demand:\n- **Indicators** (RSI, MACD, ATR, etc.) - computed fresh on every request, never stored\n- **Annotations** (dump events, regime changes) - computed on first request, cached incrementally\n\n**Why lazy?**\n- Storage efficiency (10-100x smaller database)\n- Algorithm flexibility (change detection logic without migrations)\n- Fresh computations always use latest code\n\n## Data Sources\n- **OHLCV**: Real 1-minute candles from CoinAPI (executed trades)\n- **Orderbook**: 20-level depth snapshots with mid_price, spread, imbalance\n\n## Supported Symbols\nCurrently supported (Coinbase USD spot pairs):\n- `COINBASE_SPOT_BTC_USD`\n- `COINBASE_SPOT_ETH_USD`\n- `COINBASE_SPOT_SOL_USD`\n- `COINBASE_SPOT_AERO_USD`\n- `COINBASE_SPOT_RECALL_USD`\n"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Replay Lab API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Charts",
+      "description": "Static chart image generation with edge caching.\n\nGenerate beautiful financial charts as PNG/JPEG images on-demand.\nImages are cached at Vercel's edge CDN for fast global delivery.\n\n## Features\n\n- **Layered visualizations**: Combine candles, moving averages, Bollinger Bands, oscillators\n- **Smart caching**: Historical charts cached for 1 year, current charts TTL by timeframe\n- **Multiple styles**: Candlestick, OHLC, line, area, Heikin-Ashi\n- **Multi-panel**: Price + Volume + Oscillator panels automatically composed\n\n## Layer Syntax\n\nLayers are comma-separated: `layers=candles,sma:20,ema:50,bb:20:2`\n\n**Chartable layers** (return time-series data):\n\n| Layer | Params | Panel | Description |\n|-------|--------|-------|-------------|\n| `candles` | - | price | OHLCV candlesticks |\n| `sma` | period | price | Simple Moving Average |\n| `ema` | period | price | Exponential Moving Average |\n| `bb` | period,stdDev | price | Bollinger Bands |\n| `vwap` | - | price | Volume Weighted Average Price |\n| `volume` | - | volume | Volume histogram |\n\n**Not yet chartable** (use `/indicators` endpoint instead):\nRSI, MACD, StochRSI, ADX, ATR, CMF, CHOP, SuperTrend, VolumeRatio\n"
+    },
+    {
+      "name": "Market Data",
+      "description": "OHLCV candles and technical indicators.\n\n## Technical Indicators\n\nThe `/indicators` endpoint computes 15+ technical indicators on-the-fly:\n\n**Momentum**: RSI (14-period, Wilder's smoothing), Stochastic RSI (14,14,5,3)\n\n**Trend**: MACD (12,26,9), ADX (14-period), SuperTrend (10,3)\n\n**Volatility**: ATR (14-period, Wilder's smoothing), Bollinger Band Width (20), Realized Volatility\n\n**Volume**: CMF (20-period), VWAP with bands\n\n### Smoothing Methods\n\nDifferent indicators use different smoothing:\n- **SMA**: Arithmetic mean (Bollinger Bands)\n- **EMA**: Exponential weighted (MACD)\n- **Wilder's**: Modified EMA with 1/period factor (RSI, ATR) - matches TradingView/TAAPI\n\n### Adding New Indicators\n\n1. Create indicator file in `/lib/indicators/`\n2. Validate input length, return `null` for insufficient data\n3. Export from `index.ts` and add to API route\n4. Write tests validating against TAAPI reference\n\n**Critical**: Candles must be ordered oldest-first (ascending) for correct calculations.\n"
+    },
+    {
+      "name": "Annotators",
+      "description": "Annotation generation system for ground truth labels.\n\n## What Are Annotations?\n\nAnnotations are **labeled time ranges** representing ground truth events:\n- **Agent evaluation** - Measure how well trading agents detect dumps, pumps, regime changes\n- **Backtesting** - Test strategies against historical events\n- **Data labeling** - Create supervised learning datasets\n\n## Building Custom Annotators (EventSpec Pattern)\n\nAn annotator is a registered function that processes candles and emits annotations. Use `defineEventAnnotator` with an `EventSpec` for proper hindsight semantics and cache key generation.\n\n### Annotator Definition\n\n```typescript\nimport { defineEventAnnotator, buildEventSpec } from '@recallnet/core-domain'\nimport type { AvailabilityMeta } from '@recallnet/core-domain/replay-lab'\n\nconst eventSpec = buildEventSpec({\n  type: 'dump_event',\n  method: 'simple-threshold',\n  candleTimeframe: '1m',\n  params: { threshold: -0.03 },\n  hindsight: {\n    mode: 'none',\n    description: 'Available when candle closes.',\n  },\n})\n\ndefineEventAnnotator({\n  name: 'dump-simple-1m-3pct',\n  version: 'v2',\n  eventSpec,\n  windowSize: '1h',\n  startTime: null,\n  description: 'Detects 3% dumps on 1m candles',\n\n  transform: async (ctx) => {\n    const candles = await ctx.getCandles('1m')\n    const dumps = []\n    for (const candle of candles) {\n      const returnPct = (candle.close - candle.open) / candle.open\n      if (returnPct <= eventSpec.params.threshold) {\n        const availability: AvailabilityMeta = {\n          availableAt: candle.timestamp.toISOString(),\n          futureBarsUsed: 0,\n          mode: 'none',\n        }\n        dumps.push({\n          timeStart: candle.timestamp,\n          payload: {\n            method: eventSpec.method,\n            params: eventSpec.params,\n            availability,\n            returnPct,\n          }\n        })\n      }\n    }\n    return dumps\n  }\n})\n```\n\n### Annotator Types\n\n**Simple Threshold**: Flag candles crossing a return threshold\n- `dump-simple-{timeframe}-{pct}` - e.g., dump-simple-1m-3pct\n- `pump-simple-{timeframe}-{pct}` - e.g., pump-simple-1m-3pct\n\n**Volatility-Adjusted**: Normalize returns by rolling volatility (z-score)\n- `dump-vol-adjusted-{timeframe}-z{threshold}` - e.g., dump-vol-adjusted-1m-z2\n- `pump-vol-adjusted-{timeframe}-z{threshold}` - e.g., pump-vol-adjusted-1m-z2\n\n**Drawdown/Drawup**: Track peak-to-trough/trough-to-peak with recovery detection\n- `dump-drawdown-{pct}` - e.g., dump-drawdown-3pct\n- `pump-drawup-{pct}` - e.g., pump-drawup-3pct\n\n**Local Extrema**: Fractal pivots and ZigZag turning points\n- `local-extrema-fractal-{timeframe}-L{bars}` - e.g., local-extrema-fractal-1m-L5\n- `local-extrema-zigzag-{timeframe}-{pct}` - e.g., local-extrema-zigzag-1m-3pct\n\n### Version Bumping\n\nBump `version` when algorithm logic changes - triggers fresh backfill while preserving old annotations.\n"
+    },
+    {
+      "name": "Annotations",
+      "description": "Query ground truth annotations for agent self-scoring.\n\nAnnotations are computed lazily on first request, then cached incrementally.\nSubsequent queries for the same time range are instant.\n\n### On-Demand Computation\n\nUse the `/compute` endpoint to run annotation detection with custom parameters without pre-registration:\n\n```bash\nPOST /api/annotations/COINBASE_SPOT_BTC_USD/compute\n{\n  \"type\": \"dump_event\",\n  \"method\": \"simple-threshold\",\n  \"params\": { \"threshold\": -0.05, \"candleTimeframe\": \"1m\" },\n  \"from\": \"2025-12-16T00:00:00Z\",\n  \"to\": \"2025-12-16T23:59:59Z\",\n  \"cachePolicy\": \"none\"\n}\n```\n\nAvailable methods:\n- **dump_event**: simple-threshold, vol-adjusted-zscore, drawdown\n- **pump_event**: simple-threshold, vol-adjusted-zscore, drawup\n- **local_extrema**: fractal, zigzag\n- **sweep_reclaim**: sweep-reclaim (not yet implemented)\n\n### Cache Warming\n\nPre-compute annotations for your training date ranges:\n```bash\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?from=2025-12-01&to=2025-12-08\"\n# Subsequent queries will be instant (cache hits)\n```\n"
+    },
+    {
+      "name": "System",
+      "description": "System endpoints for health checks and data ingestion.\n\n## Data Ingestion\n\nThe cron endpoint runs every minute, performing:\n1. Fetch latest OHLCV candles for all symbols\n2. Detect gaps in last 60 minutes\n3. Heal gaps by fetching missing candles\n\nAt minute 5 of each hour:\n4. Fetch previous hour's orderbook snapshots in batch\n5. Compute orderbook metrics (mid-price, spread, imbalance)\n\n### Adding New Symbols\n\n1. Verify CoinAPI supports the symbol\n2. Add to `SYMBOLS` array in `/lib/coinapi.ts`\n3. Deploy - ingestion starts automatically\n\n### Gap Healing\n\nAutomatic detection and backfill of missing candles:\n- Scans last 60 minutes for gaps > 1 minute\n- Fetches missing data via time-range queries\n- Maximum 10 gaps healed per symbol per run (rate limit protection)\n"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health check",
+        "description": "Returns service health status.",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "description": "Health status"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ohlcv/{symbolId}": {
+      "get": {
+        "summary": "Get OHLCV candles",
+        "description": "Returns real OHLCV candles from executed trades. Supports timeframe aggregation (1m, 5m, 15m, 1h, 4h, 1d).",
+        "tags": [
+          "Market Data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "default": "1m",
+              "example": "1m",
+              "description": "Candle interval"
+            },
+            "required": false,
+            "description": "Candle interval",
+            "name": "timeframe",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Start time (ISO 8601). Default: 24h ago",
+              "example": "2025-12-16T17:00:00Z"
+            },
+            "required": false,
+            "description": "Start time (ISO 8601). Default: 24h ago",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "End time (ISO 8601). Default: now",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": false,
+            "description": "End time (ISO 8601). Default: now",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "default": 100,
+              "description": "Max records (1-1000)",
+              "example": 100
+            },
+            "required": false,
+            "description": "Max records (1-1000)",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OHLCV candles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Trading pair symbol"
+                    },
+                    "timeframe": {
+                      "type": "string",
+                      "description": "Candle interval"
+                    },
+                    "candles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "description": "ISO 8601 datetime"
+                          },
+                          "open": {
+                            "type": "number",
+                            "description": "Opening price"
+                          },
+                          "high": {
+                            "type": "number",
+                            "description": "Highest price"
+                          },
+                          "low": {
+                            "type": "number",
+                            "description": "Lowest price"
+                          },
+                          "close": {
+                            "type": "number",
+                            "description": "Closing price"
+                          },
+                          "volume": {
+                            "type": "number",
+                            "description": "Trading volume"
+                          },
+                          "trades_count": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "Number of trades"
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "open",
+                          "high",
+                          "low",
+                          "close",
+                          "volume"
+                        ]
+                      },
+                      "description": "OHLCV candles"
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "timeframe",
+                    "candles"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No data found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trades/{symbolId}": {
+      "get": {
+        "summary": "Get tick-by-tick trades",
+        "description": "Returns raw trade data for a symbol in a time range.\n\n**Note:** CoinAPI requires `from` and `to` to be on the same UTC day.\n\nEach trade includes:\n- `timestamp`: When the trade executed\n- `price`: Trade price\n- `size`: Trade size\n- `taker_side`: BUY (buyer was aggressor) or SELL (seller was aggressor)\n- `uuid`: Unique trade identifier from CoinAPI\n",
+        "tags": [
+          "Market Data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start time (ISO 8601)",
+              "example": "2025-12-16T17:00:00Z"
+            },
+            "required": true,
+            "description": "Start time (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End time (ISO 8601)",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": true,
+            "description": "End time (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1000,
+              "description": "Max trades to return",
+              "example": 1000
+            },
+            "required": false,
+            "description": "Max trades to return",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trades",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Trading pair symbol"
+                    },
+                    "trades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol_id": {
+                            "type": "string",
+                            "description": "Trading pair identifier"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Trade timestamp (ISO 8601)"
+                          },
+                          "price": {
+                            "type": "number",
+                            "description": "Trade price"
+                          },
+                          "size": {
+                            "type": "number",
+                            "description": "Trade size"
+                          },
+                          "taker_side": {
+                            "type": "string",
+                            "enum": [
+                              "BUY",
+                              "SELL"
+                            ],
+                            "description": "Taker/aggressor side"
+                          },
+                          "uuid": {
+                            "type": "string",
+                            "description": "CoinAPI trade UUID"
+                          }
+                        },
+                        "required": [
+                          "symbol_id",
+                          "timestamp",
+                          "price",
+                          "size",
+                          "taker_side",
+                          "uuid"
+                        ]
+                      },
+                      "description": "Trade ticks"
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "trades"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No trades found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/charts/{symbolId}/image": {
+      "get": {
+        "summary": "Generate chart image",
+        "description": "Renders a static chart image with configurable layers and annotation overlays.\n\n**Annotation Parameters:**\nUse `type`, `method`, and `params` to configure annotations:\n\n| Type | Valid Methods |\n|------|---------------|\n| `local_extrema` | fractal, zigzag |\n| `dump_event` | simple-threshold, vol-adjusted-zscore, drawdown |\n| `pump_event` | simple-threshold, vol-adjusted-zscore, drawup |\n| `sweep_reclaim` | sweep-reclaim-low, sweep-reclaim-high |\n\n**Caching behavior:**\n- Historical charts (time range before current bar): Cached for 1 year (immutable)\n- Current charts: Cached based on timeframe (1m=30s, 1h=30min, 1d=12h)\n\n**Canonical redirect:**\nWhen `from`/`to` are omitted, the server returns a 302 redirect to a canonical URL\nwith explicit timestamps. This ensures stable cache keys.\n",
+        "tags": [
+          "Charts"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "description": "Trading pair symbol"
+            },
+            "required": true,
+            "description": "Trading pair symbol",
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "default": "1h",
+              "example": "1h",
+              "description": "Candle interval"
+            },
+            "required": false,
+            "description": "Candle interval",
+            "name": "timeframe",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start time (ISO 8601). Use with `to` for historical charts. When omitted, computed from lookback."
+            },
+            "required": false,
+            "description": "Start time (ISO 8601). Use with `to` for historical charts. When omitted, computed from lookback.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End time (ISO 8601). Use with `from` for historical charts. When omitted, uses current time bucket."
+            },
+            "required": false,
+            "description": "End time (ISO 8601). Use with `from` for historical charts. When omitted, uses current time bucket.",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 60,
+              "description": "Number of bars to include when from/to omitted."
+            },
+            "required": false,
+            "description": "Number of bars to include when from/to omitted.",
+            "name": "lookback",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Chart type (deprecated, use style instead)"
+            },
+            "required": false,
+            "description": "Chart type (deprecated, use style instead)",
+            "name": "chartType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "candles",
+                "ohlc",
+                "line",
+                "area",
+                "heikin_ashi"
+              ],
+              "default": "candles",
+              "example": "candles",
+              "description": "Price chart rendering style"
+            },
+            "required": false,
+            "description": "Price chart rendering style",
+            "name": "style",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "default": "candles,sma",
+              "description": "Comma-separated layer specs. Format: `type[:param1[:param2]]`. Supported: candles, sma, ema, bb, vwap, volume",
+              "example": "candles,sma"
+            },
+            "required": false,
+            "description": "Comma-separated layer specs. Format: `type[:param1[:param2]]`. Supported: candles, sma, ema, bb, vwap, volume",
+            "name": "layers",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 2000,
+              "default": 1200,
+              "description": "Image width in pixels",
+              "example": 1200
+            },
+            "required": false,
+            "description": "Image width in pixels",
+            "name": "width",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 1200,
+              "default": 628,
+              "description": "Image height in pixels",
+              "example": 628
+            },
+            "required": false,
+            "description": "Image height in pixels",
+            "name": "height",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dark"
+              ],
+              "default": "dark",
+              "example": "dark",
+              "description": "Color theme"
+            },
+            "required": false,
+            "description": "Color theme",
+            "name": "theme",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "png",
+                "jpeg"
+              ],
+              "default": "png",
+              "example": "png",
+              "description": "Output image format"
+            },
+            "required": false,
+            "description": "Output image format",
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "hidden"
+              ],
+              "default": "auto",
+              "example": "auto",
+              "description": "Legend visibility"
+            },
+            "required": false,
+            "description": "Legend visibility",
+            "name": "legend",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "default": "1",
+              "description": "Indicator version (for cache busting when algorithms change)",
+              "example": "1"
+            },
+            "required": false,
+            "description": "Indicator version (for cache busting when algorithms change)",
+            "name": "iv",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "local_extrema",
+                "dump_event",
+                "pump_event",
+                "sweep_reclaim"
+              ],
+              "default": "local_extrema",
+              "description": "Annotation type to overlay on chart.\n\n**Valid methods per type:**\n- `local_extrema`: fractal, zigzag\n- `dump_event`: simple-threshold, vol-adjusted-zscore, drawdown\n- `pump_event`: simple-threshold, vol-adjusted-zscore, drawup\n- `sweep_reclaim`: sweep-reclaim-low, sweep-reclaim-high",
+              "example": "local_extrema"
+            },
+            "required": false,
+            "description": "Annotation type to overlay on chart.\n\n**Valid methods per type:**\n- `local_extrema`: fractal, zigzag\n- `dump_event`: simple-threshold, vol-adjusted-zscore, drawdown\n- `pump_event`: simple-threshold, vol-adjusted-zscore, drawup\n- `sweep_reclaim`: sweep-reclaim-low, sweep-reclaim-high",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "default": "fractal",
+              "description": "Detection method. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+              "example": "fractal"
+            },
+            "required": false,
+            "description": "Detection method. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+            "name": "method",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "default": "{\"L\": 3}",
+              "description": "JSON-encoded parameters for the annotation method. Examples:\n- fractal: {\"L\": 3}\n- zigzag: {\"deviationPct\": 0.03}\n- simple-threshold: {\"threshold\": -0.01}\n- vol-adjusted-zscore: {\"lookbackCandles\": 20, \"zThreshold\": -2, \"minAbsoluteThreshold\": -0.005}",
+              "example": "{\"L\": 3}"
+            },
+            "required": false,
+            "description": "JSON-encoded parameters for the annotation method. Examples:\n- fractal: {\"L\": 3}\n- zigzag: {\"deviationPct\": 0.03}\n- simple-threshold: {\"threshold\": -0.01}\n- vol-adjusted-zscore: {\"lookbackCandles\": 20, \"zThreshold\": -2, \"minAbsoluteThreshold\": -0.005}",
+            "name": "params",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chart image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "fractal": {
+                    "summary": "Fractal detection (Williams fractals)",
+                    "value": "Binary PNG image data"
+                  },
+                  "dumpSimple": {
+                    "summary": "Simple dump threshold",
+                    "value": "Binary PNG image data"
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to canonical URL (when from/to omitted)"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No data found for time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orderbook/{symbolId}": {
+      "get": {
+        "summary": "Get order book snapshots",
+        "description": "Returns historical order book snapshots with derived microstructure metrics:\n- `mid_price`: (best_bid + best_ask) / 2\n- `spread`: best_ask - best_bid\n- `spread_bps`: spread in basis points\n- `imbalance`: (bid_depth - ask_depth) / (bid_depth + ask_depth)\n- `bid_depth`, `ask_depth`: Total size on each side\n",
+        "tags": [
+          "Market Data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Start time (ISO 8601). Default: 1h ago",
+              "example": "2025-12-16T17:00:00Z"
+            },
+            "required": false,
+            "description": "Start time (ISO 8601). Default: 1h ago",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "End time (ISO 8601). Default: now",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": false,
+            "description": "End time (ISO 8601). Default: now",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d+$",
+              "default": 100,
+              "description": "Max snapshots (1-1000)",
+              "example": 100
+            },
+            "required": false,
+            "description": "Max snapshots (1-1000)",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order book snapshots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Trading pair symbol"
+                    },
+                    "snapshots": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "description": "ISO 8601 datetime"
+                          },
+                          "mid_price": {
+                            "type": "number",
+                            "description": "(best_bid + best_ask) / 2"
+                          },
+                          "spread": {
+                            "type": "number",
+                            "description": "best_ask - best_bid"
+                          },
+                          "spread_bps": {
+                            "type": "number",
+                            "description": "Spread in basis points"
+                          },
+                          "imbalance": {
+                            "type": "number",
+                            "minimum": -1,
+                            "maximum": 1,
+                            "description": "(bid_depth - ask_depth) / (bid_depth + ask_depth)"
+                          },
+                          "bid_depth": {
+                            "type": "number",
+                            "description": "Total size on bid side"
+                          },
+                          "ask_depth": {
+                            "type": "number",
+                            "description": "Total size on ask side"
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "mid_price",
+                          "spread",
+                          "spread_bps",
+                          "imbalance",
+                          "bid_depth",
+                          "ask_depth"
+                        ]
+                      },
+                      "description": "Orderbook snapshots"
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "snapshots"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No snapshots found for time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/indicators/{symbolId}": {
+      "get": {
+        "summary": "Get computed indicators",
+        "description": "Returns OHLCV candles with computed technical indicators:\n- **BBW**: Bollinger Band Width (20-period, 2 std dev)\n- **Realized Volatility**: Rolling standard deviation of log returns\n- **VWAP**: Volume-weighted average price with bands\n- **Recent Returns**: Last N log returns\n- **RSI**: Relative Strength Index (14-period, Wilder's smoothing)\n- **ATR**: Average True Range (14-period, Wilder's smoothing)\n- **MACD**: Moving Average Convergence Divergence (12, 26, 9)\n- **Stochastic RSI**: Stochastic RSI with %K and %D lines (14, 14, 5, 3)\n- **ADX**: Average Directional Index (14-period)\n- **CMF**: Chaikin Money Flow (20-period)\n- **SuperTrend**: Trend-following indicator with long/short signals (10, 3)\n\n**Ordering**: Candles are returned in ascending order (oldest first).\nIndicators are computed on the full candle window, using Wilder's smoothing\nfor RSI and ATR (matching TradingView/TAAPI methodology).\n",
+        "tags": [
+          "Market Data"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "default": "1m",
+              "example": "1m",
+              "description": "Candle interval"
+            },
+            "required": false,
+            "description": "Candle interval",
+            "name": "timeframe",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Start time (ISO 8601). Default: 24h ago",
+              "example": "2025-12-16T17:00:00Z"
+            },
+            "required": false,
+            "description": "Start time (ISO 8601). Default: 24h ago",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "End time (ISO 8601). Default: now",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": false,
+            "description": "End time (ISO 8601). Default: now",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 20,
+              "description": "Max candles (1-1000)",
+              "example": 20
+            },
+            "required": false,
+            "description": "Max candles (1-1000)",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candles with computed indicators",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Trading pair symbol"
+                    },
+                    "timeframe": {
+                      "type": "string",
+                      "description": "Candle interval"
+                    },
+                    "candles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "timestamp": {
+                            "type": "string",
+                            "description": "ISO 8601 datetime"
+                          },
+                          "open": {
+                            "type": "number",
+                            "description": "Opening price"
+                          },
+                          "high": {
+                            "type": "number",
+                            "description": "Highest price"
+                          },
+                          "low": {
+                            "type": "number",
+                            "description": "Lowest price"
+                          },
+                          "close": {
+                            "type": "number",
+                            "description": "Closing price"
+                          },
+                          "volume": {
+                            "type": "number",
+                            "description": "Trading volume"
+                          },
+                          "trades_count": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "Number of trades"
+                          }
+                        },
+                        "required": [
+                          "timestamp",
+                          "open",
+                          "high",
+                          "low",
+                          "close",
+                          "volume"
+                        ]
+                      },
+                      "description": "OHLCV candles"
+                    },
+                    "indicators": {
+                      "type": "object",
+                      "properties": {
+                        "bbw": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "Bollinger Band Width (20-period, 2 std dev)"
+                        },
+                        "realized_vol": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "Rolling standard deviation of log returns"
+                        },
+                        "recent_returns": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "description": "Last N log returns"
+                        },
+                        "rsi": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "Relative Strength Index (14-period)"
+                        },
+                        "atr": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "Average True Range (14-period)"
+                        },
+                        "macd": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "macd": {
+                              "type": "number",
+                              "description": "MACD line"
+                            },
+                            "signal": {
+                              "type": "number",
+                              "description": "Signal line"
+                            },
+                            "histogram": {
+                              "type": "number",
+                              "description": "MACD histogram (MACD - Signal)"
+                            }
+                          },
+                          "required": [
+                            "macd",
+                            "signal",
+                            "histogram"
+                          ],
+                          "description": "MACD indicator (12, 26, 9 periods)"
+                        },
+                        "stoch_rsi": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "stoch_rsi": {
+                              "type": "number",
+                              "description": "Stochastic RSI value (0-100)"
+                            },
+                            "k": {
+                              "type": "number",
+                              "description": "%K line (0-100)"
+                            },
+                            "d": {
+                              "type": "number",
+                              "description": "%D line (0-100)"
+                            }
+                          },
+                          "required": [
+                            "stoch_rsi",
+                            "k",
+                            "d"
+                          ],
+                          "description": "Stochastic RSI (14, 14, 3, 3 periods)"
+                        },
+                        "adx": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "Average Directional Index (14-period, 0-100)"
+                        },
+                        "cmf": {
+                          "type": "number",
+                          "nullable": true,
+                          "description": "Chaikin Money Flow (20-period, -1 to 1)"
+                        },
+                        "supertrend": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "value": {
+                              "type": "number",
+                              "description": "SuperTrend line value"
+                            },
+                            "advice": {
+                              "type": "string",
+                              "enum": [
+                                "long",
+                                "short"
+                              ],
+                              "description": "Trading signal based on price vs SuperTrend"
+                            }
+                          },
+                          "required": [
+                            "value",
+                            "advice"
+                          ],
+                          "description": "SuperTrend indicator (10-period ATR, 3x multiplier)"
+                        },
+                        "price": {
+                          "type": "number",
+                          "description": "Latest close price"
+                        }
+                      },
+                      "required": [
+                        "bbw",
+                        "realized_vol",
+                        "recent_returns",
+                        "rsi",
+                        "atr",
+                        "macd",
+                        "stoch_rsi",
+                        "adx",
+                        "cmf",
+                        "supertrend",
+                        "price"
+                      ],
+                      "description": "Computed indicators for latest candle"
+                    },
+                    "vwap": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "vwap": {
+                          "type": "number",
+                          "description": "Volume-weighted average price"
+                        },
+                        "upper_band": {
+                          "type": "number",
+                          "description": "VWAP + 1 std dev"
+                        },
+                        "lower_band": {
+                          "type": "number",
+                          "description": "VWAP - 1 std dev"
+                        },
+                        "std_dev": {
+                          "type": "number",
+                          "description": "Standard deviation"
+                        }
+                      },
+                      "required": [
+                        "vwap",
+                        "upper_band",
+                        "lower_band",
+                        "std_dev"
+                      ],
+                      "description": "VWAP with bands"
+                    },
+                    "rolling_vwap": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "vwap_per_bar": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "description": "Cumulative VWAP at each candle"
+                        },
+                        "close_above_vwap": {
+                          "type": "array",
+                          "items": {
+                            "type": "boolean"
+                          },
+                          "description": "Whether close was above VWAP at each bar"
+                        },
+                        "acceptance_count": {
+                          "type": "integer",
+                          "description": "Count of bars where close > VWAP"
+                        },
+                        "acceptance_ratio": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "Ratio of bars above VWAP (0-1)"
+                        },
+                        "price_to_vwap_bp": {
+                          "type": "integer",
+                          "description": "Current price distance from VWAP in basis points"
+                        }
+                      },
+                      "required": [
+                        "vwap_per_bar",
+                        "close_above_vwap",
+                        "acceptance_count",
+                        "acceptance_ratio",
+                        "price_to_vwap_bp"
+                      ],
+                      "description": "Per-bar VWAP evolution and acceptance analysis"
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "timeframe",
+                    "candles",
+                    "indicators",
+                    "vwap",
+                    "rolling_vwap"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No candles found for time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replays": {
+      "get": {
+        "summary": "List available market data",
+        "description": "Returns what time ranges have OHLCV data available per symbol.\nUse this to discover what data exists before requesting candles or indicators.\n",
+        "tags": [
+          "Market Data"
+        ],
+        "responses": {
+          "200": {
+            "description": "Available data per symbol",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbols": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol_id": {
+                            "type": "string",
+                            "description": "Trading pair symbol"
+                          },
+                          "timeframe": {
+                            "type": "string",
+                            "description": "Candle timeframe (e.g., 1m)"
+                          },
+                          "earliest": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Earliest available data (ISO 8601)"
+                          },
+                          "latest": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Latest available data (ISO 8601)"
+                          },
+                          "candle_count": {
+                            "type": "integer",
+                            "description": "Total number of candles"
+                          },
+                          "duration_minutes": {
+                            "type": "integer",
+                            "description": "Duration in minutes"
+                          }
+                        },
+                        "required": [
+                          "symbol_id",
+                          "timeframe",
+                          "earliest",
+                          "latest",
+                          "candle_count",
+                          "duration_minutes"
+                        ]
+                      },
+                      "description": "Available replay data per symbol"
+                    },
+                    "generated_at": {
+                      "type": "string",
+                      "description": "When this data was generated (ISO 8601)"
+                    }
+                  },
+                  "required": [
+                    "symbols",
+                    "generated_at"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotations/{symbolId}": {
+      "get": {
+        "summary": "Get ground truth annotations",
+        "description": "Returns annotations for agent self-scoring.\n\n**Query parameters:**\n- `type`: Filter by annotation type (dump_event, pump_event, local_extrema, sweep_reclaim)\n- `method`: Filter by detection method\n- `from`/`to`: Time range filter\n- `availableAt`: Filter by availability timestamp (for non-lookahead filtering)\n\n**Valid methods per type:**\n| Type | Methods |\n|------|---------|\n| `local_extrema` | fractal, zigzag |\n| `dump_event` | simple-threshold, vol-adjusted-zscore, drawdown |\n| `pump_event` | simple-threshold, vol-adjusted-zscore, drawup |\n| `sweep_reclaim` | sweep-reclaim-low, sweep-reclaim-high |\n",
+        "tags": [
+          "Annotations"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Start time (ISO 8601)",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": false,
+            "description": "Start time (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "End time (ISO 8601)",
+              "example": "2025-12-16T23:59:59Z"
+            },
+            "required": false,
+            "description": "End time (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dump_event",
+                "pump_event",
+                "local_extrema",
+                "regime",
+                "vol_spike",
+                "sweep_reclaim"
+              ],
+              "description": "Filter by annotation type",
+              "example": "dump_event"
+            },
+            "required": false,
+            "description": "Filter by annotation type",
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fractal",
+                "zigzag",
+                "simple-threshold",
+                "vol-adjusted-zscore",
+                "drawdown",
+                "drawup",
+                "sweep-reclaim-low",
+                "sweep-reclaim-high"
+              ],
+              "description": "Filter by detection method",
+              "example": "simple-threshold"
+            },
+            "required": false,
+            "description": "Filter by detection method",
+            "name": "method",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "format": "date",
+              "description": "Filter annotations available at or before this timestamp (ISO 8601). Only returns annotations where payload.availability.availableAt <= this value.",
+              "example": "2025-12-24T12:00:00Z"
+            },
+            "required": false,
+            "description": "Filter annotations available at or before this timestamp (ISO 8601). Only returns annotations where payload.availability.availableAt <= this value.",
+            "name": "availableAt",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100,
+              "description": "Max annotations (1-1000)",
+              "example": 100
+            },
+            "required": false,
+            "description": "Max annotations (1-1000)",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotations (empty array if none exist)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Trading pair symbol"
+                    },
+                    "annotations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "description": "Unique annotation identifier"
+                          },
+                          "time_start": {
+                            "type": "string",
+                            "description": "Start time (ISO 8601)"
+                          },
+                          "time_end": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "End time (ISO 8601), null for point-in-time events"
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "Annotation type (e.g., dump_event, pump_event, local_extrema)"
+                          },
+                          "method": {
+                            "type": "string",
+                            "description": "Detection method (e.g., simple-threshold, fractal, zigzag)"
+                          },
+                          "schema_version": {
+                            "type": "string",
+                            "description": "Payload schema version"
+                          },
+                          "payload": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "nullable": true
+                            },
+                            "description": "Type-specific annotation data"
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Internal annotator source string"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "description": "Creation timestamp (ISO 8601)"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "time_start",
+                          "time_end",
+                          "type",
+                          "method",
+                          "schema_version",
+                          "payload",
+                          "source"
+                        ]
+                      },
+                      "description": "List of annotations"
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "annotations"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotators": {
+      "get": {
+        "summary": "List registered annotators",
+        "description": "Returns all registered annotators with their status.\nAnnotators automatically process historical and new data to create annotations.\n",
+        "tags": [
+          "Annotators"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of annotators",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "annotators": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Unique annotator identifier"
+                          },
+                          "version": {
+                            "type": "string",
+                            "description": "Annotator version"
+                          },
+                          "annotation_type": {
+                            "type": "string",
+                            "description": "Type of annotations produced"
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Source identifier for created annotations"
+                          },
+                          "window_size": {
+                            "type": "string",
+                            "description": "Processing window size (e.g., 1m, 15m, 1h)"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "backfilling",
+                              "active",
+                              "deprecated"
+                            ],
+                            "description": "Current operational status"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Human-readable description"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "version",
+                          "annotation_type",
+                          "source",
+                          "window_size",
+                          "status",
+                          "description"
+                        ]
+                      },
+                      "description": "List of registered annotators"
+                    }
+                  },
+                  "required": [
+                    "annotators"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotators/{name}": {
+      "get": {
+        "summary": "Get annotator details and progress",
+        "description": "Returns details for a specific annotator including backfill progress.\n",
+        "tags": [
+          "Annotators"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Annotator name (e.g., dump-simple-15m-3pct)",
+              "example": "dump-simple-1m-1pct"
+            },
+            "required": true,
+            "description": "Annotator name (e.g., dump-simple-15m-3pct)",
+            "name": "name",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotator details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "annotator": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Unique annotator identifier"
+                        },
+                        "version": {
+                          "type": "string",
+                          "description": "Annotator version"
+                        },
+                        "annotation_type": {
+                          "type": "string",
+                          "description": "Type of annotations produced"
+                        },
+                        "source": {
+                          "type": "string",
+                          "description": "Source identifier for created annotations"
+                        },
+                        "window_size": {
+                          "type": "string",
+                          "description": "Processing window size"
+                        },
+                        "start_time": {
+                          "type": "string",
+                          "description": "Start time for processing"
+                        },
+                        "status": {
+                          "type": "string",
+                          "description": "Current operational status"
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "Human-readable description"
+                        },
+                        "config": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          },
+                          "description": "Annotator configuration"
+                        },
+                        "registered_at": {
+                          "type": "string",
+                          "description": "Registration timestamp"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "version",
+                        "annotation_type",
+                        "source",
+                        "window_size",
+                        "status",
+                        "description",
+                        "config"
+                      ],
+                      "description": "Annotator details"
+                    },
+                    "progress": {
+                      "type": "object",
+                      "properties": {
+                        "windows_processed": {
+                          "type": "integer",
+                          "description": "Total windows processed"
+                        },
+                        "annotations_created": {
+                          "type": "integer",
+                          "description": "Total annotations created"
+                        },
+                        "last_processed_at": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Last processing timestamp (ISO 8601)"
+                        }
+                      },
+                      "required": [
+                        "windows_processed",
+                        "annotations_created",
+                        "last_processed_at"
+                      ],
+                      "description": "Processing progress"
+                    }
+                  },
+                  "required": [
+                    "annotator",
+                    "progress"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Annotator not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotators/{name}/run": {
+      "post": {
+        "summary": "Run annotator on time range",
+        "description": "Manually trigger annotator processing for a specific symbol and time range.\nUseful for backfilling or reprocessing specific periods.\n",
+        "tags": [
+          "Annotators"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Annotator name",
+              "example": "dump-simple-1m-1pct"
+            },
+            "required": true,
+            "description": "Annotator name",
+            "name": "name",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Symbol to process",
+              "example": "COINBASE_SPOT_BTC_USD"
+            },
+            "required": true,
+            "description": "Symbol to process",
+            "name": "symbol_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Start time (ISO 8601)",
+              "example": "2025-12-16T17:00:00Z"
+            },
+            "required": true,
+            "description": "Start time (ISO 8601)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "End time (ISO 8601)",
+              "example": "2025-12-16T18:00:00Z"
+            },
+            "required": true,
+            "description": "End time (ISO 8601)",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotator run result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "annotator": {
+                      "type": "string",
+                      "description": "Annotator name"
+                    },
+                    "symbol_id": {
+                      "type": "string",
+                      "description": "Symbol processed"
+                    },
+                    "from": {
+                      "type": "string",
+                      "description": "Start time (ISO 8601)"
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "End time (ISO 8601)"
+                    },
+                    "windows_processed": {
+                      "type": "integer",
+                      "description": "Number of windows processed"
+                    },
+                    "annotations_created": {
+                      "type": "integer",
+                      "description": "Number of annotations created"
+                    }
+                  },
+                  "required": [
+                    "annotator",
+                    "symbol_id",
+                    "from",
+                    "to",
+                    "windows_processed",
+                    "annotations_created"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Annotator not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cron/ingest": {
+      "get": {
+        "summary": "Trigger data ingestion",
+        "description": "Called by cron every minute. Fetches OHLCV candles for all symbols. Orderbook snapshots are fetched hourly in batches.\n\nPer minute:\n- 5 OHLCV calls (last 5 candles per symbol)\n- Gap detection and healing (60-minute lookback)\n\nPer hour (at minute 5):\n- 5 Orderbook calls (previous hour's snapshots per symbol)\n",
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "Ingestion completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "batchId": {
+                      "type": "string",
+                      "description": "Unique batch identifier"
+                    },
+                    "ohlcvCount": {
+                      "type": "integer",
+                      "description": "Number of OHLCV candles ingested"
+                    },
+                    "orderbookCount": {
+                      "type": "integer",
+                      "description": "Number of orderbook snapshots ingested"
+                    },
+                    "symbols": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Symbols processed in this ingestion run"
+                    }
+                  },
+                  "required": [
+                    "batchId",
+                    "ohlcvCount",
+                    "orderbookCount",
+                    "symbols"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotations/{symbolId}/compute": {
+      "post": {
+        "summary": "Compute annotations on-demand",
+        "description": "Run parameterized annotation detection without pre-registration.\nComputes annotations for a given symbol, type, method, params, and time range.\n\n**Valid methods per type:**\n\n| Type | Methods |\n|------|---------|\n| `local_extrema` | fractal, zigzag |\n| `dump_event` | simple-threshold, vol-adjusted-zscore, drawdown |\n| `pump_event` | simple-threshold, vol-adjusted-zscore, drawup |\n| `sweep_reclaim` | sweep-reclaim-low, sweep-reclaim-high |\n\n**Parameter reference by method:**\n- **fractal**: `{ L: number, candleTimeframe: string }` - Williams fractal with L bars on each side\n- **zigzag**: `{ deviationPct: number, candleTimeframe: string }` - ZigZag with minimum deviation\n- **simple-threshold**: `{ threshold: number, candleTimeframe: string }` - Fixed return threshold (negative for dumps, positive for pumps)\n- **vol-adjusted-zscore**: `{ lookbackCandles: number, zThreshold: number, minAbsoluteThreshold: number, candleTimeframe: string }` - Z-score normalized returns\n- **drawdown/drawup**: `{ threshold: number, candleTimeframe: string }` - Peak-to-trough/trough-to-peak detection\n",
+        "tags": [
+          "Annotations"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ],
+              "example": "COINBASE_SPOT_BTC_USD",
+              "examples": [
+                "COINBASE_SPOT_BTC_USD",
+                "COINBASE_SPOT_ETH_USD",
+                "COINBASE_SPOT_SOL_USD",
+                "COINBASE_SPOT_AERO_USD",
+                "COINBASE_SPOT_RECALL_USD"
+              ]
+            },
+            "required": true,
+            "name": "symbolId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "dump_event",
+                      "pump_event",
+                      "local_extrema",
+                      "sweep_reclaim"
+                    ],
+                    "description": "Annotation type. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+                    "example": "local_extrema"
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "Detection method. Must match the type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+                    "example": "fractal"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "description": "Method-specific parameters.\n\n**Parameter reference by method:**\n- fractal: { L: number, candleTimeframe: \"1m\"|\"5m\"|\"15m\"|\"1h\"|\"4h\"|\"1d\" }\n- zigzag: { deviationPct: number, candleTimeframe: string }\n- simple-threshold: { threshold: number, candleTimeframe: string }\n- vol-adjusted-zscore: { lookbackCandles: number, zThreshold: number, minAbsoluteThreshold: number, candleTimeframe: string }\n- drawdown/drawup: { threshold: number, candleTimeframe: string }\n- sweep-reclaim-*: { swingLookback: number, minDisplacementATR: number, maxBarsToReclaim: number, candleTimeframe: string }",
+                    "example": {
+                      "L": 3,
+                      "candleTimeframe": "1m"
+                    }
+                  },
+                  "from": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date",
+                    "description": "Time range start (ISO 8601)",
+                    "example": "2025-12-30T15:00:00Z"
+                  },
+                  "to": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date",
+                    "description": "Time range end (ISO 8601)",
+                    "example": "2025-12-30T16:00:00Z"
+                  },
+                  "cachePolicy": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "ephemeral",
+                      "persist"
+                    ],
+                    "default": "none",
+                    "description": "Cache policy: none (no caching), ephemeral (in-memory), persist (database)",
+                    "example": "none"
+                  }
+                },
+                "required": [
+                  "type",
+                  "method",
+                  "params",
+                  "from",
+                  "to"
+                ]
+              },
+              "examples": {
+                "fractal": {
+                  "summary": "Fractal detection (Williams fractals)",
+                  "value": {
+                    "type": "local_extrema",
+                    "method": "fractal",
+                    "params": {
+                      "L": 3,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "zigzag": {
+                  "summary": "ZigZag pivot detection",
+                  "value": {
+                    "type": "local_extrema",
+                    "method": "zigzag",
+                    "params": {
+                      "deviationPct": 0.03,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "dumpSimple": {
+                  "summary": "Simple dump threshold (-1%)",
+                  "value": {
+                    "type": "dump_event",
+                    "method": "simple-threshold",
+                    "params": {
+                      "threshold": -0.01,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "dumpVolAdjusted": {
+                  "summary": "Volatility-adjusted dump (z-score)",
+                  "value": {
+                    "type": "dump_event",
+                    "method": "vol-adjusted-zscore",
+                    "params": {
+                      "lookbackCandles": 20,
+                      "zThreshold": -2,
+                      "minAbsoluteThreshold": -0.005,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "dumpDrawdown": {
+                  "summary": "Drawdown-based dump detection",
+                  "value": {
+                    "type": "dump_event",
+                    "method": "drawdown",
+                    "params": {
+                      "threshold": -0.03,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                },
+                "pumpSimple": {
+                  "summary": "Simple pump threshold (+1%)",
+                  "value": {
+                    "type": "pump_event",
+                    "method": "simple-threshold",
+                    "params": {
+                      "threshold": 0.01,
+                      "candleTimeframe": "1m"
+                    },
+                    "from": "2025-12-30T15:00:00Z",
+                    "to": "2025-12-30T16:00:00Z",
+                    "cachePolicy": "none"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Computed annotations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "symbol_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "params": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "annotations": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "cachePolicy": {
+                          "type": "string"
+                        },
+                        "cacheHit": {
+                          "type": "boolean"
+                        },
+                        "computeTimeMs": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "cachePolicy",
+                        "cacheHit",
+                        "computeTimeMs"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "symbol_id",
+                    "type",
+                    "method",
+                    "params",
+                    "from",
+                    "to",
+                    "annotations",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No candle data found for time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Method not implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Human-readable error message"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Machine-readable error code"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
