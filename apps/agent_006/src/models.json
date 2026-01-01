@@ -19,6 +19,15 @@
       "notes": "Claude Sonnet 4.5 - balanced with vision"
     },
     {
+      "id": "anthropic/claude-opus-4-5",
+      "provider": "anthropic",
+      "inputCostPerMillion": 5.00,
+      "outputCostPerMillion": 25.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Claude Opus 4.5 - most capable with vision"
+    },
+    {
       "id": "anthropic/claude-3-5-sonnet-20241022",
       "provider": "anthropic",
       "inputCostPerMillion": 3.00,
@@ -109,6 +118,15 @@
       "notes": "GPT-5 Nano - cheapest with vision"
     },
     {
+      "id": "openai/gpt-5.2",
+      "provider": "openai",
+      "inputCostPerMillion": 0.50,
+      "outputCostPerMillion": 3.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "GPT-5.2 with vision"
+    },
+    {
       "id": "google/gemini-2.0-flash",
       "provider": "google",
       "inputCostPerMillion": 0.10,
@@ -172,6 +190,24 @@
       "notes": "Grok 4 Fast with vision"
     },
     {
+      "id": "xai/grok-4.1-fast-reasoning",
+      "provider": "xai",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 4.1 Fast Reasoning with vision"
+    },
+    {
+      "id": "xai/grok-4",
+      "provider": "xai",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 4 flagship with vision"
+    },
+    {
       "id": "mistral/pixtral-large-latest",
       "provider": "mistral",
       "inputCostPerMillion": 2.00,
@@ -206,6 +242,15 @@
       "tier": "budget",
       "vision": true,
       "notes": "Ministral 8B"
+    },
+    {
+      "id": "perplexity/sonar-pro",
+      "provider": "perplexity",
+      "inputCostPerMillion": 1.00,
+      "outputCostPerMillion": 1.00,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Sonar Pro - search-augmented"
     }
   ],
   "tiers": {
@@ -229,6 +274,7 @@
     "openai",
     "google",
     "xai",
-    "mistral"
+    "mistral",
+    "perplexity"
   ]
 }
