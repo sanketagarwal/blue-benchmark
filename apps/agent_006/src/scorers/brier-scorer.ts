@@ -47,5 +47,8 @@ export function meanBrierScore(predictions: number[], actuals: boolean[]): numbe
  * @returns Skill score (1 is perfect, 0 equals baseline, negative is worse than baseline)
  */
 export function brierSkillScore(modelBrierScore: number, baselineBrierScore: number): number {
+  if (baselineBrierScore === 0) {
+    return modelBrierScore === 0 ? 0 : -Infinity;
+  }
   return 1 - modelBrierScore / baselineBrierScore;
 }

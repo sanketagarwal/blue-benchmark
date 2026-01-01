@@ -72,6 +72,14 @@ describe('Brier Score', () => {
     it('calculates correct skill score', () => {
       expect(brierSkillScore(0.1, 0.25)).toBeCloseTo(0.6);
     });
+
+    it('returns 0 when both baseline and model are 0 (perfect baseline, perfect model)', () => {
+      expect(brierSkillScore(0, 0)).toBe(0);
+    });
+
+    it('returns -Infinity when baseline is 0 but model is not (perfect baseline, imperfect model)', () => {
+      expect(brierSkillScore(0.1, 0)).toBe(-Infinity);
+    });
   });
 });
 
