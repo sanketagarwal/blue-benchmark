@@ -154,9 +154,9 @@ function formatRoundScoreWithBaseline(
   return `LL[${parts.join(' ')}]`;
 }
 
-// Quick mode constants
-const QUICK_ROUNDS_PER_PHASE = 3;
-const QUICK_MODEL_COUNT = 3;
+// Quick mode constants - minimal for fast pipeline verification
+const QUICK_ROUNDS_PER_PHASE = 1;
+const QUICK_MODEL_COUNT = 5;
 const QUICK_MODE_DATA_VERIFIED_MSG = 'Data collection verified - rounds completed successfully';
 
 /**
