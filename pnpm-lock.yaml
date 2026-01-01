@@ -48,116 +48,30 @@ importers:
         specifier: 2.0.2
         version: 2.0.2(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
 
-  apps/agent_000:
+  benchmarks/forecasting/matrix-eval:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
-        version: link:../../packages/agent-core
+        version: link:../../../packages/agent-core
       '@nullagent/cli-utils':
         specifier: workspace:*
-        version: link:../../packages/cli-utils
+        version: link:../../../packages/cli-utils
       '@nullagent/database':
         specifier: workspace:*
-        version: link:../../packages/database
-      zod:
-        specifier: ^3.23.0
-        version: 3.25.76
-    devDependencies:
-      '@nullagent/eslint-config':
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      '@nullagent/typescript-config':
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.3
-      '@vitest/coverage-v8':
-        specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
-      eslint:
-        specifier: ^9.0.0
-        version: 9.39.2
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.2
-      vitest:
-        specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
-
-  apps/agent_001:
-    dependencies:
-      '@nullagent/agent-core':
-        specifier: workspace:*
-        version: link:../../packages/agent-core
-      '@nullagent/cli-utils':
-        specifier: workspace:*
-        version: link:../../packages/cli-utils
-      '@nullagent/database':
-        specifier: workspace:*
-        version: link:../../packages/database
-      zod:
-        specifier: ^3.23.0
-        version: 3.25.76
-    devDependencies:
-      '@nullagent/eslint-config':
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      '@nullagent/typescript-config':
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.3
-      '@vitest/coverage-v8':
-        specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
-      eslint:
-        specifier: ^9.0.0
-        version: 9.39.2
-      tsx:
-        specifier: ^4.19.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.2
-      vitest:
-        specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
-
-  apps/agent_002:
-    dependencies:
-      '@nullagent/agent-core':
-        specifier: workspace:*
-        version: link:../../packages/agent-core
-      '@nullagent/cli-utils':
-        specifier: workspace:*
-        version: link:../../packages/cli-utils
-      '@nullagent/database':
-        specifier: workspace:*
-        version: link:../../packages/database
+        version: link:../../../packages/database
       '@nullagent/scorers':
         specifier: workspace:*
-        version: link:../../packages/scorers
+        version: link:../../../packages/scorers
       zod:
         specifier: ^3.23.0
         version: 3.25.76
     devDependencies:
       '@nullagent/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../../packages/eslint-config
       '@nullagent/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../../packages/typescript-config
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.3
@@ -180,30 +94,30 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
 
-  apps/agent_003:
+  benchmarks/forecasting/price-predictor:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
-        version: link:../../packages/agent-core
+        version: link:../../../packages/agent-core
       '@nullagent/cli-utils':
         specifier: workspace:*
-        version: link:../../packages/cli-utils
+        version: link:../../../packages/cli-utils
       '@nullagent/database':
         specifier: workspace:*
-        version: link:../../packages/database
+        version: link:../../../packages/database
       '@nullagent/scorers':
         specifier: workspace:*
-        version: link:../../packages/scorers
+        version: link:../../../packages/scorers
       zod:
         specifier: ^3.23.0
         version: 3.25.76
     devDependencies:
       '@nullagent/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../../packages/eslint-config
       '@nullagent/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../../packages/typescript-config
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.3
@@ -226,30 +140,27 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
 
-  apps/agent_004:
+  benchmarks/games/crossword-v1:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
-        version: link:../../packages/agent-core
+        version: link:../../../packages/agent-core
       '@nullagent/cli-utils':
         specifier: workspace:*
-        version: link:../../packages/cli-utils
+        version: link:../../../packages/cli-utils
       '@nullagent/database':
         specifier: workspace:*
-        version: link:../../packages/database
-      '@nullagent/scorers':
-        specifier: workspace:*
-        version: link:../../packages/scorers
+        version: link:../../../packages/database
       zod:
         specifier: ^3.23.0
         version: 3.25.76
     devDependencies:
       '@nullagent/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../../packages/eslint-config
       '@nullagent/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../../packages/typescript-config
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.3
@@ -272,20 +183,109 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
 
-  apps/agent_005:
+  benchmarks/games/crossword-v2:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
-        version: link:../../packages/agent-core
+        version: link:../../../packages/agent-core
       '@nullagent/cli-utils':
         specifier: workspace:*
-        version: link:../../packages/cli-utils
+        version: link:../../../packages/cli-utils
       '@nullagent/database':
         specifier: workspace:*
-        version: link:../../packages/database
+        version: link:../../../packages/database
       '@nullagent/scorers':
         specifier: workspace:*
-        version: link:../../packages/scorers
+        version: link:../../../packages/scorers
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@nullagent/eslint-config':
+        specifier: workspace:*
+        version: link:../../../packages/eslint-config
+      '@nullagent/typescript-config':
+        specifier: workspace:*
+        version: link:../../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.3
+      '@vitest/coverage-v8':
+        specifier: ^2.0.0
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.2
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+
+  benchmarks/games/twenty-questions:
+    dependencies:
+      '@nullagent/agent-core':
+        specifier: workspace:*
+        version: link:../../../packages/agent-core
+      '@nullagent/cli-utils':
+        specifier: workspace:*
+        version: link:../../../packages/cli-utils
+      '@nullagent/database':
+        specifier: workspace:*
+        version: link:../../../packages/database
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@nullagent/eslint-config':
+        specifier: workspace:*
+        version: link:../../../packages/eslint-config
+      '@nullagent/typescript-config':
+        specifier: workspace:*
+        version: link:../../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.3
+      '@vitest/coverage-v8':
+        specifier: ^2.0.0
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.2
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+
+  benchmarks/trading/bottom-caller:
+    dependencies:
+      '@nullagent/agent-core':
+        specifier: workspace:*
+        version: link:../../../packages/agent-core
+      '@nullagent/cli-utils':
+        specifier: workspace:*
+        version: link:../../../packages/cli-utils
+      '@nullagent/database':
+        specifier: workspace:*
+        version: link:../../../packages/database
+      '@nullagent/scorers':
+        specifier: workspace:*
+        version: link:../../../packages/scorers
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -307,10 +307,10 @@ importers:
     devDependencies:
       '@nullagent/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../../packages/eslint-config
       '@nullagent/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../../packages/typescript-config
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.3
@@ -339,20 +339,20 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
 
-  apps/agent_006:
+  benchmarks/trading/market-maker:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
-        version: link:../../packages/agent-core
+        version: link:../../../packages/agent-core
       '@nullagent/cli-utils':
         specifier: workspace:*
-        version: link:../../packages/cli-utils
+        version: link:../../../packages/cli-utils
       '@nullagent/database':
         specifier: workspace:*
-        version: link:../../packages/database
+        version: link:../../../packages/database
       '@nullagent/scorers':
         specifier: workspace:*
-        version: link:../../packages/scorers
+        version: link:../../../packages/scorers
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -374,10 +374,10 @@ importers:
     devDependencies:
       '@nullagent/eslint-config':
         specifier: workspace:*
-        version: link:../../packages/eslint-config
+        version: link:../../../packages/eslint-config
       '@nullagent/typescript-config':
         specifier: workspace:*
-        version: link:../../packages/typescript-config
+        version: link:../../../packages/typescript-config
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.3

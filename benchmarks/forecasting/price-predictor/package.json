@@ -1,5 +1,5 @@
 {
-  "name": "agent_002",
+  "name": "@nullagent/bench-price-predictor",
   "version": "0.0.0",
   "private": true,
   "type": "module",

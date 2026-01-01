@@ -1,5 +1,5 @@
 {
-  "name": "agent_003",
+  "name": "@nullagent/bench-twenty-questions",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,6 @@
     "@nullagent/agent-core": "workspace:*",
     "@nullagent/cli-utils": "workspace:*",
     "@nullagent/database": "workspace:*",
-    "@nullagent/scorers": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

@@ -1,11 +1,11 @@
 {
-  "name": "agent_004",
+  "name": "@nullagent/bench-crossword-v1",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "benchmark": "node --env-file=.env.local --import tsx src/benchmark.ts",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src --ext .ts,.tsx",
     "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -15,7 +15,6 @@
     "@nullagent/agent-core": "workspace:*",
     "@nullagent/cli-utils": "workspace:*",
     "@nullagent/database": "workspace:*",
-    "@nullagent/scorers": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

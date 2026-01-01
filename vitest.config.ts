@@ -53,25 +53,25 @@ export default defineConfig({
         // Database operations tested via integration
         'packages/scorers/src/save-score.ts',
         // CLI benchmark entry points don't need unit tests
-        'apps/**/src/benchmark.ts',
-        // agent_006 CLI utilities (tested via integration)
-        'apps/agent_006/src/prefetch-warmup.ts',
-        'apps/agent_006/src/persist-results.ts',
-        'apps/agent_006/src/scorers/timing-metrics.ts',
-        // agent_000 game state is simpler and not unit tested
-        'apps/agent_000/src/game-state.ts',
-        // agent_004 has no unit tests yet (matrix benchmark tool)
-        'apps/agent_004/src/**/*.ts',
-        // agent_005 benchmark helper files (tested via integration)
-        'apps/agent_005/src/matrix.ts',
-        'apps/agent_005/src/results.ts',
-        'apps/agent_005/src/table.ts',
+        'benchmarks/**/src/benchmark.ts',
+        // bottom-caller CLI utilities (tested via integration)
+        'benchmarks/trading/bottom-caller/src/prefetch-warmup.ts',
+        'benchmarks/trading/bottom-caller/src/persist-results.ts',
+        'benchmarks/trading/bottom-caller/src/scorers/timing-metrics.ts',
+        // twenty-questions game state is simpler and not unit tested
+        'benchmarks/games/twenty-questions/src/game-state.ts',
+        // matrix-eval has no unit tests yet (matrix benchmark tool)
+        'benchmarks/forecasting/matrix-eval/src/**/*.ts',
+        // market-maker benchmark helper files (tested via integration)
+        'benchmarks/trading/market-maker/src/matrix.ts',
+        'benchmarks/trading/market-maker/src/results.ts',
+        'benchmarks/trading/market-maker/src/table.ts',
         // Script files for generating chart URLs
-        'apps/**/scripts/**',
+        'benchmarks/**/scripts/**',
         // Next.js API routes (tested via e2e)
-        'apps/**/src/app/api/**',
+        'benchmarks/**/src/app/api/**',
         // Market maker agent template code (tested via benchmark)
-        'apps/agent_005/src/market-maker.ts',
+        'benchmarks/trading/market-maker/src/market-maker.ts',
       ],
     },
     include: [
@@ -79,10 +79,10 @@ export default defineConfig({
       'packages/**/src/**/*.test.tsx',
       'packages/**/__tests__/**/*.test.ts',
       'packages/**/__tests__/**/*.test.tsx',
-      'apps/**/src/**/*.test.ts',
-      'apps/**/src/**/*.test.tsx',
-      'apps/**/__tests__/**/*.test.ts',
-      'apps/**/__tests__/**/*.test.tsx',
+      'benchmarks/**/src/**/*.test.ts',
+      'benchmarks/**/src/**/*.test.tsx',
+      'benchmarks/**/__tests__/**/*.test.ts',
+      'benchmarks/**/__tests__/**/*.test.tsx',
     ],
     exclude: [
       'node_modules',

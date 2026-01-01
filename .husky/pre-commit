@@ -173,7 +173,7 @@ echo "=== Checking markdown file locations ==="
 for file in $STAGED_FILES; do
   if echo "$file" | grep -qE '\.md$'; then
     # Allow: docs/, README.md, CONTRIBUTING.md, CLAUDE.md, package READMEs
-    if ! echo "$file" | grep -qE '^(docs/|README\.md|CONTRIBUTING\.md|CLAUDE\.md|AGENTS\.md|packages/[^/]+/README\.md|apps/[^/]+/README\.md)'; then
+    if ! echo "$file" | grep -qE '^(docs/|README\.md|CONTRIBUTING\.md|CLAUDE\.md|AGENTS\.md|packages/[^/]+/README\.md|benchmarks/[^/]+/[^/]+/README\.md)'; then
       echo "WARNING: Markdown file outside docs/: $file"
       echo "Consider moving documentation to docs/ directory."
     fi
