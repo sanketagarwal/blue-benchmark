@@ -40,7 +40,9 @@ describe('history', () => {
       const mockDb = getDatabase();
       mockDb.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([]),
+          }),
         }),
       });
 
@@ -54,10 +56,12 @@ describe('history', () => {
       const mockDb = getDatabase();
       mockDb.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([
-            { role: 'user', content: 'Hello', kind: 'prompt' },
-            { role: 'assistant', content: 'Hi there', kind: 'output' },
-          ]),
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([
+              { role: 'user', content: 'Hello', kind: 'prompt' },
+              { role: 'assistant', content: 'Hi there', kind: 'output' },
+            ]),
+          }),
         }),
       });
 
@@ -73,11 +77,13 @@ describe('history', () => {
       const mockDb = getDatabase();
       mockDb.select.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([
-            { role: 'user', content: 'Hello', kind: 'prompt' },
-            { role: 'assistant', content: 'Summary', kind: 'compaction' },
-            { role: 'assistant', content: 'Hi there', kind: 'output' },
-          ]),
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([
+              { role: 'user', content: 'Hello', kind: 'prompt' },
+              { role: 'assistant', content: 'Summary', kind: 'compaction' },
+              { role: 'assistant', content: 'Hi there', kind: 'output' },
+            ]),
+          }),
         }),
       });
 

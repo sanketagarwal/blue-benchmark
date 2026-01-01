@@ -138,7 +138,7 @@ describe('run-round', () => {
 
       await runRound(agent);
 
-      expect(loadMessageHistory).toHaveBeenCalledWith('test-agent');
+      expect(loadMessageHistory).toHaveBeenCalledWith('test-agent', undefined);
       expect(getCurrentRoundNumber).toHaveBeenCalledWith('test-agent');
     });
 
@@ -490,6 +490,114 @@ describe('run-round', () => {
         wasCompacted: false,
         traceId: customTraceId,
       });
+    });
+
+    it('passes since option to loadMessageHistory for session isolation', async () => {
+      const schema = z.object({ result: z.string() });
+      const definition: AgentDefinition<{ result: string }> = {
+        id: 'test-agent',
+        outputSchema: schema,
+        buildRoundPrompt: () => 'What is 2+2?',
+        buildCompactionPrompt: () => 'Compact',
+      };
+      const agent = defineAgent(definition);
+
+      const { loadMessageHistory, getCurrentRoundNumber } = await import('../src/history.js');
+      vi.mocked(loadMessageHistory).mockResolvedValue([]);
+      vi.mocked(getCurrentRoundNumber).mockResolvedValue(1);
+
+      const { shouldCompact } = await import('../src/compaction.js');
+      vi.mocked(shouldCompact).mockResolvedValue(false);
+
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValue({
+        object: { result: '4' },
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      } as never);
+
+      const sinceDate = new Date('2024-01-01T00:00:00Z');
+      await runRound(agent, { since: sinceDate });
+
+      expect(loadMessageHistory).toHaveBeenCalledWith('test-agent', { since: sinceDate });
+    });
+
+    it('uses provided modelId instead of environment variable', async () => {
+      const schema = z.object({ result: z.string() });
+      const definition: AgentDefinition<{ result: string }> = {
+        id: 'test-agent',
+        outputSchema: schema,
+        buildRoundPrompt: () => 'What is 2+2?',
+        buildCompactionPrompt: () => 'Compact',
+      };
+      const agent = defineAgent(definition);
+
+      const { loadMessageHistory, getCurrentRoundNumber } = await import('../src/history.js');
+      vi.mocked(loadMessageHistory).mockResolvedValue([]);
+      vi.mocked(getCurrentRoundNumber).mockResolvedValue(1);
+
+      const { shouldCompact } = await import('../src/compaction.js');
+      vi.mocked(shouldCompact).mockResolvedValue(false);
+
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValue({
+        object: { result: '4' },
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      } as never);
+
+      const customModelId = 'anthropic/claude-3-opus';
+      await runRound(agent, { modelId: customModelId });
+
+      expect(mockOpenAIProvider.chat).toHaveBeenCalledWith(customModelId);
+    });
+
+    it('isolates parallel runs with different agents using since option', async () => {
+      const schema = z.object({ result: z.string() });
+
+      const agent1 = defineAgent({
+        id: 'agent-1',
+        outputSchema: schema,
+        buildRoundPrompt: () => 'Agent 1 prompt',
+        buildCompactionPrompt: () => 'Compact',
+      });
+
+      const agent2 = defineAgent({
+        id: 'agent-2',
+        outputSchema: schema,
+        buildRoundPrompt: () => 'Agent 2 prompt',
+        buildCompactionPrompt: () => 'Compact',
+      });
+
+      const { loadMessageHistory, getCurrentRoundNumber, saveRoundPrompt, saveRoundOutput } =
+        await import('../src/history.js');
+      vi.mocked(loadMessageHistory).mockResolvedValue([]);
+      vi.mocked(getCurrentRoundNumber).mockResolvedValue(1);
+      vi.mocked(saveRoundPrompt).mockResolvedValue(undefined);
+      vi.mocked(saveRoundOutput).mockResolvedValue(undefined);
+
+      const { shouldCompact } = await import('../src/compaction.js');
+      vi.mocked(shouldCompact).mockResolvedValue(false);
+
+      const { generateObject } = await import('ai');
+      vi.mocked(generateObject).mockResolvedValue({
+        object: { result: 'done' },
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      } as never);
+
+      const sharedSince = new Date('2024-06-01T12:00:00Z');
+
+      await Promise.all([
+        runRound(agent1, { modelId: 'model-a', since: sharedSince }),
+        runRound(agent2, { modelId: 'model-b', since: sharedSince }),
+      ]);
+
+      expect(loadMessageHistory).toHaveBeenCalledWith('agent-1', { since: sharedSince });
+      expect(loadMessageHistory).toHaveBeenCalledWith('agent-2', { since: sharedSince });
+
+      expect(saveRoundPrompt).toHaveBeenCalledWith('agent-1', 'Agent 1 prompt', 1, expect.any(String));
+      expect(saveRoundPrompt).toHaveBeenCalledWith('agent-2', 'Agent 2 prompt', 1, expect.any(String));
+
+      expect(mockOpenAIProvider.chat).toHaveBeenCalledWith('model-a');
+      expect(mockOpenAIProvider.chat).toHaveBeenCalledWith('model-b');
     });
   });
 });

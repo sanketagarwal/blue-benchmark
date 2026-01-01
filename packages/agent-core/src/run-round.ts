@@ -27,15 +27,19 @@ export function defineAgent<TOutput>(definition: AgentDefinition<TOutput>): Agen
  * @param options - Optional configuration
  * @param options.traceId - Optional trace ID for correlation (auto-generated if not provided)
  * @param options.modelId - Optional model ID override for parallel execution (avoids env race condition)
+ * @param options.since - Only load messages created at or after this date (for session isolation)
  */
 export async function runRound<TOutput>(
   agent: Agent<TOutput>,
-  options?: { traceId?: string; modelId?: string }
+  options?: { traceId?: string; modelId?: string; since?: Date }
 ): Promise<RoundResult<TOutput>> {
   const { definition } = agent;
   const traceId = options?.traceId ?? crypto.randomUUID();
 
-  const messages = await loadMessageHistory(definition.id);
+  const messages = await loadMessageHistory(
+    definition.id,
+    options?.since ? { since: options.since } : undefined
+  );
   const roundNumber = await getCurrentRoundNumber(definition.id);
 
   let wasCompacted = false;

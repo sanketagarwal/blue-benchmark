@@ -21,6 +21,7 @@ import {
 import { resolveDualGroundTruth } from './ground-truth/bottom-checker.js';
 import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
+import { prefetchAllRoundData } from './prefetch-warmup.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 import {
   buildLeaderboardScoreData,
@@ -617,11 +618,16 @@ function createModelState(modelId: string): ModelState {
 /**
  * Run a single model round and return the output
  * @param modelId - The model identifier to run
+ * @param since - Only load message history from this time onwards (isolates benchmark runs)
  * @returns Bottom caller output with predictions
  */
-async function runModelRound(modelId: string): Promise<BottomCallerOutput> {
+async function runModelRound(modelId: string, since?: Date): Promise<BottomCallerOutput> {
   const bottomCaller = createBottomCaller(modelId);
-  const result = await runRound(bottomCaller, { modelId });
+  const options: { modelId: string; since?: Date } = { modelId };
+  if (since !== undefined) {
+    options.since = since;
+  }
+  const result = await runRound(bottomCaller, options);
   return result.output;
 }
 
@@ -1543,7 +1549,7 @@ function writeModelAuditRecords(params: {
  * @param symbolId - Trading symbol
  * @param currentTime - Current prediction time
  * @param currentPhase - Current phase number for persistence
- * @param startTime - Benchmark start time for persistence
+ * @param benchmarkStartTime - Real wall-clock time when benchmark started (for session isolation)
  * @param labelCounts - Label counts for trivial baseline calculation
  */
 async function runBenchmarkRound(
@@ -1553,7 +1559,7 @@ async function runBenchmarkRound(
   symbolId: string,
   currentTime: Date,
   currentPhase: number,
-  startTime: string,
+  benchmarkStartTime: Date,
   labelCounts: Record<TimeframeId, { total: number; positive: number }>
 ): Promise<void> {
   logger.logRoundHeader(roundNumber, totalRounds, currentTime);
@@ -1592,7 +1598,7 @@ async function runBenchmarkRound(
     const batchResults = await Promise.all(
       batch.map(async (state) => {
         try {
-          const output = await runModelRound(state.modelId);
+          const output = await runModelRound(state.modelId, benchmarkStartTime);
           return { state, output, error: undefined as Error | undefined };
         } catch (error) {
           return { state, output: undefined, error: error as Error };
@@ -1645,7 +1651,7 @@ async function runBenchmarkRound(
 
   // Persist results after each round
   persistResults(models, {
-    startTime,
+    startTime: benchmarkStartTime.toISOString(),
     symbolId,
     totalRounds,
     currentRound: roundNumber,
@@ -1955,6 +1961,7 @@ async function main(): Promise<void> {
   // Initialize clock
   resetClockState();
   let clockState = initializeClock();
+  const benchmarkStartTime = new Date(); // Real wall-clock time for session isolation
   const startTime = clockState.currentTime.toISOString();
 
   logger.newline();
@@ -1968,12 +1975,21 @@ async function main(): Promise<void> {
   const totalRounds = phase0Rounds + phase1Rounds + phase2Rounds;
   let roundNumber = 0;
 
+  // ========== PREFETCH ALL REPLAY LAB DATA ==========
+  // Warm up cache before AI calls to fail fast on API errors
+  await prefetchAllRoundData(
+    SYMBOL_ID,
+    clockState.currentTime,
+    totalRounds,
+    process.argv.includes('--verbose')
+  );
+
   // ========== PHASE 0 ==========
   logger.newline();
   logger.log(`--- Starting Phase 0 rounds (1-${String(phase0Rounds)}) ---`);
   for (let phase0Round = 1; phase0Round <= phase0Rounds; phase0Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, startTime, labelCounts);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, benchmarkStartTime, labelCounts);
     clockState = advanceClock();
   }
 
@@ -1987,7 +2003,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 1 rounds (${String(phase1Start)}-${String(phase1End)}) ---`);
   for (let phase1Round = 1; phase1Round <= phase1Rounds; phase1Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, startTime, labelCounts);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, benchmarkStartTime, labelCounts);
     clockState = advanceClock();
   }
 
@@ -2001,7 +2017,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 2 rounds (${String(phase2Start)}-${String(phase2End)}) ---`);
   for (let phase2Round = 1; phase2Round <= phase2Rounds; phase2Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, startTime, labelCounts);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, benchmarkStartTime, labelCounts);
     clockState = advanceClock();
   }
 

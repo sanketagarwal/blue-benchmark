@@ -14,14 +14,25 @@ export interface Message {
 /**
  * Load message history since last compaction for an agent
  * @param agentId
+ * @param options - Optional configuration
+ * @param options.since - Only return messages created at or after this date
  */
-export async function loadMessageHistory(agentId: string): Promise<Message[]> {
+export async function loadMessageHistory(
+  agentId: string,
+  options?: { since?: Date }
+): Promise<Message[]> {
   const database = getDatabase();
+
+  const conditions = [eq(agentMessages.agentId, agentId)];
+  if (options?.since) {
+    conditions.push(gte(agentMessages.createdAt, options.since));
+  }
 
   const messages = await database
     .select()
     .from(agentMessages)
-    .where(eq(agentMessages.agentId, agentId));
+    .where(and(...conditions))
+    .orderBy(asc(agentMessages.createdAt));
 
   return messages
     .filter((message) => message.kind !== 'compaction')

@@ -20,6 +20,9 @@ export default defineConfig({
         '**/src/app/page.tsx',
         '**/src/app/api/**',
         '**/src/benchmark.ts',
+        '**/src/prefetch-warmup.ts',
+        '**/src/persist-results.ts',
+        '**/src/scorers/timing-metrics.ts',
         '**/scripts/**',
       ],
       thresholds: {

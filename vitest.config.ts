@@ -54,6 +54,10 @@ export default defineConfig({
         'packages/scorers/src/save-score.ts',
         // CLI benchmark entry points don't need unit tests
         'apps/**/src/benchmark.ts',
+        // agent_006 CLI utilities (tested via integration)
+        'apps/agent_006/src/prefetch-warmup.ts',
+        'apps/agent_006/src/persist-results.ts',
+        'apps/agent_006/src/scorers/timing-metrics.ts',
         // agent_000 game state is simpler and not unit tested
         'apps/agent_000/src/game-state.ts',
         // agent_004 has no unit tests yet (matrix benchmark tool)
