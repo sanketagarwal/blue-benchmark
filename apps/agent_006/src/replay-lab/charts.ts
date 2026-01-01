@@ -26,8 +26,8 @@ interface SignedUrlResponse {
 const CHART_LAYERS = 'candles,sma:20,ema:20,bb:20:2,vwap,volume';
 
 export async function getSignedChartUrl(params: ChartParams): Promise<string> {
-  const width = params.width ?? 1200;
-  const height = params.height ?? 800;
+  const width = params.width ?? 900;
+  const height = params.height ?? 600;
 
   // Build the chart path (relative URL)
   const chartPath = `/api/charts/${params.symbolId}/image?timeframe=${params.timeframe}&from=${params.from.toISOString()}&to=${params.to.toISOString()}&layers=${params.layers}&width=${String(width)}&height=${String(height)}`;
