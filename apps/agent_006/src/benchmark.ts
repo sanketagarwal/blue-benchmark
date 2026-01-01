@@ -1366,50 +1366,58 @@ async function runBenchmarkRound(
   // Update label counts for base rate calculation in audit records
   updateLabelCounts(labelCounts, labels);
 
-  // Run each active model
-  for (const state of models.values()) {
-    if (state.eliminated) {
+  // Run all active models in parallel
+  const activeModels = [...models.values()].filter(state => !state.eliminated);
+  logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Calling ${String(activeModels.length)} models in parallel...`);
+
+  const modelResults = await Promise.all(
+    activeModels.map(async (state) => {
+      try {
+        const output = await runModelRound(state.modelId);
+        return { state, output, error: undefined as Error | undefined };
+      } catch (error) {
+        return { state, output: undefined, error: error as Error };
+      }
+    })
+  );
+  logger.succeedSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: All ${String(activeModels.length)} models complete`);
+
+  // Process results sequentially for logging and state updates
+  for (const { state, output, error } of modelResults) {
+    if (error !== undefined) {
+      state.failedRounds.push(roundNumber);
+      const errorMessage = error.message;
+      logger.log(`${chalk.red('✖')} ${state.modelId}: Failed - ${errorMessage.slice(0, 100)}`);
       continue;
     }
 
-    logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: ${state.modelId} - Calling LLM...`);
+    if (output === undefined) {continue;}
 
-    try {
-      const output = await runModelRound(state.modelId);
-      const legacyPredictions = convertPredictionsForScorer(output.predictions);
-      const roundScore = scorePhase0Round(
-        legacyPredictions,
-        labels
-      );
-      recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
+    const legacyPredictions = convertPredictionsForScorer(output.predictions);
+    const roundScore = scorePhase0Round(legacyPredictions, labels);
+    recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
 
-      // Write audit records for each horizon (writes even in quick mode)
-      writeModelAuditRecords({
-        currentTime,
-        roundNumber,
-        modelId: state.modelId,
-        predictions: output.predictions,
-        labels,
-        firstPivotAts,
-        timeToPivotRatios,
-        labelCounts,
-      });
+    // Write audit records for each horizon
+    writeModelAuditRecords({
+      currentTime,
+      roundNumber,
+      modelId: state.modelId,
+      predictions: output.predictions,
+      labels,
+      firstPivotAts,
+      timeToPivotRatios,
+      labelCounts,
+    });
 
-      // Compute baselines from accumulated labels for this model
-      const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
-        '15m': computeBaselineLogLoss(state.labelsByHorizon['15m']),
-        '1h': computeBaselineLogLoss(state.labelsByHorizon['1h']),
-        '4h': computeBaselineLogLoss(state.labelsByHorizon['4h']),
-        '24h': computeBaselineLogLoss(state.labelsByHorizon['24h']),
-      };
-      const scoreSummary = formatRoundScoreWithBaseline(roundScore, baselinesByHorizon);
-      logger.succeedSpinner(`${chalk.cyan(state.modelId)}: ${scoreSummary}`);
-    } catch (error) {
-      // Record failure but continue with other models
-      state.failedRounds.push(roundNumber);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.failSpinner(`${state.modelId}: Failed - ${errorMessage.slice(0, 100)}`);
-    }
+    // Compute baselines from accumulated labels for this model
+    const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
+      '15m': computeBaselineLogLoss(state.labelsByHorizon['15m']),
+      '1h': computeBaselineLogLoss(state.labelsByHorizon['1h']),
+      '4h': computeBaselineLogLoss(state.labelsByHorizon['4h']),
+      '24h': computeBaselineLogLoss(state.labelsByHorizon['24h']),
+    };
+    const scoreSummary = formatRoundScoreWithBaseline(roundScore, baselinesByHorizon);
+    logger.log(`${chalk.green('✔')} ${chalk.cyan(state.modelId)}: ${scoreSummary}`);
   }
 
   clearBottomCallerContext();
