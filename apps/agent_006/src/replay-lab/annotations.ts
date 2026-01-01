@@ -393,11 +393,7 @@ export async function getLocalExtremaAnnotations(
   }
 
   // Fallback to compute endpoint when no stored annotations exist
-  // eslint-disable-next-line no-console, no-restricted-syntax -- Debug log for compute endpoint fallback visibility
-  console.log(
-    `[annotations] No stored annotations found for ${symbolId} ${method}, using compute endpoint`
-  );
-
+  // (e.g., stored data has L:5 but we need L:3)
   return await computeLocalExtremaAnnotations(symbolId, method, params, from, to);
 }
 
