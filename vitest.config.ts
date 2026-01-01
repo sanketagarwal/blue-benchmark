@@ -59,9 +59,9 @@ export default defineConfig({
         'benchmarks/trading/bottom-caller/src/persist-results.ts',
         'benchmarks/trading/bottom-caller/src/scorers/timing-metrics.ts',
         // twenty-questions game state is simpler and not unit tested
-        'benchmarks/games/twenty-questions/src/game-state.ts',
+        'benchmarks/tutorials/twenty-questions/src/game-state.ts',
         // matrix-eval has no unit tests yet (matrix benchmark tool)
-        'benchmarks/forecasting/matrix-eval/src/**/*.ts',
+        'benchmarks/tutorials/matrix-eval/src/**/*.ts',
         // market-maker benchmark helper files (tested via integration)
         'benchmarks/trading/market-maker/src/matrix.ts',
         'benchmarks/trading/market-maker/src/results.ts',
