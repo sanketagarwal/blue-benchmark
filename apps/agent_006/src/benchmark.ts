@@ -232,6 +232,129 @@ function createQualificationAudit(): QualificationAudit {
 }
 
 /**
+ * Horizon diagnostics assessment constants
+ */
+const ASSESSMENT_GOOD = 'good arena candidate' as const;
+const ASSESSMENT_MODERATE = 'moderate arena candidate' as const;
+const ASSESSMENT_DEFER = 'elite-only arena or defer' as const;
+
+type HorizonAssessment = typeof ASSESSMENT_GOOD | typeof ASSESSMENT_MODERATE | typeof ASSESSMENT_DEFER;
+
+/**
+ * Determine assessment based on percentage of models better than random
+ * @param betterThanRandomCount - Number of models better than random
+ * @param totalCount - Total number of models evaluated
+ * @returns Assessment string
+ */
+function getHorizonAssessment(betterThanRandomCount: number, totalCount: number): HorizonAssessment {
+  if (totalCount === 0) {
+    return ASSESSMENT_DEFER;
+  }
+  const ratio = betterThanRandomCount / totalCount;
+  if (ratio > 0.6) {
+    return ASSESSMENT_GOOD;
+  }
+  if (ratio >= 0.4) {
+    return ASSESSMENT_MODERATE;
+  }
+  return ASSESSMENT_DEFER;
+}
+
+/**
+ * Collect model results for a horizon from Phase 0 scores
+ * @param models - Map of model states
+ * @param horizon - Horizon to collect results for
+ * @returns Array of model results with mean log loss
+ */
+function collectHorizonResults(
+  models: Map<string, ModelState>,
+  horizon: TimeframeId
+): { modelId: string; meanLogLoss: number }[] {
+  const results: { modelId: string; meanLogLoss: number }[] = [];
+
+  for (const state of models.values()) {
+    if (state.roundScores.length === 0) {
+      continue;
+    }
+    const aggregate = aggregatePhase0Scores(state.roundScores);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    results.push({ modelId: state.modelId, meanLogLoss: aggregate.meanLogLoss[horizon] });
+  }
+
+  return results;
+}
+
+/**
+ * Format assessment string with appropriate color
+ * @param assessment - The horizon assessment
+ * @returns Formatted and colored assessment string
+ */
+function formatAssessment(assessment: HorizonAssessment): string {
+  if (assessment === ASSESSMENT_GOOD) {
+    return chalk.green(`High differentiation -> ${assessment}`);
+  }
+  if (assessment === ASSESSMENT_MODERATE) {
+    return chalk.yellow(`Mixed behavior -> ${assessment}`);
+  }
+  return chalk.red(`Most models worse than baseline -> ${assessment}`);
+}
+
+/**
+ * Print diagnostics for a single horizon
+ * @param horizon - The horizon to print diagnostics for
+ * @param modelResults - Model results for this horizon
+ * @param randomBaseline - Random baseline log loss for comparison
+ */
+function printSingleHorizonDiagnostics(
+  horizon: TimeframeId,
+  modelResults: { modelId: string; meanLogLoss: number }[],
+  randomBaseline: number
+): void {
+  const betterThanRandom = modelResults.filter(m => m.meanLogLoss < randomBaseline);
+  const worseThanRandom = modelResults.filter(m => m.meanLogLoss >= randomBaseline);
+  const assessment = getHorizonAssessment(betterThanRandom.length, modelResults.length);
+
+  logger.log(`${chalk.cyan(horizon)}:`);
+  logger.log(`  - ${chalk.green(String(betterThanRandom.length))}/${String(modelResults.length)} models better than random`);
+  if (worseThanRandom.length > 0) {
+    logger.log(`  - ${chalk.red(String(worseThanRandom.length))} models consistently worse`);
+  }
+  logger.log(`  - ${formatAssessment(assessment)}`);
+  logger.newline();
+}
+
+/**
+ * Print Horizon Diagnostics summary section
+ * Summarizes what the per-horizon Phase 0 results mean for arena design decisions
+ *
+ * @param models - Map of model states with Phase 0 scores
+ * @param baselines - Baselines per horizon for comparison
+ */
+function printHorizonDiagnostics(
+  models: Map<string, ModelState>,
+  baselines: Record<TimeframeId, BaselineLogLoss>
+): void {
+  logger.newline();
+  logger.log(chalk.bold('=== Horizon Diagnostics ==='));
+  logger.newline();
+
+  for (const horizon of HORIZONS) {
+    const modelResults = collectHorizonResults(models, horizon);
+
+    if (modelResults.length === 0) {
+      logger.log(`${chalk.cyan(horizon)}:`);
+      logger.log(chalk.dim('  - No models with data'));
+      logger.newline();
+      continue;
+    }
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const baseline = baselines[horizon];
+    printSingleHorizonDiagnostics(horizon, modelResults, baseline.random);
+  }
+}
+
+/**
  * Print qualification audit block for a phase
  * @param phase - Phase number (0, 1, 2)
  * @param audit - Qualification audit data
@@ -699,6 +822,9 @@ function runPhase0(models: Map<string, ModelState>, smokeTestStatus?: SmokeTestS
   const phase0Audit = buildQualificationAuditForPhase(models, 0);
   const phase0Rounds = sampleLabels['15m'].length;
   printQualificationAudit(0, phase0Audit, models.size, phase0Rounds);
+
+  // Print Horizon Diagnostics summary (interpretation layer for arena design decisions)
+  printHorizonDiagnostics(models, baselines);
 }
 
 /**
