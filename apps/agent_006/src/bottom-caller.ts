@@ -141,6 +141,19 @@ ${chartUrl}`;
 
 Current Time: ${currentTime}
 
+**OUTPUT FORMAT (exact JSON structure required):**
+\`\`\`json
+{
+  "reasoning": "brief explanation of your analysis",
+  "predictions": {
+    "15m": { "hasBottomed": true, "confidence": 0.75, "candlesBack": 2 },
+    "1h": { "hasBottomed": false, "confidence": 0.60, "candlesBack": 0 },
+    "4h": { "hasBottomed": true, "confidence": 0.85, "candlesBack": 5 },
+    "24h": { "hasBottomed": false, "confidence": 0.40, "candlesBack": 0 }
+  }
+}
+\`\`\`
+
 **CHART ANALYSIS** (Analyze each chart for its corresponding timeframe):
 
 ${chartSections}
