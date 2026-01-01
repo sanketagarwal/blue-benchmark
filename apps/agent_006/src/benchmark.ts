@@ -791,15 +791,55 @@ function printHorizonQualificationSummary(models: Map<string, ModelState>): void
 }
 
 /**
+ * Extended model score data with qualification status
+ */
+interface ModelScoreDataWithQualification extends ModelScoreData {
+  isQualified: boolean;
+}
+
+/**
+ * Check if any models are qualified for a horizon
+ * @param horizonScores - Map of model scores for a horizon
+ * @returns Number of qualified models
+ */
+function countQualifiedModels(horizonScores: Map<string, ModelScoreDataWithQualification>): number {
+  let count = 0;
+  for (const data of horizonScores.values()) {
+    if (data.isQualified) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Convert extended score data to base format
+ * @param horizonScores - Extended model score data
+ * @returns Base model score data without isQualified field
+ */
+function toBaseScoreData(horizonScores: Map<string, ModelScoreDataWithQualification>): Map<string, ModelScoreData> {
+  const baseData = new Map<string, ModelScoreData>();
+  for (const [modelId, data] of horizonScores) {
+    baseData.set(modelId, {
+      logLosses: data.logLosses,
+      briers: data.briers,
+      predictions: data.predictions,
+      labels: data.labels,
+    });
+  }
+  return baseData;
+}
+
+/**
  * Build ModelScoreData maps for each horizon from model states
- * Only includes model data for horizons they are qualified for
+ * Includes ALL non-eliminated models with data, regardless of qualification status
  * @param modelStates - Map of model states
- * @returns Record of horizon to map of modelId to ModelScoreData
+ * @returns Record of horizon to map of modelId to ModelScoreDataWithQualification
  */
 function buildLeaderboardScoreData(
   modelStates: Map<string, ModelState>
-): Record<TimeframeId, Map<string, ModelScoreData>> {
-  const result: Record<TimeframeId, Map<string, ModelScoreData>> = {
+): Record<TimeframeId, Map<string, ModelScoreDataWithQualification>> {
+  const result: Record<TimeframeId, Map<string, ModelScoreDataWithQualification>> = {
     '15m': new Map(),
     '1h': new Map(),
     '4h': new Map(),
@@ -810,16 +850,16 @@ function buildLeaderboardScoreData(
       continue;
     }
     for (const horizon of HORIZONS) {
-      // Only include data for horizons the model is qualified for
-      if (!state.qualifiedHorizons.has(horizon)) {
-        continue;
-      }
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       const logLosses = state.logLossByHorizon[horizon];
+      if (logLosses.length === 0) {
+        continue;
+      }
       const { predictions, labels } = extractHorizonPredictionsAndLabels(state.trackBRounds, horizon);
       const briers = calculateBrierScores(predictions, labels);
+      const isQualified = state.qualifiedHorizons.has(horizon);
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      result[horizon].set(state.modelId, { logLosses, briers, predictions, labels });
+      result[horizon].set(state.modelId, { logLosses, briers, predictions, labels, isQualified });
     }
   }
   return result;
@@ -827,6 +867,7 @@ function buildLeaderboardScoreData(
 
 /**
  * Print leaderboards for each horizon
+ * Shows all models with data regardless of qualification status
  * @param modelStates - Map of model states
  */
 function printHorizonLeaderboards(modelStates: Map<string, ModelState>): void {
@@ -837,33 +878,35 @@ function printHorizonLeaderboards(modelStates: Map<string, ModelState>): void {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const horizonScores = scoreData[horizon];
     if (horizonScores.size === 0) {
+      logger.newline();
+      logger.log(chalk.yellow(`  ${horizon}: No models have data for this horizon`));
       continue;
     }
-    const leaderboard = generateLeaderboard(horizon, 'fractal', horizonScores);
+    const qualifiedCount = countQualifiedModels(horizonScores);
+    const baseScoreData = toBaseScoreData(horizonScores);
+    const leaderboard = generateLeaderboard(horizon, 'fractal', baseScoreData);
     logger.newline();
+    if (qualifiedCount === 0) {
+      logger.log(chalk.yellow(`Note: No models qualified for ${horizon} per Phase 0-2 criteria. Showing raw data.`));
+    }
     logger.log(formatLeaderboardTable(leaderboard));
   }
 }
 
 /**
  * Build round data with scores from model track B rounds for profile generation
- * Only includes data for horizons the model is qualified for
+ * Includes ALL horizons regardless of qualification status
  * @param trackBRounds - Array of track B round scores
- * @param qualifiedHorizons - Set of horizons the model is qualified for
  * @returns Array of round data formatted for buildModelProfile
  */
 function buildRoundDataForProfile(
-  trackBRounds: RoundScore[],
-  qualifiedHorizons: Set<TimeframeId>
+  trackBRounds: RoundScore[]
 ): {
   predictions: Record<TimeframeId, number>;
   labels: Record<TimeframeId, boolean>;
   logLosses: Record<TimeframeId, number>;
   briers: Record<TimeframeId, number>;
 }[] {
-  // Filter to only qualified horizons
-  const qualifiedHorizonList = HORIZONS.filter(h => qualifiedHorizons.has(h));
-
   return trackBRounds
     .filter((round) =>
       round.predictions !== undefined &&
@@ -877,7 +920,8 @@ function buildRoundDataForProfile(
       const briers: Record<string, number> = {};
 
       // Only include data for qualified horizons
-      for (const horizon of qualifiedHorizonList) {
+      // Include data for ALL horizons
+      for (const horizon of HORIZONS) {
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
         const pred = round.predictions?.[horizon] ?? 0.5;
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -906,16 +950,16 @@ function buildRoundDataForProfile(
 
 /**
  * Print model quality profiles and separability analysis
- * Only includes data for horizons each model is qualified for
+ * Includes ALL non-eliminated models with data regardless of qualification status
  * @param modelStates - Map of model states
  */
 function printModelProfilesAndSeparability(modelStates: Map<string, ModelState>): void {
   // Build profiles for non-eliminated models with round data
   // Only include data for horizons the model is qualified for
   const profiles = [...modelStates.values()]
-    .filter((state) => !state.eliminated && state.trackBRounds.length > 0 && state.qualifiedHorizons.size > 0)
+    .filter((state) => !state.eliminated && state.trackBRounds.length > 0)
     .map((state) => {
-      const roundData = buildRoundDataForProfile(state.trackBRounds, state.qualifiedHorizons);
+      const roundData = buildRoundDataForProfile(state.trackBRounds);
       return buildModelProfile(state.modelId, roundData);
     });
 
@@ -927,6 +971,12 @@ function printModelProfilesAndSeparability(modelStates: Map<string, ModelState>)
   // Print Model Quality Profiles
   logger.newline();
   logger.log('=== Model Quality Profiles ===');
+  // Count how many models have qualified horizons
+  const qualifiedCount = [...modelStates.values()]
+    .filter((state) => !state.eliminated && state.qualifiedHorizons.size > 0).length;
+  if (qualifiedCount === 0) {
+    logger.log(chalk.yellow('Note: No models passed Phase 0-2 qualification. Showing raw data for debugging.'));
+  }
   logger.newline();
   logger.log(formatProfileTable(profiles));
 
@@ -1389,6 +1439,7 @@ function printRecommendationsBlock(
 
 /**
  * Build separability data and analysis from model states
+ * Includes ALL non-eliminated models with data regardless of qualification status
  * @param modelStates - Map of model states
  * @returns Object with profiles, analysis, and cohort size
  */
@@ -1399,7 +1450,7 @@ function buildSeparabilityData(
   const profiles = [...modelStates.values()]
     .filter((state) => !state.eliminated && state.trackBRounds.length > 0 && state.qualifiedHorizons.size > 0)
     .map((state) => {
-      const roundData = buildRoundDataForProfile(state.trackBRounds, state.qualifiedHorizons);
+      const roundData = buildRoundDataForProfile(state.trackBRounds);
       return buildModelProfile(state.modelId, roundData);
     });
 
