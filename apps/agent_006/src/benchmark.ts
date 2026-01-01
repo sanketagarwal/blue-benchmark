@@ -300,6 +300,82 @@ function formatAssessment(assessment: HorizonAssessment): string {
 }
 
 /**
+ * Variance thresholds for log loss spread classification
+ */
+const VARIANCE_LOW_THRESHOLD = 0.1;
+const VARIANCE_HIGH_THRESHOLD = 0.5;
+
+/**
+ * Variance classification labels
+ */
+const VARIANCE_LOW_SPREAD = 'low spread' as const;
+const VARIANCE_MODERATE_SPREAD = 'moderate spread' as const;
+const VARIANCE_HIGH_SPREAD = 'high spread' as const;
+
+type VarianceClassification = typeof VARIANCE_LOW_SPREAD | typeof VARIANCE_MODERATE_SPREAD | typeof VARIANCE_HIGH_SPREAD;
+
+/**
+ * Compute population variance of an array of numbers
+ * @param values - Array of numeric values
+ * @returns Population variance (0 if empty or single value)
+ */
+function computeVariance(values: number[]): number {
+  if (values.length <= 1) {
+    return 0;
+  }
+
+  // Compute mean
+  let sum = 0;
+  for (const value of values) {
+    sum += value;
+  }
+  const mean = sum / values.length;
+
+  // Compute sum of squared differences
+  let squaredDiffSum = 0;
+  for (const value of values) {
+    const diff = value - mean;
+    squaredDiffSum += diff * diff;
+  }
+
+  // Population variance
+  return squaredDiffSum / values.length;
+}
+
+/**
+ * Classify variance into low/moderate/high spread
+ * @param variance - The computed variance value
+ * @returns Classification string
+ */
+function classifyVariance(variance: number): VarianceClassification {
+  if (variance < VARIANCE_LOW_THRESHOLD) {
+    return VARIANCE_LOW_SPREAD;
+  }
+  if (variance > VARIANCE_HIGH_THRESHOLD) {
+    return VARIANCE_HIGH_SPREAD;
+  }
+  return VARIANCE_MODERATE_SPREAD;
+}
+
+/**
+ * Format variance display with color based on classification
+ * @param variance - The computed variance value
+ * @returns Formatted string with variance and classification
+ */
+function formatVarianceDisplay(variance: number): string {
+  const classification = classifyVariance(variance);
+  const formattedValue = variance.toFixed(3);
+
+  if (classification === VARIANCE_LOW_SPREAD) {
+    return chalk.yellow(`${formattedValue} (${classification})`);
+  }
+  if (classification === VARIANCE_HIGH_SPREAD) {
+    return chalk.green(`${formattedValue} (${classification})`);
+  }
+  return chalk.cyan(`${formattedValue} (${classification})`);
+}
+
+/**
  * Print diagnostics for a single horizon
  * @param horizon - The horizon to print diagnostics for
  * @param modelResults - Model results for this horizon
@@ -314,11 +390,21 @@ function printSingleHorizonDiagnostics(
   const worseThanRandom = modelResults.filter(m => m.meanLogLoss >= randomBaseline);
   const assessment = getHorizonAssessment(betterThanRandom.length, modelResults.length);
 
+  // Calculate percentage of models better than random
+  const percentage = modelResults.length > 0
+    ? ((betterThanRandom.length / modelResults.length) * 100).toFixed(0)
+    : '0';
+
+  // Calculate log loss variance across all models
+  const logLossValues = modelResults.map(m => m.meanLogLoss);
+  const variance = computeVariance(logLossValues);
+
   logger.log(`${chalk.cyan(horizon)}:`);
-  logger.log(`  - ${chalk.green(String(betterThanRandom.length))}/${String(modelResults.length)} models better than random`);
+  logger.log(`  - ${chalk.green(String(betterThanRandom.length))}/${String(modelResults.length)} models (${percentage}%) better than random`);
   if (worseThanRandom.length > 0) {
     logger.log(`  - ${chalk.red(String(worseThanRandom.length))} models consistently worse`);
   }
+  logger.log(`  - Log loss variance: ${formatVarianceDisplay(variance)}`);
   logger.log(`  - ${formatAssessment(assessment)}`);
   logger.newline();
 }
