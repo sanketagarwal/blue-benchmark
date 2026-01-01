@@ -157,6 +157,9 @@ function formatRoundScoreWithBaseline(
 // Quick mode constants - minimal for fast pipeline verification
 const QUICK_ROUNDS_PER_PHASE = 1;
 const QUICK_MODEL_COUNT = 5;
+
+// Concurrency limit for parallel LLM calls (avoid rate limiting)
+const MAX_CONCURRENT_LLM_CALLS = 10;
 const QUICK_MODE_DATA_VERIFIED_MSG = 'Data collection verified - rounds completed successfully';
 
 /**
@@ -1366,20 +1369,29 @@ async function runBenchmarkRound(
   // Update label counts for base rate calculation in audit records
   updateLabelCounts(labelCounts, labels);
 
-  // Run all active models in parallel
+  // Run all active models in parallel with concurrency limit
   const activeModels = [...models.values()].filter(state => !state.eliminated);
-  logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Calling ${String(activeModels.length)} models in parallel...`);
+  const batchCount = Math.ceil(activeModels.length / MAX_CONCURRENT_LLM_CALLS);
+  logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Calling ${String(activeModels.length)} models (${String(batchCount)} batch${batchCount > 1 ? 'es' : ''})...`);
 
-  const modelResults = await Promise.all(
-    activeModels.map(async (state) => {
-      try {
-        const output = await runModelRound(state.modelId);
-        return { state, output, error: undefined as Error | undefined };
-      } catch (error) {
-        return { state, output: undefined, error: error as Error };
-      }
-    })
-  );
+  interface ModelResult { state: typeof activeModels[0]; output: Awaited<ReturnType<typeof runModelRound>> | undefined; error: Error | undefined }
+  const modelResults: ModelResult[] = [];
+
+  // Process in batches to avoid rate limiting
+  for (let index = 0; index < activeModels.length; index += MAX_CONCURRENT_LLM_CALLS) {
+    const batch = activeModels.slice(index, index + MAX_CONCURRENT_LLM_CALLS);
+    const batchResults = await Promise.all(
+      batch.map(async (state) => {
+        try {
+          const output = await runModelRound(state.modelId);
+          return { state, output, error: undefined as Error | undefined };
+        } catch (error) {
+          return { state, output: undefined, error: error as Error };
+        }
+      })
+    );
+    modelResults.push(...batchResults);
+  }
   logger.succeedSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: All ${String(activeModels.length)} models complete`);
 
   // Process results sequentially for logging and state updates
