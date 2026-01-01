@@ -211,8 +211,10 @@ export function shouldEliminatePhase0(score: Phase0AggregateScore): boolean {
 }
 
 /**
- * Minimum improvement required over trivial baseline to demonstrate skill
- * Model must beat trivial baseline by at least this margin
+ * Tolerance margin for comparing model performance to trivial baseline.
+ * Models with log loss within this margin of trivialBest are tolerated.
+ * A model fails the skill check only if its log loss >= (trivialBest + SKILL_MARGIN),
+ * meaning it performs worse than the trivial baseline by more than this tolerance.
  */
 const SKILL_MARGIN = 0.1;
 
