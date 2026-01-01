@@ -248,14 +248,16 @@ export function getPhase0DisqualifiedHorizonsWithBaselines(
       continue;
     }
 
-    // Disqualify if not significantly better than trivial baseline
-    // Model must beat trivialBest by SKILL_MARGIN, otherwise it's just luck
-    const skillThreshold = baseline.trivialBest + SKILL_MARGIN;
-
     // Also still check random baseline (model shouldn't be worse than random)
     const randomThreshold = baseline.random * 1.1;
 
-    if (meanLL > randomThreshold || meanLL >= skillThreshold) {
+    // Only apply skill threshold when there's meaningful positive class representation
+    // When trivialBest < 0.1, the data is too imbalanced for skill assessment
+    const shouldCheckSkill = baseline.trivialBest >= 0.1;
+    const skillThreshold = baseline.trivialBest + SKILL_MARGIN;
+    const failsSkillCheck = shouldCheckSkill && meanLL >= skillThreshold;
+
+    if (meanLL > randomThreshold || failsSkillCheck) {
       disqualified.add(horizon);
     }
   }

@@ -11,8 +11,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { logLoss } from '../src/scorers/log-loss-scorer.js';
 import { brierScore } from '../src/scorers/brier-scorer.js';
 import { filterPivotLows } from '../src/replay-lab/annotations.js';
+import {
+  computeBaselineLogLoss,
+  getPhase0DisqualifiedHorizonsWithBaselines,
+  RANDOM_BASELINE,
+} from '../src/scorers/phase-0-scorer.js';
+import { generateLeaderboard } from '../src/reports/leaderboards.js';
 
 import type { LocalExtremaAnnotation } from '../src/replay-lab/annotations.js';
+import type { ModelScoreData, LeaderboardEntry } from '../src/reports/leaderboards.js';
 
 // ============================================================================
 // GOLDEN CONFIG
@@ -578,6 +585,304 @@ describe('Golden Scenario E2E', () => {
       const barSizeMinutes = 5;
       const claimedTime = new Date(SNAP_TIME.getTime() - candlesBack * barSizeMinutes * 60_000);
       expect(claimedTime.getTime()).toBe(PIVOT_TIME.getTime());
+    });
+  });
+});
+
+/**
+ * Golden Scenario: All Labels False (No Bottoms)
+ *
+ * This scenario tests the edge case where no pivot lows (bottoms) occurred
+ * in the benchmark window, resulting in all ground truth labels being false
+ * for all horizons.
+ *
+ * This is a valid and important scenario because:
+ * - Markets don't always produce detectable bottoms
+ * - Models should still be rankable based on their probability calibration
+ * - The leaderboard should function correctly even without positive events
+ */
+describe('Golden Scenario: All Labels False (No Bottoms)', () => {
+  /**
+   * When all labels are false, the baseline strategies have predictable behavior:
+   * - alwaysFalse: predicts 0 for all samples -> perfect score (near 0)
+   * - alwaysTrue: predicts 1 for all samples -> catastrophic score (very high)
+   * - trivialBest: equals alwaysFalse (near 0)
+   * - random: always 0.693 (log(2))
+   */
+  describe('baseline computation with all-false labels', () => {
+    it('should compute trivialBest approaching 0 when all labels are false', () => {
+      const allFalseLabels = [false, false, false, false, false];
+      const baseline = computeBaselineLogLoss(allFalseLabels);
+
+      // alwaysFalse should be near 0 (predicting 0 when actual is 0 = perfect)
+      expect(baseline.alwaysFalse).toBeCloseTo(0, 5);
+
+      // alwaysTrue should be very high (predicting 1 when actual is 0 = catastrophic)
+      expect(baseline.alwaysTrue).toBeGreaterThan(30);
+
+      // trivialBest = min(alwaysFalse, alwaysTrue) = alwaysFalse
+      expect(baseline.trivialBest).toBe(baseline.alwaysFalse);
+      expect(baseline.trivialBest).toBeCloseTo(0, 5);
+
+      // random baseline is always log(2)
+      expect(baseline.random).toBeCloseTo(0.693, 3);
+    });
+  });
+
+  describe('model rankings when all labels are false', () => {
+    it('should produce valid rankings when all ground truth labels are false', () => {
+      // Create mock model score data with varying log loss scores
+      // All predictions are against false labels (no bottoms occurred)
+      const modelScores = new Map([
+        [
+          'model-a',
+          {
+            logLosses: [0.3, 0.4, 0.35, 0.45], // Best performer
+            briers: [0.09, 0.16, 0.12, 0.2],
+            predictions: [0.2, 0.3, 0.25, 0.35], // Low probabilities (correctly predicting no bottom)
+            labels: [false, false, false, false],
+          },
+        ],
+        [
+          'model-b',
+          {
+            logLosses: [0.5, 0.6, 0.55, 0.65], // Middle performer
+            briers: [0.25, 0.36, 0.3, 0.42],
+            predictions: [0.4, 0.45, 0.42, 0.48],
+            labels: [false, false, false, false],
+          },
+        ],
+        [
+          'model-c',
+          {
+            logLosses: [0.7, 0.8, 0.75, 0.85], // Worst performer (but still better than random)
+            briers: [0.49, 0.64, 0.56, 0.72],
+            predictions: [0.5, 0.55, 0.52, 0.58],
+            labels: [false, false, false, false],
+          },
+        ],
+      ]);
+
+      const leaderboard = generateLeaderboard('15m', 'fractal', modelScores);
+
+      // All three models should appear in rankings
+      expect(leaderboard.entries).toHaveLength(3);
+
+      // Models should be ranked by log loss (lower is better)
+      expect(leaderboard.entries[0].modelId).toBe('model-a');
+      expect(leaderboard.entries[0].rank).toBe(1);
+
+      expect(leaderboard.entries[1].modelId).toBe('model-b');
+      expect(leaderboard.entries[1].rank).toBe(2);
+
+      expect(leaderboard.entries[2].modelId).toBe('model-c');
+      expect(leaderboard.entries[2].rank).toBe(3);
+
+      // Verify mean log loss values are computed correctly
+      expect(leaderboard.entries[0].meanLogLoss).toBeCloseTo(0.375, 3); // (0.3+0.4+0.35+0.45)/4
+      expect(leaderboard.entries[1].meanLogLoss).toBeCloseTo(0.575, 3); // (0.5+0.6+0.55+0.65)/4
+      expect(leaderboard.entries[2].meanLogLoss).toBeCloseTo(0.775, 3); // (0.7+0.8+0.75+0.85)/4
+    });
+
+    it('should correctly calculate win rate when all labels are false', () => {
+      // When all labels are false, a model "wins" when it predicts < 0.5
+      const modelScores = new Map([
+        [
+          'correct-model',
+          {
+            logLosses: [0.3, 0.3],
+            briers: [0.09, 0.09],
+            predictions: [0.2, 0.3], // Both < 0.5, so both are correct
+            labels: [false, false],
+          },
+        ],
+        [
+          'wrong-model',
+          {
+            logLosses: [0.9, 0.9],
+            briers: [0.81, 0.81],
+            predictions: [0.8, 0.9], // Both > 0.5, so both are wrong
+            labels: [false, false],
+          },
+        ],
+      ]);
+
+      const leaderboard = generateLeaderboard('1h', 'zigzag', modelScores);
+
+      // correct-model should have 100% win rate
+      const correctEntry = leaderboard.entries.find(
+        (e: LeaderboardEntry) => e.modelId === 'correct-model'
+      );
+      expect(correctEntry?.winRate).toBe(1.0);
+
+      // wrong-model should have 0% win rate
+      const wrongEntry = leaderboard.entries.find(
+        (e: LeaderboardEntry) => e.modelId === 'wrong-model'
+      );
+      expect(wrongEntry?.winRate).toBe(0);
+    });
+
+    it('should handle precision as NaN when no positive predictions exist', () => {
+      // If all labels are false and a smart model predicts all < 0.5,
+      // there are no positive predictions, so precision is undefined (NaN)
+      const modelScores = new Map([
+        [
+          'conservative-model',
+          {
+            logLosses: [0.2, 0.2, 0.2],
+            briers: [0.04, 0.04, 0.04],
+            predictions: [0.1, 0.15, 0.2], // All < 0.5, no positive predictions
+            labels: [false, false, false],
+          },
+        ],
+      ]);
+
+      const leaderboard = generateLeaderboard('4h', 'fractal', modelScores);
+
+      // Precision should be NaN (no positive predictions to evaluate)
+      expect(Number.isNaN(leaderboard.entries[0].precision)).toBe(true);
+    });
+  });
+
+  describe('skill threshold behavior with all-false labels', () => {
+    it('should skip skill threshold check when trivialBest is near zero (all-false scenario)', () => {
+      // When all labels are false, trivialBest (alwaysFalse) approaches 0
+      // The phase-0-scorer is designed to skip the skill threshold check when
+      // trivialBest < 0.1, because in highly imbalanced scenarios the skill
+      // threshold becomes unreasonably strict.
+      //
+      // Instead, only the random baseline check applies: model must beat random.
+
+      const aggregateScore = {
+        meanLogLoss: { '15m': 0.3, '1h': 0.4, '4h': 0.5, '24h': 0.6 },
+        meanBrier: { '15m': 0.1, '1h': 0.15, '4h': 0.2, '24h': 0.25 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '4h': false, '24h': false },
+      };
+
+      // When all labels are false: trivialBest is near 0 (< 0.1)
+      // This triggers the shouldCheckSkill = false branch in phase-0-scorer
+      // So only the random threshold (0.693 * 1.1 = ~0.76) is checked
+      const baselines = {
+        '15m': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '1h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '4h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '24h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(aggregateScore, baselines);
+
+      // All models with LL < 0.76 (random threshold) should be qualified
+      // because the skill check is skipped when trivialBest < 0.1
+      expect(disqualified.size).toBe(0);
+    });
+
+    it('should disqualify models worse than random even in all-false scenario', () => {
+      // Even when skill check is skipped, models must still beat random baseline
+      const aggregateScore = {
+        meanLogLoss: { '15m': 0.9, '1h': 0.85, '4h': 0.8, '24h': 0.75 },
+        meanBrier: { '15m': 0.4, '1h': 0.35, '4h': 0.3, '24h': 0.25 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '4h': false, '24h': false },
+      };
+
+      const baselines = {
+        '15m': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '1h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '4h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '24h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(aggregateScore, baselines);
+
+      // Random threshold = 0.693 * 1.1 = 0.762
+      // 15m (0.9 > 0.762), 1h (0.85 > 0.762), 4h (0.8 > 0.762) should be disqualified
+      // 24h (0.75 < 0.762) should be qualified
+      expect(disqualified.size).toBe(3);
+      expect(disqualified.has('15m')).toBe(true);
+      expect(disqualified.has('1h')).toBe(true);
+      expect(disqualified.has('4h')).toBe(true);
+      expect(disqualified.has('24h')).toBe(false);
+    });
+
+    it('should keep models that predict very low probabilities when all labels are false', () => {
+      // A model that correctly predicts very low probabilities (< 0.05) when
+      // no bottoms occurred should NOT be disqualified
+      const aggregateScore = {
+        meanLogLoss: { '15m': 0.05, '1h': 0.05, '4h': 0.05, '24h': 0.05 },
+        meanBrier: { '15m': 0.002, '1h': 0.002, '4h': 0.002, '24h': 0.002 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '4h': false, '24h': false },
+      };
+
+      const baselines = {
+        '15m': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '1h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '4h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+        '24h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 35, trivialBest: 0.001 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(aggregateScore, baselines);
+
+      // Model with LL 0.05 easily beats random threshold (0.762)
+      // Skill check is skipped because trivialBest < 0.1
+      expect(disqualified.size).toBe(0);
+    });
+  });
+
+  describe('audit clarity for all-false scenario', () => {
+    it('should clearly distinguish all-false scenario from data issues', () => {
+      // When computing baselines, an all-false scenario should still produce
+      // valid baseline values, not zeros that might indicate missing data
+      const allFalseLabels = Array.from({ length: 50 }, () => false);
+      const baseline = computeBaselineLogLoss(allFalseLabels);
+
+      // Baselines should be valid numbers, not zeros from empty data
+      expect(baseline.random).toBeCloseTo(RANDOM_BASELINE, 9);
+      expect(baseline.alwaysFalse).toBeGreaterThanOrEqual(0);
+      expect(baseline.alwaysTrue).toBeGreaterThan(0);
+      expect(baseline.trivialBest).toBeGreaterThanOrEqual(0);
+
+      // Importantly: this is NOT the same as empty data
+      const emptyBaseline = computeBaselineLogLoss([]);
+      expect(emptyBaseline.alwaysFalse).toBe(0);
+      expect(emptyBaseline.alwaysTrue).toBe(0);
+      expect(emptyBaseline.trivialBest).toBe(0);
+
+      // All-false produces near-zero trivialBest, but non-zero alwaysTrue
+      // This distinguishes it from "no data" where both are zero
+      expect(baseline.alwaysTrue).toBeGreaterThan(emptyBaseline.alwaysTrue);
+    });
+
+    it('should provide meaningful metrics even without positive events', () => {
+      // Even when no bottoms occurred, we can still measure:
+      // - Log loss for probability calibration
+      // - Brier score for probability accuracy
+      // - Win rate for directional accuracy
+      // - Calibration error for probability reliability
+
+      const allFalseLabels = [false, false, false, false, false];
+
+      // A well-calibrated model predicting ~0.1 probability of bottom
+      const wellCalibratedPredictions = [0.1, 0.12, 0.08, 0.11, 0.09];
+
+      // Compute log losses
+      const logLosses = wellCalibratedPredictions.map((p) => {
+        // Log loss for label=false is -ln(1-p)
+        return -Math.log(1 - p);
+      });
+
+      const meanLL = logLosses.reduce((a, b) => a + b, 0) / logLosses.length;
+
+      // Should be a reasonable low log loss since predictions match reality
+      expect(meanLL).toBeLessThan(0.15);
+      expect(meanLL).toBeGreaterThan(0);
+
+      // Win rate should be 100% since all predictions < 0.5 and all labels false
+      const winRate =
+        wellCalibratedPredictions.filter((p) => p < 0.5).length /
+        wellCalibratedPredictions.length;
+      expect(winRate).toBe(1.0);
     });
   });
 });

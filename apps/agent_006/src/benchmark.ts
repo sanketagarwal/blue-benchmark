@@ -23,6 +23,11 @@ import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 import {
+  buildLeaderboardScoreData,
+  countQualifiedModels,
+  toBaseScoreData,
+} from './reports/leaderboard-data.js';
+import {
   generateLeaderboard,
   formatLeaderboardTable,
 } from './reports/leaderboards.js';
@@ -63,7 +68,6 @@ import {
 } from './table.js';
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
-import type { ModelScoreData } from './reports/leaderboards.js';
 import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
@@ -954,46 +958,8 @@ function runPhase2(models: Map<string, ModelState>): void {
 }
 
 
-/**
- * Extract predictions and labels for a specific horizon from track B rounds
- * @param trackBRounds - Array of round scores with predictions/labels
- * @param horizon - The timeframe to extract data for
- * @returns Object containing predictions and labels arrays
- */
-function extractHorizonPredictionsAndLabels(
-  trackBRounds: RoundScore[],
-  horizon: TimeframeId
-): { predictions: number[]; labels: boolean[] } {
-  const predictions: number[] = [];
-  const labels: boolean[] = [];
-  for (const round of trackBRounds) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const prediction = round.predictions?.[horizon];
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const label = round.labels?.[horizon];
-    if (prediction !== undefined && label !== undefined) {
-      predictions.push(prediction);
-      labels.push(label);
-    }
-  }
-  return { predictions, labels };
-}
-
-/**
- * Calculate Brier scores from paired predictions and labels
- * @param predictionValues - Array of predicted probabilities
- * @param labelValues - Array of actual outcomes
- * @returns Array of Brier scores
- */
-function calculateBrierScores(predictionValues: number[], labelValues: boolean[]): number[] {
-  const briers: number[] = [];
-  for (const [index, prediction] of predictionValues.entries()) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion, security/detect-object-injection -- index bounded by entries()
-    const label = labelValues[index]!;
-    briers.push(brierScore(prediction, label));
-  }
-  return briers;
-}
+// Note: extractHorizonPredictionsAndLabels and calculateBrierScores
+// are now imported from './reports/leaderboard-data.js'
 
 /**
  * Print a summary of which horizons each model is qualified for
@@ -1017,80 +983,8 @@ function printHorizonQualificationSummary(models: Map<string, ModelState>): void
   }
 }
 
-/**
- * Extended model score data with qualification status
- */
-interface ModelScoreDataWithQualification extends ModelScoreData {
-  isQualified: boolean;
-}
-
-/**
- * Check if any models are qualified for a horizon
- * @param horizonScores - Map of model scores for a horizon
- * @returns Number of qualified models
- */
-function countQualifiedModels(horizonScores: Map<string, ModelScoreDataWithQualification>): number {
-  let count = 0;
-  for (const data of horizonScores.values()) {
-    if (data.isQualified) {
-      count++;
-    }
-  }
-  return count;
-}
-
-/**
- * Convert extended score data to base format
- * @param horizonScores - Extended model score data
- * @returns Base model score data without isQualified field
- */
-function toBaseScoreData(horizonScores: Map<string, ModelScoreDataWithQualification>): Map<string, ModelScoreData> {
-  const baseData = new Map<string, ModelScoreData>();
-  for (const [modelId, data] of horizonScores) {
-    baseData.set(modelId, {
-      logLosses: data.logLosses,
-      briers: data.briers,
-      predictions: data.predictions,
-      labels: data.labels,
-    });
-  }
-  return baseData;
-}
-
-/**
- * Build ModelScoreData maps for each horizon from model states
- * Includes ALL non-eliminated models with data, regardless of qualification status
- * @param modelStates - Map of model states
- * @returns Record of horizon to map of modelId to ModelScoreDataWithQualification
- */
-function buildLeaderboardScoreData(
-  modelStates: Map<string, ModelState>
-): Record<TimeframeId, Map<string, ModelScoreDataWithQualification>> {
-  const result: Record<TimeframeId, Map<string, ModelScoreDataWithQualification>> = {
-    '15m': new Map(),
-    '1h': new Map(),
-    '4h': new Map(),
-    '24h': new Map(),
-  };
-  for (const state of modelStates.values()) {
-    if (state.eliminated) {
-      continue;
-    }
-    for (const horizon of HORIZONS) {
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      const logLosses = state.logLossByHorizon[horizon];
-      if (logLosses.length === 0) {
-        continue;
-      }
-      const { predictions, labels } = extractHorizonPredictionsAndLabels(state.trackBRounds, horizon);
-      const briers = calculateBrierScores(predictions, labels);
-      const isQualified = state.qualifiedHorizons.has(horizon);
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      result[horizon].set(state.modelId, { logLosses, briers, predictions, labels, isQualified });
-    }
-  }
-  return result;
-}
+// Note: ModelScoreDataWithQualification, countQualifiedModels, toBaseScoreData,
+// and buildLeaderboardScoreData are now imported from './reports/leaderboard-data.js'
 
 /**
  * Print leaderboards for each horizon

@@ -377,16 +377,17 @@ describe('phase-0-scorer', () => {
 
     it('disqualifies when model matches trivial baseline (no skill)', () => {
       const score: Phase0AggregateScore = {
-        // Model LL of 0.16 is >= skillThreshold (trivialBest + SKILL_MARGIN = 0.05 + 0.1 = 0.15)
+        // Model LL of 0.25 is >= skillThreshold (trivialBest + SKILL_MARGIN = 0.15 + 0.1 = 0.25)
         // Model is NOT significantly better than trivial baseline
-        meanLogLoss: { '15m': 0.16, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
-        meanBrier: { '15m': 0.08, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
+        meanLogLoss: { '15m': 0.25, '1h': 0.3, '24h': 0.3, '4h': 0.3 },
+        meanBrier: { '15m': 0.12, '1h': 0.15, '24h': 0.15, '4h': 0.15 },
         extremeErrorRate: { '15m': 0, '1h': 0, '24h': 0, '4h': 0 },
         degenerateByHorizon: { '15m': false, '1h': false, '24h': false, '4h': false },
       };
-      // 15m: skillThreshold = 0.05 + 0.1 = 0.15, model has 0.16 >= 0.15, so disqualified
+      // 15m: trivialBest >= 0.1 so skill check applies
+      // skillThreshold = 0.15 + 0.1 = 0.25, model has 0.25 >= 0.25, so disqualified
       const baselines: Record<TimeframeId, BaselineLogLoss> = {
-        '15m': { random: 0.693, alwaysFalse: 0.05, alwaysTrue: 34, trivialBest: 0.05 },
+        '15m': { random: 0.693, alwaysFalse: 0.15, alwaysTrue: 34, trivialBest: 0.15 },
         '1h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
         '4h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
         '24h': { random: 0.693, alwaysFalse: 8, alwaysTrue: 8, trivialBest: 8 },
@@ -450,6 +451,30 @@ describe('phase-0-scorer', () => {
 
       const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
       expect(disqualified.has('15m')).toBe(true);
+    });
+
+    it('should not disqualify based on skill threshold when trivialBest is near zero', () => {
+      // When all labels are false, trivialBest approaches 0
+      // Models should NOT be disqualified just because their LL >= 0.1
+      const score: Phase0AggregateScore = {
+        meanLogLoss: { '15m': 0.5, '1h': 0.5, '4h': 0.5, '24h': 0.5 },
+        meanBrier: { '15m': 0.25, '1h': 0.25, '4h': 0.25, '24h': 0.25 },
+        extremeErrorRate: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
+        degenerateByHorizon: { '15m': false, '1h': false, '4h': false, '24h': false },
+      };
+      // Baseline where trivialBest is near zero (all labels were false)
+      const baselines: Record<TimeframeId, BaselineLogLoss> = {
+        '15m': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 5.0, trivialBest: 0.001 },
+        '1h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 5.0, trivialBest: 0.001 },
+        '4h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 5.0, trivialBest: 0.001 },
+        '24h': { random: 0.693, alwaysFalse: 0.001, alwaysTrue: 5.0, trivialBest: 0.001 },
+      };
+
+      const disqualified = getPhase0DisqualifiedHorizonsWithBaselines(score, baselines);
+
+      // Model with LL=0.5 should NOT be disqualified when baseline is degenerate
+      // It beats random (0.693) so it should pass
+      expect(disqualified.size).toBe(0);
     });
   });
 });
