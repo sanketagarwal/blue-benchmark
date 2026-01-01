@@ -83,14 +83,18 @@ export function computeCompositeScore(
 
   // Normalize and invert best window (lower is better)
   const bestWindowNorm =
-    (metrics.avgBestWindow - ranges.bestWindowRange.min) /
-    (ranges.bestWindowRange.max - ranges.bestWindowRange.min);
+    ranges.bestWindowRange.max === ranges.bestWindowRange.min
+      ? 0.5
+      : (metrics.avgBestWindow - ranges.bestWindowRange.min) /
+        (ranges.bestWindowRange.max - ranges.bestWindowRange.min);
   const bestWindowScore = 1 - Math.max(0, Math.min(1, bestWindowNorm));
 
   // Normalize and invert stability (lower is better)
   const stabilityNorm =
-    (metrics.avgStability - ranges.stabilityRange.min) /
-    (ranges.stabilityRange.max - ranges.stabilityRange.min);
+    ranges.stabilityRange.max === ranges.stabilityRange.min
+      ? 0.5
+      : (metrics.avgStability - ranges.stabilityRange.min) /
+        (ranges.stabilityRange.max - ranges.stabilityRange.min);
   const stabilityScore = 1 - Math.max(0, Math.min(1, stabilityNorm));
 
   // Time to pivot ratio is already 0-1, invert (lower = earlier = better)

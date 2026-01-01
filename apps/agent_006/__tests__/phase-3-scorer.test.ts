@@ -47,6 +47,26 @@ describe('phase-3-scorer', () => {
       expect(score).toBeGreaterThan(0);
       expect(score).toBeLessThanOrEqual(1);
     });
+
+    it('returns valid number when ranges are degenerate (min === max)', () => {
+      const metrics: Phase3ModelMetrics = {
+        avgPercentileRank: 75,
+        avgBestWindow: 0.3,
+        avgStability: 0.15,
+        avgTimeToPivotRatio: 0.5,
+      };
+
+      // All models have identical metrics, so min === max
+      const score = computeCompositeScore(metrics, {
+        bestWindowRange: { min: 0.3, max: 0.3 },
+        stabilityRange: { min: 0.15, max: 0.15 },
+      });
+
+      expect(Number.isFinite(score)).toBe(true);
+      expect(Number.isNaN(score)).toBe(false);
+      expect(score).toBeGreaterThan(0);
+      expect(score).toBeLessThanOrEqual(1);
+    });
   });
 
   describe('rankModels', () => {
