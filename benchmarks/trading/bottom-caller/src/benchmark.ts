@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- TODO: Split benchmark.ts into smaller modules (2141 lines) */
 import { runRound } from '@nullagent/agent-core';
 import { createBenchmarkLogger } from '@nullagent/cli-utils';
 import chalk from 'chalk';
@@ -2139,3 +2140,4 @@ await main()
     // eslint-disable-next-line unicorn/no-process-exit -- CLI exit code
     process.exit(1);
   });
+/* eslint-enable max-lines -- end of file */

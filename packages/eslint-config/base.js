@@ -504,6 +504,9 @@ export const config = [
   // General ESLint rules
   {
     rules: {
+      // File size limit - prevent monolithic files that should be split
+      "max-lines": ["error", { max: 1000, skipBlankLines: true, skipComments: true }],
+
       // Ban console.log/warn/info - use BenchmarkLogger from @nullagent/cli-utils instead
       // console.error is allowed for fatal errors only
       "no-console": ["error", { allow: ["error"] }],
