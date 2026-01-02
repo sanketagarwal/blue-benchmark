@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getConfig, replayLabFetch } from '../src/replay-lab/client';
 import {
   getSignedChartUrl,
-  getForecastingCharts,
+  getForecastingChartUrls,
   type ChartParams,
 } from '../src/replay-lab/charts';
 import {
@@ -183,7 +183,7 @@ describe('Replay Lab Charts', () => {
     });
   });
 
-  describe('getForecastingCharts', () => {
+  describe('getForecastingChartUrls', () => {
     it('should fetch four signed chart URLs for each horizon', async () => {
       const symbolId = 'COINBASE_SPOT_ETH_USD';
       const snapTime = new Date('2025-12-22T14:00:00Z');
@@ -218,7 +218,7 @@ describe('Replay Lab Charts', () => {
           }),
         });
 
-      const result = await getForecastingCharts(symbolId, snapTime);
+      const result = await getForecastingChartUrls(symbolId, snapTime);
 
       expect(result.chartByHorizon['15m']).toBe('https://signed.example.com/chart-15m');
       expect(result.chartByHorizon['1h']).toBe('https://signed.example.com/chart-1h');

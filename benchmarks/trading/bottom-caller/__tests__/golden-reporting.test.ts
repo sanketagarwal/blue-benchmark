@@ -25,7 +25,7 @@ import * as annotations from '../src/replay-lab/annotations.js';
 import type { TimeframeId } from '../src/timeframe-config.js';
 import type { BottomContractId } from '../src/bottom-caller.js';
 import type { RoundScore } from '../src/state/model-state.js';
-import type { LocalExtremaAnnotation } from '../src/replay-lab/annotations.js';
+import type { BottomHoldAnnotation } from '../src/replay-lab/annotations.js';
 
 // ============================================================================
 // MOCKS
@@ -35,9 +35,40 @@ vi.mock('../src/replay-lab/annotations.js', async (importOriginal) => {
   const actual = await importOriginal<typeof annotations>();
   return {
     ...actual,
-    getLocalExtremaAnnotations: vi.fn(),
+    getBottomHoldAnnotations: vi.fn(),
   };
 });
+
+function createBottomHoldAnnotation(overrides: Partial<{
+  id: string;
+  time_start: string;
+  drawdownFrac: number;
+  maxDrawdownFrac: number;
+  refLow: number;
+  fwdLow: number;
+}>): BottomHoldAnnotation {
+  return {
+    id: overrides.id ?? '1',
+    time_start: overrides.time_start ?? '2025-01-01T00:05:00Z',
+    time_end: null,
+    type: 'bottom_event',
+    method: 'bottom-hold',
+    schema_version: '1.0',
+    payload: {
+      refLow: overrides.refLow ?? 99.5,
+      fwdLow: overrides.fwdLow ?? 99.6,
+      drawdownFrac: overrides.drawdownFrac ?? 0.0005,
+      params: {
+        horizonCandles: 3,
+        lookbackCandles: 24,
+        maxDrawdownFrac: overrides.maxDrawdownFrac ?? 0.001,
+        candleTimeframe: '5m',
+      },
+    },
+    source: 'fractal',
+    created_at: '2025-01-01T00:00:00Z',
+  };
+}
 
 describe('Golden B1: Quick mode reporting guards', () => {
   it('suppresses percentile output with default 50 when cohort=1', () => {
@@ -596,45 +627,60 @@ describe('Golden B3: Metric registry completeness', () => {
     }
   });
 
-  it('both fractal and zigzag labels are present when dual-track enabled', async () => {
-    // Setup: Mock annotation fetch to return both fractal and zigzag annotations
-    const fractalAnnotation: LocalExtremaAnnotation = {
-      id: 'fractal-pivot-1',
-      time_start: '2025-01-01T00:05:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.5 },
-      source: 'fractal',
-    };
+  it('returns label=1 when bottom held (didBottomHold filter)', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.0005,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
 
-    const zigzagAnnotation: LocalExtremaAnnotation = {
-      id: 'zigzag-pivot-1',
-      time_start: '2025-01-01T00:07:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.0 },
-      source: 'zigzag',
-    };
-
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockImplementation(
-      async (_symbolId, method) => {
-        if (method === 'fractal') {
-          return [fractalAnnotation];
-        }
-        return [zigzagAnnotation];
-      }
-    );
-
-    // Call resolveDualGroundTruth
     const result = await resolveDualGroundTruth(
       'COINBASE_SPOT_BTC_USD',
       '15m',
       new Date('2025-01-01T00:00:00Z')
     );
 
-    // Both primary and secondary must have label
+    expect(result.primary.label).toBe(1);
+    expect(result.primary.hasStructuralBottom).toBe(true);
+    expect(result.secondary.label).toBe(1);
+    expect(result.secondary.hasStructuralBottom).toBe(true);
+  });
+
+  it('returns label=0 when bottom did not hold (didBottomHold filter)', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.002,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
+
+    const result = await resolveDualGroundTruth(
+      'COINBASE_SPOT_BTC_USD',
+      '15m',
+      new Date('2025-01-01T00:00:00Z')
+    );
+
+    expect(result.primary.label).toBe(0);
+    expect(result.primary.hasStructuralBottom).toBe(false);
+    expect(result.secondary.label).toBe(0);
+    expect(result.secondary.hasStructuralBottom).toBe(false);
+  });
+
+  it('primary and secondary labels match (unified bottom-hold method)', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.0005,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
+
+    const result = await resolveDualGroundTruth(
+      'COINBASE_SPOT_BTC_USD',
+      '15m',
+      new Date('2025-01-01T00:00:00Z')
+    );
+
     expect(result.primary.label).toBeDefined();
     expect(typeof result.primary.label).toBe('number');
     expect([0, 1]).toContain(result.primary.label);
@@ -643,12 +689,9 @@ describe('Golden B3: Metric registry completeness', () => {
     expect(typeof result.secondary.label).toBe('number');
     expect([0, 1]).toContain(result.secondary.label);
 
-    // Both must have method
+    expect(result.primary.label).toBe(result.secondary.label);
     expect(result.primary.method).toBeDefined();
     expect(result.secondary.method).toBeDefined();
-    expect(new Set([result.primary.method, result.secondary.method])).toEqual(
-      new Set(['fractal', 'zigzag'])
-    );
   });
 
   it('timing fields present when timing metrics enabled', () => {

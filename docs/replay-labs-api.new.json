@@ -1033,7 +1033,8 @@
               "local_extrema",
               "regime",
               "vol_spike",
-              "sweep_reclaim"
+              "sweep_reclaim",
+              "bottom_event"
             ],
             "description": "High-level event category"
           },
@@ -1177,7 +1178,7 @@
     },
     {
       "name": "Annotations",
-      "description": "Query ground truth annotations for agent self-scoring.\n\nAnnotations are computed lazily on first request, then cached incrementally.\nSubsequent queries for the same time range are instant.\n\n### On-Demand Computation\n\nUse the `/compute` endpoint to run annotation detection with custom parameters without pre-registration:\n\n```bash\nPOST /api/annotations/COINBASE_SPOT_BTC_USD/compute\n{\n  \"type\": \"dump_event\",\n  \"method\": \"simple-threshold\",\n  \"params\": { \"threshold\": -0.05, \"candleTimeframe\": \"1m\" },\n  \"from\": \"2025-12-16T00:00:00Z\",\n  \"to\": \"2025-12-16T23:59:59Z\",\n  \"cachePolicy\": \"none\"\n}\n```\n\nAvailable methods:\n- **dump_event**: simple-threshold, vol-adjusted-zscore, drawdown\n- **pump_event**: simple-threshold, vol-adjusted-zscore, drawup\n- **local_extrema**: fractal, zigzag\n- **sweep_reclaim**: sweep-reclaim (not yet implemented)\n\n### Cache Warming\n\nPre-compute annotations for your training date ranges:\n```bash\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?from=2025-12-01&to=2025-12-08\"\n# Subsequent queries will be instant (cache hits)\n```\n"
+      "description": "Query ground truth annotations for agent self-scoring.\n\nAnnotations are computed lazily on first request, then cached incrementally.\nSubsequent queries for the same time range are instant.\n\n### On-Demand Computation\n\nUse the `/compute` endpoint to run annotation detection with custom parameters without pre-registration:\n\n```bash\nPOST /api/annotations/COINBASE_SPOT_BTC_USD/compute\n{\n  \"type\": \"dump_event\",\n  \"method\": \"simple-threshold\",\n  \"params\": { \"threshold\": -0.05, \"candleTimeframe\": \"1m\" },\n  \"from\": \"2025-12-16T00:00:00Z\",\n  \"to\": \"2025-12-16T23:59:59Z\",\n  \"cachePolicy\": \"none\"\n}\n```\n\nAvailable methods:\n- **dump_event**: simple-threshold, vol-adjusted-zscore, drawdown\n- **pump_event**: simple-threshold, vol-adjusted-zscore, drawup\n- **local_extrema**: fractal, zigzag\n- **sweep_reclaim**: sweep-reclaim (not yet implemented)\n- **bottom_event**: bottom-hold\n\n### Cache Warming\n\nPre-compute annotations for your training date ranges:\n```bash\ncurl \"/api/annotations/COINBASE_SPOT_BTC_USD?from=2025-12-01&to=2025-12-08\"\n# Subsequent queries will be instant (cache hits)\n```\n"
     },
     {
       "name": "System",
@@ -1879,7 +1880,8 @@
                 "local_extrema",
                 "dump_event",
                 "pump_event",
-                "sweep_reclaim"
+                "sweep_reclaim",
+                "bottom_event"
               ],
               "default": "local_extrema",
               "description": "Annotation type to overlay on chart.\n\n**Valid methods per type:**\n- `local_extrema`: fractal, zigzag\n- `dump_event`: simple-threshold, vol-adjusted-zscore, drawdown\n- `pump_event`: simple-threshold, vol-adjusted-zscore, drawup\n- `sweep_reclaim`: sweep-reclaim-low, sweep-reclaim-high",
@@ -2723,7 +2725,8 @@
                 "local_extrema",
                 "regime",
                 "vol_spike",
-                "sweep_reclaim"
+                "sweep_reclaim",
+                "bottom_event"
               ],
               "description": "Filter by annotation type",
               "example": "dump_event"
@@ -3351,14 +3354,15 @@
                       "dump_event",
                       "pump_event",
                       "local_extrema",
-                      "sweep_reclaim"
+                      "sweep_reclaim",
+                      "bottom_event"
                     ],
-                    "description": "Annotation type. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+                    "description": "Annotation type. Valid methods per type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high\n- bottom_event: bottom-hold",
                     "example": "local_extrema"
                   },
                   "method": {
                     "type": "string",
-                    "description": "Detection method. Must match the type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high",
+                    "description": "Detection method. Must match the type:\n- local_extrema: fractal, zigzag\n- dump_event: simple-threshold, vol-adjusted-zscore, drawdown\n- pump_event: simple-threshold, vol-adjusted-zscore, drawup\n- sweep_reclaim: sweep-reclaim-low, sweep-reclaim-high\n- bottom_event: bottom-hold",
                     "example": "fractal"
                   },
                   "params": {
@@ -3366,7 +3370,7 @@
                     "additionalProperties": {
                       "nullable": true
                     },
-                    "description": "Method-specific parameters.\n\n**Parameter reference by method:**\n- fractal: { L: number, candleTimeframe: \"1m\"|\"5m\"|\"15m\"|\"1h\"|\"4h\"|\"1d\" }\n- zigzag: { deviationPct: number, candleTimeframe: string }\n- simple-threshold: { threshold: number, candleTimeframe: string }\n- vol-adjusted-zscore: { lookbackCandles: number, zThreshold: number, minAbsoluteThreshold: number, candleTimeframe: string }\n- drawdown/drawup: { threshold: number, candleTimeframe: string }\n- sweep-reclaim-*: { swingLookback: number, minDisplacementATR: number, maxBarsToReclaim: number, candleTimeframe: string }",
+                    "description": "Method-specific parameters.\n\n**Parameter reference by method:**\n- fractal: { L: number, candleTimeframe: \"1m\"|\"5m\"|\"15m\"|\"1h\"|\"4h\"|\"1d\" }\n- zigzag: { deviationPct: number, candleTimeframe: string }\n- simple-threshold: { threshold: number, candleTimeframe: string }\n- vol-adjusted-zscore: { lookbackCandles: number, zThreshold: number, minAbsoluteThreshold: number, candleTimeframe: string }\n- drawdown/drawup: { threshold: number, candleTimeframe: string }\n- sweep-reclaim-*: { swingLookback: number, minDisplacementATR: number, maxBarsToReclaim: number, candleTimeframe: string }\n- bottom-hold: { lookbackCandles: number, horizonCandles: number, maxDrawdownFrac: number, candleTimeframe?: string, minPreDropFrac?: number, minBounceFrac?: number } (horizonCandles clamped to max 500)",
                     "example": {
                       "L": 3,
                       "candleTimeframe": "1m"

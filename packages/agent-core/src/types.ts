@@ -1,5 +1,25 @@
 import type { ZodType } from 'zod';
 
+/** Text content part */
+export interface TextPart {
+  type: 'text';
+  text: string;
+}
+
+/** Image content part (URL, base64, or binary data) */
+export interface ImagePart {
+  type: 'image';
+  image: string | Uint8Array; // URL, base64 data, or binary data
+}
+
+/** Content can be text-only string or multimodal parts */
+export type MessageContent = string | (TextPart | ImagePart)[];
+
+/** Multimodal prompt result from buildRoundPrompt */
+export interface MultimodalPrompt {
+  content: MessageContent;
+}
+
 /**
  * Compaction trigger strategies
  */
@@ -56,11 +76,13 @@ export interface RoundResult<TOutput> {
 export interface AgentDefinition<TOutput> {
   id: string;
   outputSchema: ZodType<TOutput>;
-  buildRoundPrompt: (context: RoundContext<TOutput>) => string;
+  buildRoundPrompt: (context: RoundContext<TOutput>) => string | MultimodalPrompt;
   buildCompactionPrompt: (history: RoundHistory<TOutput>[]) => string;
   compactionTrigger?: CompactionTrigger;
   systemPrompt?: string;
   onRoundComplete?: (result: RoundResult<TOutput>) => Promise<void>;
+  /** If true, don't load previous messages - each round is independent */
+  stateless?: boolean;
 }
 
 /**

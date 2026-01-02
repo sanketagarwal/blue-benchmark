@@ -16,6 +16,10 @@ export type {
   RoundContext,
   RoundHistory,
   RoundResult,
+  TextPart,
+  ImagePart,
+  MessageContent,
+  MultimodalPrompt,
 } from './types.js';
 
 // History functions (useful for custom implementations)

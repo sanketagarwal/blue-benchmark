@@ -15,6 +15,8 @@ import {
   TIMEFRAME_CONFIG,
   TIMEFRAME_IDS,
   getTimeframeConfig,
+  getHorizonBars,
+  getLookbackBars,
   validateTimeframeConfig,
 } from '../src/timeframe-config.js';
 import { resolveDualGroundTruth } from '../src/ground-truth/bottom-checker.js';
@@ -22,7 +24,7 @@ import * as annotations from '../src/replay-lab/annotations.js';
 import { computeMaxDrawdownFromCandles } from '../src/replay-lab/ohlcv.js';
 
 import type { TimeframeId } from '../src/timeframe-config.js';
-import type { LocalExtremaAnnotation } from '../src/replay-lab/annotations.js';
+import type { BottomHoldAnnotation } from '../src/replay-lab/annotations.js';
 import type { Candle } from '../src/replay-lab/ohlcv.js';
 
 // ============================================================================
@@ -33,9 +35,40 @@ vi.mock('../src/replay-lab/annotations.js', async (importOriginal) => {
   const actual = await importOriginal<typeof annotations>();
   return {
     ...actual,
-    getLocalExtremaAnnotations: vi.fn(),
+    getBottomHoldAnnotations: vi.fn(),
   };
 });
+
+function createBottomHoldAnnotation(overrides: Partial<{
+  id: string;
+  time_start: string;
+  drawdownFrac: number;
+  maxDrawdownFrac: number;
+  refLow: number;
+  fwdLow: number;
+}>): BottomHoldAnnotation {
+  return {
+    id: overrides.id ?? '1',
+    time_start: overrides.time_start ?? '2025-01-01T00:05:00Z',
+    time_end: null,
+    type: 'bottom_event',
+    method: 'bottom-hold',
+    schema_version: '1.0',
+    payload: {
+      refLow: overrides.refLow ?? 99.5,
+      fwdLow: overrides.fwdLow ?? 99.6,
+      drawdownFrac: overrides.drawdownFrac ?? 0.0005,
+      params: {
+        horizonCandles: 3,
+        lookbackCandles: 24,
+        maxDrawdownFrac: overrides.maxDrawdownFrac ?? 0.001,
+        candleTimeframe: '5m',
+      },
+    },
+    source: 'fractal',
+    created_at: '2025-01-01T00:00:00Z',
+  };
+}
 
 // ============================================================================
 // Golden 0: Config consistency and invariants
@@ -180,8 +213,7 @@ describe('Golden 2: Ground truth availability', () => {
   });
 
   it('returns label=0 (no bottom) when no annotations available by closesAt', async () => {
-    // Stub annotation with no results (simulating availableAt > closesAt scenario)
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockResolvedValue([]);
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([]);
 
     const result = await resolveDualGroundTruth(
       'COINBASE_SPOT_BTC_USD',
@@ -189,25 +221,16 @@ describe('Golden 2: Ground truth availability', () => {
       new Date('2025-01-01T00:00:00Z')
     );
 
-    // No annotations = no bottom
     expect(result.primary.label).toBe(0);
     expect(result.primary.hasStructuralBottom).toBe(false);
   });
 
-  it('returns label=1 (bottom) when annotation availableAt <= closesAt', async () => {
-    // Stub annotation with a pivot LOW available before closesAt
-    const annotation: LocalExtremaAnnotation = {
-      id: 'test-pivot-1',
-      time_start: '2025-01-01T00:05:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.5 },
-      source: 'fractal',
-    };
-
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockResolvedValue([
-      annotation,
+  it('returns label=1 (bottom held) when drawdown within threshold', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.0005,
+        maxDrawdownFrac: 0.001,
+      }),
     ]);
 
     const result = await resolveDualGroundTruth(
@@ -220,31 +243,46 @@ describe('Golden 2: Ground truth availability', () => {
     expect(result.primary.hasStructuralBottom).toBe(true);
   });
 
+  it('returns label=0 (bottom did not hold) when drawdown exceeds threshold', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.002,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
+
+    const result = await resolveDualGroundTruth(
+      'COINBASE_SPOT_BTC_USD',
+      '15m',
+      new Date('2025-01-01T00:00:00Z')
+    );
+
+    expect(result.primary.label).toBe(0);
+    expect(result.primary.hasStructuralBottom).toBe(false);
+  });
+
   it('passes availableAt=closesAt to annotation fetch (no lookahead)', async () => {
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockResolvedValue([]);
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([]);
 
     const predictedAt = new Date('2025-01-01T00:00:00Z');
     await resolveDualGroundTruth('COINBASE_SPOT_BTC_USD', '15m', predictedAt);
 
-    // For 15m timeframe, closesAt = predictedAt + 15 minutes
     const expectedClosesAt = new Date(
       predictedAt.getTime() + 15 * 60 * 1000
     );
 
-    // Verify getLocalExtremaAnnotations was called with availableAt=closesAt
-    expect(annotations.getLocalExtremaAnnotations).toHaveBeenCalledWith(
+    expect(annotations.getBottomHoldAnnotations).toHaveBeenCalledWith(
       'COINBASE_SPOT_BTC_USD',
-      expect.any(String), // method
-      expect.any(Object), // params
+      expect.any(Object),
       predictedAt,
       expectedClosesAt,
-      expectedClosesAt // availableAt should equal closesAt
+      expectedClosesAt
     );
   });
 });
 
 // ============================================================================
-// Golden 3: Dual-label resolution
+// Golden 3: Dual-label resolution (bottom-hold based)
 // ============================================================================
 
 describe('Golden 3: Dual-label resolution', () => {
@@ -256,108 +294,13 @@ describe('Golden 3: Dual-label resolution', () => {
     vi.restoreAllMocks();
   });
 
-  it('computes fractal=true, zigzag=false when only fractal present', async () => {
-    const fractalAnnotation: LocalExtremaAnnotation = {
-      id: 'fractal-pivot-1',
-      time_start: '2025-01-01T00:05:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.5 },
-      source: 'fractal',
-    };
-
-    // Mock based on method parameter
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockImplementation(
-      async (_symbolId, method) => {
-        if (method === 'fractal') {
-          return [fractalAnnotation];
-        }
-        return []; // zigzag returns empty
-      }
-    );
-
-    const result = await resolveDualGroundTruth(
-      'COINBASE_SPOT_BTC_USD',
-      '15m', // Uses fractal as primary
-      new Date('2025-01-01T00:00:00Z')
-    );
-
-    // 15m uses fractal as primary
-    expect(result.primary.method).toBe('fractal');
-    expect(result.primary.label).toBe(1);
-    expect(result.primary.hasStructuralBottom).toBe(true);
-
-    expect(result.secondary.method).toBe('zigzag');
-    expect(result.secondary.label).toBe(0);
-    expect(result.secondary.hasStructuralBottom).toBe(false);
-  });
-
-  it('computes fractal=false, zigzag=true when only zigzag present', async () => {
-    const zigzagAnnotation: LocalExtremaAnnotation = {
-      id: 'zigzag-pivot-1',
-      time_start: '2025-01-01T00:05:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.5 },
-      source: 'zigzag',
-    };
-
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockImplementation(
-      async (_symbolId, method) => {
-        if (method === 'zigzag') {
-          return [zigzagAnnotation];
-        }
-        return []; // fractal returns empty
-      }
-    );
-
-    const result = await resolveDualGroundTruth(
-      'COINBASE_SPOT_BTC_USD',
-      '15m', // Uses fractal as primary
-      new Date('2025-01-01T00:00:00Z')
-    );
-
-    // 15m uses fractal as primary, zigzag as secondary
-    expect(result.primary.method).toBe('fractal');
-    expect(result.primary.label).toBe(0);
-    expect(result.primary.hasStructuralBottom).toBe(false);
-
-    expect(result.secondary.method).toBe('zigzag');
-    expect(result.secondary.label).toBe(1);
-    expect(result.secondary.hasStructuralBottom).toBe(true);
-  });
-
-  it('handles both methods having pivots', async () => {
-    const fractalAnnotation: LocalExtremaAnnotation = {
-      id: 'fractal-pivot-1',
-      time_start: '2025-01-01T00:05:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.5 },
-      source: 'fractal',
-    };
-
-    const zigzagAnnotation: LocalExtremaAnnotation = {
-      id: 'zigzag-pivot-1',
-      time_start: '2025-01-01T00:07:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.0 },
-      source: 'zigzag',
-    };
-
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockImplementation(
-      async (_symbolId, method) => {
-        if (method === 'fractal') {
-          return [fractalAnnotation];
-        }
-        return [zigzagAnnotation];
-      }
-    );
+  it('returns label=1 when bottom held (drawdown within threshold)', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.0005,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
 
     const result = await resolveDualGroundTruth(
       'COINBASE_SPOT_BTC_USD',
@@ -366,35 +309,65 @@ describe('Golden 3: Dual-label resolution', () => {
     );
 
     expect(result.primary.label).toBe(1);
-    expect(result.secondary.label).toBe(1);
     expect(result.primary.hasStructuralBottom).toBe(true);
+    expect(result.secondary.label).toBe(1);
     expect(result.secondary.hasStructuralBottom).toBe(true);
   });
 
-  it('4h timeframe uses zigzag as primary, fractal as secondary', async () => {
-    // Verify config structure for 4h
-    const config4h = getTimeframeConfig('4h');
-    expect(config4h.groundTruth.pivot.spec.method).toBe('zigzag');
-    expect(config4h.groundTruth.secondaryPivot.spec.method).toBe('fractal');
+  it('returns label=0 when bottom did not hold (drawdown exceeds threshold)', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.002,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
 
-    const zigzagAnnotation: LocalExtremaAnnotation = {
-      id: 'zigzag-pivot-1',
-      time_start: '2025-01-01T01:00:00Z',
-      time_end: null,
-      type: 'local_extrema',
-      schema_version: 'test-v1',
-      payload: { direction: 'low', price: 99.5 },
-      source: 'zigzag',
-    };
-
-    vi.mocked(annotations.getLocalExtremaAnnotations).mockImplementation(
-      async (_symbolId, method) => {
-        if (method === 'zigzag') {
-          return [zigzagAnnotation];
-        }
-        return [];
-      }
+    const result = await resolveDualGroundTruth(
+      'COINBASE_SPOT_BTC_USD',
+      '15m',
+      new Date('2025-01-01T00:00:00Z')
     );
+
+    expect(result.primary.label).toBe(0);
+    expect(result.primary.hasStructuralBottom).toBe(false);
+    expect(result.secondary.label).toBe(0);
+    expect(result.secondary.hasStructuralBottom).toBe(false);
+  });
+
+  it('filters to only held bottoms when mixed annotations exist', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        id: '1',
+        time_start: '2025-01-01T00:03:00Z',
+        drawdownFrac: 0.002,
+        maxDrawdownFrac: 0.001,
+      }),
+      createBottomHoldAnnotation({
+        id: '2',
+        time_start: '2025-01-01T00:07:00Z',
+        drawdownFrac: 0.0005,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
+
+    const result = await resolveDualGroundTruth(
+      'COINBASE_SPOT_BTC_USD',
+      '15m',
+      new Date('2025-01-01T00:00:00Z')
+    );
+
+    expect(result.primary.label).toBe(1);
+    expect(result.primary.hasStructuralBottom).toBe(true);
+    expect(result.primary.firstPivotAt).toEqual(new Date('2025-01-01T00:07:00Z'));
+  });
+
+  it('primary and secondary return same result (unified bottom-hold method)', async () => {
+    vi.mocked(annotations.getBottomHoldAnnotations).mockResolvedValue([
+      createBottomHoldAnnotation({
+        drawdownFrac: 0.0005,
+        maxDrawdownFrac: 0.001,
+      }),
+    ]);
 
     const result = await resolveDualGroundTruth(
       'COINBASE_SPOT_BTC_USD',
@@ -402,11 +375,8 @@ describe('Golden 3: Dual-label resolution', () => {
       new Date('2025-01-01T00:00:00Z')
     );
 
-    // 4h uses zigzag as primary
-    expect(result.primary.method).toBe('zigzag');
-    expect(result.primary.label).toBe(1);
-    expect(result.secondary.method).toBe('fractal');
-    expect(result.secondary.label).toBe(0);
+    expect(result.primary.label).toBe(result.secondary.label);
+    expect(result.primary.hasStructuralBottom).toBe(result.secondary.hasStructuralBottom);
   });
 });
 
@@ -424,25 +394,25 @@ describe('Golden 4: Drawdown gating', () => {
       {
         timestamp: new Date('2025-01-01T00:00:00Z'),
         open: entryPrice,
-        high: entryPrice + 1,
-        low: entryPrice - 0.5,
+        high: entryPrice + 0.01,
+        low: entryPrice,
         close: entryPrice,
         volume: 100,
       },
       {
         timestamp: new Date('2025-01-01T00:05:00Z'),
         open: entryPrice,
-        high: entryPrice + 0.5,
+        high: entryPrice + 0.01,
         low: lowestLow, // This creates the drawdown
-        close: lowestLow + 0.5,
+        close: lowestLow + 0.01,
         volume: 150,
       },
       {
         timestamp: new Date('2025-01-01T00:10:00Z'),
-        open: lowestLow + 0.5,
+        open: lowestLow + 0.01,
         high: entryPrice,
-        low: lowestLow + 0.2,
-        close: entryPrice - 0.1,
+        low: lowestLow,
+        close: entryPrice - 0.01,
         volume: 120,
       },
     ];
@@ -450,68 +420,68 @@ describe('Golden 4: Drawdown gating', () => {
 
   it('label valid when maxDrawdown <= threshold', () => {
     const entryPrice = 100;
-    const lowestLow = 99; // 1% drawdown
+    const lowestLow = 99.9; // 0.1% drawdown
     const candles = createCandlesWithDrawdown(entryPrice, lowestLow);
 
     const drawdown = computeMaxDrawdownFromCandles(candles, entryPrice);
-    expect(drawdown).toBeCloseTo(0.01, 5); // 1% drawdown
+    expect(drawdown).toBeCloseTo(0.001, 5); // 0.1% drawdown
 
-    // For 1h timeframe, maxDrawdown threshold is 0.01 (1%)
+    // For 1h timeframe, maxDrawdown threshold is 0.001 (0.1%)
     const threshold = TIMEFRAME_CONFIG['1h'].task.maxDrawdown;
-    expect(threshold).toBe(0.01);
+    expect(threshold).toBe(0.001);
 
-    // Threshold at 1%, actual drawdown at 1% -> valid (<=)
+    // Threshold at 0.1%, actual drawdown at 0.1% -> valid (<=)
     const isValid = drawdown <= threshold;
     expect(isValid).toBe(true);
   });
 
   it('label invalid when maxDrawdown > threshold', () => {
     const entryPrice = 100;
-    const lowestLow = 98.9; // 1.1% drawdown
+    const lowestLow = 99.85; // 0.15% drawdown
     const candles = createCandlesWithDrawdown(entryPrice, lowestLow);
 
     const drawdown = computeMaxDrawdownFromCandles(candles, entryPrice);
-    expect(drawdown).toBeCloseTo(0.011, 3); // 1.1% drawdown
+    expect(drawdown).toBeCloseTo(0.0015, 3); // 0.15% drawdown
 
-    // For 1h timeframe, maxDrawdown threshold is 0.01 (1%)
+    // For 1h timeframe, maxDrawdown threshold is 0.001 (0.1%)
     const threshold = TIMEFRAME_CONFIG['1h'].task.maxDrawdown;
-    expect(threshold).toBe(0.01);
+    expect(threshold).toBe(0.001);
 
-    // Threshold at 1%, actual drawdown at 1.1% -> invalid (>)
+    // Threshold at 0.1%, actual drawdown at 0.15% -> invalid (>)
     const isValid = drawdown <= threshold;
     expect(isValid).toBe(false);
   });
 
-  it('different timeframes have different drawdown thresholds', () => {
-    // Verify the expected thresholds
-    expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0.004); // 0.4%
-    expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0.01); // 1%
-    expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0.015); // 1.5%
-    expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0.025); // 2.5%
+  it('all timeframes have same drawdown threshold', () => {
+    // All timeframes use 0.001 (0.1%) threshold
+    expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0.001);
+    expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0.001);
+    expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0.001);
+    expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0.001);
   });
 
-  it('15m timeframe rejects 0.5% drawdown', () => {
+  it('15m timeframe rejects 0.2% drawdown', () => {
     const entryPrice = 100;
-    const lowestLow = 99.5; // 0.5% drawdown
+    const lowestLow = 99.8; // 0.2% drawdown
     const candles = createCandlesWithDrawdown(entryPrice, lowestLow);
 
     const drawdown = computeMaxDrawdownFromCandles(candles, entryPrice);
-    expect(drawdown).toBeCloseTo(0.005, 5);
+    expect(drawdown).toBeCloseTo(0.002, 5);
 
-    // 15m has 0.4% threshold, 0.5% exceeds it
+    // 15m has 0.1% threshold, 0.2% exceeds it
     const threshold = TIMEFRAME_CONFIG['15m'].task.maxDrawdown;
     expect(drawdown > threshold).toBe(true);
   });
 
-  it('24h timeframe accepts 2% drawdown', () => {
+  it('24h timeframe accepts 0.05% drawdown', () => {
     const entryPrice = 100;
-    const lowestLow = 98; // 2% drawdown
+    const lowestLow = 99.95; // 0.05% drawdown
     const candles = createCandlesWithDrawdown(entryPrice, lowestLow);
 
     const drawdown = computeMaxDrawdownFromCandles(candles, entryPrice);
-    expect(drawdown).toBeCloseTo(0.02, 5);
+    expect(drawdown).toBeCloseTo(0.0005, 5);
 
-    // 24h has 2.5% threshold, 2% is within it
+    // 24h has 0.1% threshold, 0.05% is within it
     const threshold = TIMEFRAME_CONFIG['24h'].task.maxDrawdown;
     expect(drawdown <= threshold).toBe(true);
   });
@@ -560,5 +530,51 @@ describe('Golden 4: Drawdown gating', () => {
     for (const threshold of thresholds) {
       expect(drawdown <= threshold).toBe(true);
     }
+  });
+});
+
+// ============================================================================
+// Task Spec v1 invariants
+// ============================================================================
+
+describe('Task Spec v1 invariants', () => {
+  it('validateTimeframeConfig does not throw', () => {
+    expect(() => validateTimeframeConfig()).not.toThrow();
+  });
+
+  describe.each(TIMEFRAME_IDS)('%s horizon', (id) => {
+    it('lookbackBars === 8 × horizonBars', () => {
+      const horizonBars = getHorizonBars(id);
+      const lookbackBars = getLookbackBars(id);
+      expect(lookbackBars).toBe(8 * horizonBars);
+    });
+
+    it('pivot barTimeframe matches chart barTimeframe', () => {
+      const config = getTimeframeConfig(id);
+      expect(config.groundTruth.pivot.barTimeframe).toBe(config.chart.barTimeframe);
+    });
+
+    it('has correct Task Spec v1 tolerance', () => {
+      const config = getTimeframeConfig(id);
+      const expectedTolerances = {
+        '15m': 0.001,
+        '1h': 0.001,
+        '4h': 0.001,
+        '24h': 0.001,
+      };
+      expect(config.task.maxDrawdown).toBe(expectedTolerances[id]);
+    });
+
+    it('horizonBars is a positive integer', () => {
+      const horizonBars = getHorizonBars(id);
+      expect(horizonBars).toBeGreaterThan(0);
+      expect(Number.isInteger(horizonBars)).toBe(true);
+    });
+
+    it('lookbackBars is a positive integer', () => {
+      const lookbackBars = getLookbackBars(id);
+      expect(lookbackBars).toBeGreaterThan(0);
+      expect(Number.isInteger(lookbackBars)).toBe(true);
+    });
   });
 });

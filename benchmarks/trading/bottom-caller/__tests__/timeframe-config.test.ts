@@ -13,18 +13,18 @@ describe('timeframe-config', () => {
       expect(TIMEFRAME_IDS).toEqual(['15m', '1h', '4h', '24h']);
     });
 
-    it('15m uses fractal method with 1m candles', () => {
+    it('15m uses fractal method with 5m candles', () => {
       expect(TIMEFRAME_CONFIG['15m'].groundTruth.pivot.spec.method).toBe(
         'fractal'
       );
-      expect(TIMEFRAME_CONFIG['15m'].groundTruth.pivot.barTimeframe).toBe('1m');
+      expect(TIMEFRAME_CONFIG['15m'].groundTruth.pivot.barTimeframe).toBe('5m');
     });
 
-    it('24h uses zigzag method with 1h candles', () => {
+    it('24h uses zigzag method with 4h candles', () => {
       expect(TIMEFRAME_CONFIG['24h'].groundTruth.pivot.spec.method).toBe(
         'zigzag'
       );
-      expect(TIMEFRAME_CONFIG['24h'].groundTruth.pivot.barTimeframe).toBe('1h');
+      expect(TIMEFRAME_CONFIG['24h'].groundTruth.pivot.barTimeframe).toBe('4h');
     });
   });
 
@@ -33,14 +33,14 @@ describe('timeframe-config', () => {
       const config = getTimeframeConfig('15m');
       expect(config.chart.barSizeMinutes).toBe(5);
       expect(config.chart.barTimeframe).toBe('5m');
-      expect(config.chart.range.fromMinutesAgo).toBe(240);
+      expect(config.chart.range.fromMinutesAgo).toBe(120);
       expect(config.chart.range.to).toBe('snapTime');
     });
 
     it('should return correct task config', () => {
       const config = getTimeframeConfig('1h');
       expect(config.task.forwardWindowMinutes).toBe(60);
-      expect(config.task.maxDrawdown).toBe(0.01);
+      expect(config.task.maxDrawdown).toBe(0.001);
     });
   });
 
@@ -55,10 +55,10 @@ describe('timeframe-config', () => {
 
   describe('maxDrawdown thresholds', () => {
     it('has correct thresholds', () => {
-      expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0.004);
-      expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0.01);
-      expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0.015);
-      expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0.025);
+      expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0.001);
+      expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0.001);
+      expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0.001);
+      expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0.001);
     });
   });
 
@@ -69,7 +69,7 @@ describe('timeframe-config', () => {
       if (config15m.groundTruth.pivot.spec.method === 'fractal') {
         expect(config15m.groundTruth.pivot.spec.params.L).toBe(3);
         expect(config15m.groundTruth.pivot.spec.params.candleTimeframe).toBe(
-          '1m'
+          '5m'
         );
       }
     });
@@ -80,7 +80,7 @@ describe('timeframe-config', () => {
       if (config24h.groundTruth.pivot.spec.method === 'zigzag') {
         expect(config24h.groundTruth.pivot.spec.params.deviationPct).toBe(0.025);
         expect(config24h.groundTruth.pivot.spec.params.candleTimeframe).toBe(
-          '1h'
+          '4h'
         );
       }
     });

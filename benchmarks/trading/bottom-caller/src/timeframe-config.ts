@@ -106,14 +106,17 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       barSizeMinutes: 5,
       barTimeframe: '5m',
       queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 240, to: 'snapTime' }, // 4h lookback = 48 candles
+      range: { fromMinutesAgo: 120, to: 'snapTime' }, // 2h lookback = 24 candles
     },
     task: {
       forwardWindowMinutes: 15,
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 15 minutes?',
       outputCoordinateSystem: 'bars_5m',
-      maxDrawdown: 0.004, // 0.4%
+      // Tolerance: 0.1% uniform across all horizons
+      // Exists only to filter tick noise, not to forgive real price movement
+      // If low is broken by >0.1%, the bottom was NOT in
+      maxDrawdown: 0.001,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',
@@ -122,49 +125,6 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
     },
     groundTruth: {
       window: { start: 'snapTime', durationMinutes: 15 },
-      pivot: {
-        provider: 'replaylab',
-        annotationType: 'local_extrema',
-        availableAtMode: 'closesAt',
-        barTimeframe: '1m',
-        spec: { method: 'fractal', params: { L: 3, candleTimeframe: '1m' } },
-        search: { mode: 'snapTime_to_close', slackCandles: 0 },
-      },
-      secondaryPivot: {
-        provider: 'replaylab',
-        annotationType: 'local_extrema',
-        availableAtMode: 'closesAt',
-        barTimeframe: '1m',
-        spec: {
-          method: 'zigzag',
-          params: { deviationPct: 0.005, candleTimeframe: '1m' },
-        },
-        search: { mode: 'snapTime_to_close', slackCandles: 0 },
-      },
-    },
-  },
-
-  '1h': {
-    chart: {
-      barSizeMinutes: 15,
-      barTimeframe: '15m',
-      queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 720, to: 'snapTime' }, // 12h lookback = 48 candles
-    },
-    task: {
-      forwardWindowMinutes: 60,
-      questionTemplate:
-        'Based on the chart shown, has downside already been exhausted for the next 1 hour?',
-      outputCoordinateSystem: 'bars_15m',
-      maxDrawdown: 0.01, // 1%
-    },
-    candleIndexing: {
-      rule: 'rightmost_closed_is_zero',
-      formingCandlePolicy: 'exclude',
-      snapIntervalMinutes: 15,
-    },
-    groundTruth: {
-      window: { start: 'snapTime', durationMinutes: 60 },
       pivot: {
         provider: 'replaylab',
         annotationType: 'local_extrema',
@@ -180,7 +140,53 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         barTimeframe: '5m',
         spec: {
           method: 'zigzag',
-          params: { deviationPct: 0.01, candleTimeframe: '5m' },
+          params: { deviationPct: 0.005, candleTimeframe: '5m' },
+        },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
+    },
+  },
+
+  '1h': {
+    chart: {
+      barSizeMinutes: 15,
+      barTimeframe: '15m',
+      queryMode: 'time_range_snapped',
+      range: { fromMinutesAgo: 480, to: 'snapTime' }, // 8h lookback = 32 candles
+    },
+    task: {
+      forwardWindowMinutes: 60,
+      questionTemplate:
+        'Based on the chart shown, has downside already been exhausted for the next 1 hour?',
+      outputCoordinateSystem: 'bars_15m',
+      // Tolerance: 0.1% uniform across all horizons
+      // Exists only to filter tick noise, not to forgive real price movement
+      // If low is broken by >0.1%, the bottom was NOT in
+      maxDrawdown: 0.001,
+    },
+    candleIndexing: {
+      rule: 'rightmost_closed_is_zero',
+      formingCandlePolicy: 'exclude',
+      snapIntervalMinutes: 15,
+    },
+    groundTruth: {
+      window: { start: 'snapTime', durationMinutes: 60 },
+      pivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '15m',
+        spec: { method: 'fractal', params: { L: 3, candleTimeframe: '15m' } },
+        search: { mode: 'snapTime_to_close', slackCandles: 0 },
+      },
+      secondaryPivot: {
+        provider: 'replaylab',
+        annotationType: 'local_extrema',
+        availableAtMode: 'closesAt',
+        barTimeframe: '15m',
+        spec: {
+          method: 'zigzag',
+          params: { deviationPct: 0.01, candleTimeframe: '15m' },
         },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
@@ -192,14 +198,17 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       barSizeMinutes: 60,
       barTimeframe: '1h',
       queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 2880, to: 'snapTime' }, // 48h lookback = 48 candles
+      range: { fromMinutesAgo: 1920, to: 'snapTime' }, // 32h lookback = 32 candles
     },
     task: {
       forwardWindowMinutes: 240, // 4h
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 4 hours?',
       outputCoordinateSystem: 'bars_1h',
-      maxDrawdown: 0.015, // 1.5%
+      // Tolerance: 0.1% uniform across all horizons
+      // Exists only to filter tick noise, not to forgive real price movement
+      // If low is broken by >0.1%, the bottom was NOT in
+      maxDrawdown: 0.001,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',
@@ -212,10 +221,10 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         provider: 'replaylab',
         annotationType: 'local_extrema',
         availableAtMode: 'closesAt',
-        barTimeframe: '15m',
+        barTimeframe: '1h',
         spec: {
           method: 'zigzag',
-          params: { deviationPct: 0.015, candleTimeframe: '15m' },
+          params: { deviationPct: 0.015, candleTimeframe: '1h' },
         },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
@@ -223,8 +232,8 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         provider: 'replaylab',
         annotationType: 'local_extrema',
         availableAtMode: 'closesAt',
-        barTimeframe: '15m',
-        spec: { method: 'fractal', params: { L: 4, candleTimeframe: '15m' } },
+        barTimeframe: '1h',
+        spec: { method: 'fractal', params: { L: 4, candleTimeframe: '1h' } },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
     },
@@ -235,14 +244,17 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       barSizeMinutes: 240,
       barTimeframe: '4h',
       queryMode: 'time_range_snapped',
-      range: { fromMinutesAgo: 10_080, to: 'snapTime' }, // 7d lookback = 42 candles
+      range: { fromMinutesAgo: 11_520, to: 'snapTime' }, // 8d lookback = 48 candles
     },
     task: {
       forwardWindowMinutes: 1440, // 24h
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 24 hours?',
       outputCoordinateSystem: 'bars_4h',
-      maxDrawdown: 0.025, // 2.5%
+      // Tolerance: 0.1% uniform across all horizons
+      // Exists only to filter tick noise, not to forgive real price movement
+      // If low is broken by >0.1%, the bottom was NOT in
+      maxDrawdown: 0.001,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',
@@ -255,10 +267,10 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         provider: 'replaylab',
         annotationType: 'local_extrema',
         availableAtMode: 'closesAt',
-        barTimeframe: '1h',
+        barTimeframe: '4h',
         spec: {
           method: 'zigzag',
-          params: { deviationPct: 0.025, candleTimeframe: '1h' },
+          params: { deviationPct: 0.025, candleTimeframe: '4h' },
         },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
@@ -266,8 +278,8 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
         provider: 'replaylab',
         annotationType: 'local_extrema',
         availableAtMode: 'closesAt',
-        barTimeframe: '1h',
-        spec: { method: 'fractal', params: { L: 5, candleTimeframe: '1h' } },
+        barTimeframe: '4h',
+        spec: { method: 'fractal', params: { L: 5, candleTimeframe: '4h' } },
         search: { mode: 'snapTime_to_close', slackCandles: 0 },
       },
     },
@@ -297,18 +309,56 @@ export function getTimeframeDurationMs(id: TimeframeId): number {
 }
 
 /**
- * Validate that groundTruth.window.durationMinutes equals task.forwardWindowMinutes
+ * Get horizon duration in bars for a timeframe
+ * @param id - Timeframe ID
+ * @returns Number of bars in the horizon
+ */
+export function getHorizonBars(id: TimeframeId): number {
+  const config = getTimeframeConfig(id);
+  return config.task.forwardWindowMinutes / config.chart.barSizeMinutes;
+}
+
+/**
+ * Get lookback duration in bars for a timeframe
+ * @param id - Timeframe ID
+ * @returns Number of bars in the lookback window
+ */
+export function getLookbackBars(id: TimeframeId): number {
+  const config = getTimeframeConfig(id);
+  return config.chart.range.fromMinutesAgo / config.chart.barSizeMinutes;
+}
+
+/**
+ * Validate timeframe config invariants
  * Call this at startup to catch config drift
  */
 export function validateTimeframeConfig(): void {
   for (const id of TIMEFRAME_IDS) {
     const config = getTimeframeConfig(id);
+
+    // Existing check: groundTruth duration matches task forward window
     if (
       config.groundTruth.window.durationMinutes !==
       config.task.forwardWindowMinutes
     ) {
       throw new Error(
         `Config mismatch for ${id}: groundTruth.window.durationMinutes (${String(config.groundTruth.window.durationMinutes)}) !== task.forwardWindowMinutes (${String(config.task.forwardWindowMinutes)})`
+      );
+    }
+
+    // Invariant 1 - lookbackBars = 8 × horizonBars
+    const horizonBars = getHorizonBars(id);
+    const lookbackBars = getLookbackBars(id);
+    if (lookbackBars !== 8 * horizonBars) {
+      throw new Error(
+        `Task Spec v1 violation for ${id}: lookbackBars (${String(lookbackBars)}) !== 8 × horizonBars (${String(horizonBars)})`
+      );
+    }
+
+    // Invariant 2 - pivot barTimeframe matches chart barTimeframe
+    if (config.groundTruth.pivot.barTimeframe !== config.chart.barTimeframe) {
+      throw new Error(
+        `Config mismatch for ${id}: pivot.barTimeframe (${config.groundTruth.pivot.barTimeframe}) !== chart.barTimeframe (${config.chart.barTimeframe})`
       );
     }
   }

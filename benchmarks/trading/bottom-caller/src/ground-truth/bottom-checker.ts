@@ -1,10 +1,18 @@
 import {
-  getLocalExtremaAnnotations,
-  filterPivotLows,
+  getBottomHoldAnnotations,
+  didBottomHold,
+  type BottomHoldAnnotation,
 } from '../replay-lab/annotations.js';
 import { getTimeframeConfig } from '../timeframe-config.js';
 
-import type { TimeframeId, PivotConfig } from '../timeframe-config.js';
+import type { TimeframeId, TimeframeConfig } from '../timeframe-config.js';
+
+export interface BottomHoldResult {
+  hasHeldBottom: boolean;
+  label: 0 | 1;
+  timeToPivotRatio?: number;
+  firstBottomAt?: Date;
+}
 
 /** Result for a single pivot method */
 export interface PivotMethodResult {
@@ -28,82 +36,62 @@ export interface DualGroundTruthResult {
   secondary: PivotMethodResult;
 }
 
-/**
- * Resolve ground truth for a single pivot method
- * @param symbolId - Trading symbol
- * @param pivotConfig - Pivot configuration with method and params
- * @param predictedAt - Time prediction was made
- * @param closesAt - Time window closes
- * @param durationMs - Window duration in milliseconds
- * @returns Pivot method result with label and timing metrics
- */
-async function resolveWithMethod(
+async function resolveBottomHold(
   symbolId: string,
-  pivotConfig: PivotConfig,
+  config: TimeframeConfig,
   predictedAt: Date,
   closesAt: Date,
   durationMs: number
-): Promise<PivotMethodResult> {
-  const method = pivotConfig.spec.method;
-  const candleTimeframe = pivotConfig.barTimeframe;
+): Promise<BottomHoldResult> {
+  const horizonBars = config.task.forwardWindowMinutes / config.chart.barSizeMinutes;
+  const lookbackBars = config.chart.range.fromMinutesAgo / config.chart.barSizeMinutes;
 
-  // Build params based on method
-  const params = pivotConfig.spec.params;
-  const annotationParams =
-    method === 'fractal'
-      ? { L: (params as { L: number }).L, candleTimeframe }
-      : {
-          deviationPct: (params as { deviationPct: number }).deviationPct,
-          candleTimeframe,
-        };
+  const params = {
+    lookbackCandles: lookbackBars,
+    horizonCandles: horizonBars,
+    maxDrawdownFrac: config.task.maxDrawdown,
+    candleTimeframe: config.chart.barTimeframe,
+  };
 
-  // Fetch local_extrema annotations confirmed by closesAt
-  const allAnnotations = await getLocalExtremaAnnotations(
+  const annotations = await getBottomHoldAnnotations(
     symbolId,
-    method,
-    annotationParams,
+    params,
     predictedAt,
     closesAt,
     closesAt // availableAt = closesAt to prevent lookahead
   );
 
-  // Filter to pivot LOWs only
-  const pivotLows = filterPivotLows(allAnnotations);
-  const hasStructuralBottom = pivotLows.length > 0;
-  const label: 0 | 1 = hasStructuralBottom ? 1 : 0;
+  const heldBottoms = annotations.filter(didBottomHold);
+  const hasHeldBottom = heldBottoms.length > 0;
+  const label: 0 | 1 = hasHeldBottom ? 1 : 0;
 
-  // Compute timing metrics if pivot occurred
-  if (hasStructuralBottom && pivotLows.length > 0) {
-    const pivotTimes = pivotLows.map((p) => new Date(p.time_start).getTime());
-    const earliestPivotMs = Math.min(...pivotTimes);
-    const firstPivotAt = new Date(earliestPivotMs);
-    const timeToPivot = earliestPivotMs - predictedAt.getTime();
-    const timeToPivotRatio = timeToPivot / durationMs;
+  const firstHeldBottom = heldBottoms[0];
+  if (hasHeldBottom && firstHeldBottom !== undefined) {
+    let earliest = firstHeldBottom;
+    for (const a of heldBottoms) {
+      if (new Date(a.time_start) < new Date(earliest.time_start)) {
+        earliest = a;
+      }
+    }
+    const bottomTime = new Date(earliest.time_start);
+    const timeToPivotRatio = (bottomTime.getTime() - predictedAt.getTime()) / durationMs;
 
     return {
-      hasStructuralBottom,
+      hasHeldBottom,
       label,
       timeToPivotRatio,
-      firstPivotAt,
-      method,
+      firstBottomAt: bottomTime,
     };
   }
 
-  return {
-    hasStructuralBottom,
-    label,
-    method,
-  };
+  return { hasHeldBottom, label };
 }
 
 /**
  * Resolve dual ground truth for a bottom prediction.
  *
- * Returns BOTH fractal and zigzag labels for every prediction,
- * allowing comparison of methods with real data.
- *
- * Primary method is used for scoring/elimination.
- * Secondary method is captured for analysis.
+ * Uses bottom_hold method to determine if price held above the lookback low.
+ * Returns same structure for backwards compatibility with dual-method interface.
  *
  * @param symbolId - Trading symbol
  * @param timeframeId - Prediction timeframe
@@ -119,25 +107,22 @@ export async function resolveDualGroundTruth(
   const durationMs = config.groundTruth.window.durationMinutes * 60_000;
   const closesAt = new Date(predictedAt.getTime() + durationMs);
 
-  // Resolve both methods in parallel
-  const [primary, secondary] = await Promise.all([
-    resolveWithMethod(
-      symbolId,
-      config.groundTruth.pivot,
-      predictedAt,
-      closesAt,
-      durationMs
-    ),
-    resolveWithMethod(
-      symbolId,
-      config.groundTruth.secondaryPivot,
-      predictedAt,
-      closesAt,
-      durationMs
-    ),
-  ]);
+  const result = await resolveBottomHold(symbolId, config, predictedAt, closesAt, durationMs);
 
-  return { primary, secondary };
+  const pivotResult: PivotMethodResult = {
+    hasStructuralBottom: result.hasHeldBottom,
+    label: result.label,
+    method: 'fractal', // Legacy field, not meaningful for bottom_hold
+  };
+
+  if (result.timeToPivotRatio !== undefined) {
+    pivotResult.timeToPivotRatio = result.timeToPivotRatio;
+  }
+  if (result.firstBottomAt !== undefined) {
+    pivotResult.firstPivotAt = result.firstBottomAt;
+  }
+
+  return { primary: pivotResult, secondary: pivotResult };
 }
 
 /** @deprecated Use resolveDualGroundTruth instead */
@@ -170,3 +155,5 @@ export async function resolveBottomGroundTruth(
     firstPivotAt: result.primary.firstPivotAt,
   };
 }
+
+export type { BottomHoldAnnotation };

@@ -7,6 +7,28 @@ import {
   type BottomCallerContext,
 } from '../src/bottom-caller.js';
 
+import type { MultimodalPrompt, TextPart, ImagePart } from '@nullagent/agent-core';
+
+function getTextContent(prompt: string | MultimodalPrompt): string {
+  if (typeof prompt === 'string') {
+    return prompt;
+  }
+  if (typeof prompt.content === 'string') {
+    return prompt.content;
+  }
+  return prompt.content
+    .filter((part): part is TextPart => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n');
+}
+
+function getImageParts(prompt: string | MultimodalPrompt): ImagePart[] {
+  if (typeof prompt === 'string' || typeof prompt.content === 'string') {
+    return [];
+  }
+  return prompt.content.filter((part): part is ImagePart => part.type === 'image');
+}
+
 describe('bottom-caller', () => {
   describe('BOTTOM_CONTRACT_IDS', () => {
     it('has 4 timeframe contracts', () => {
@@ -22,10 +44,10 @@ describe('bottom-caller', () => {
   describe('createBottomCaller', () => {
     const mockContext: BottomCallerContext = {
       chartByHorizon: {
-        '15m': 'https://example.com/chart-15m.png',
-        '1h': 'https://example.com/chart-1h.png',
-        '4h': 'https://example.com/chart-4h.png',
-        '24h': 'https://example.com/chart-24h.png',
+        '15m': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+        '1h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+        '4h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+        '24h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
       },
       currentTime: '2025-01-01T00:00:00Z',
       symbolId: 'COINBASE_SPOT_BTC_USD',
@@ -57,17 +79,16 @@ describe('bottom-caller', () => {
       );
     });
 
-    it('builds prompt with chart URLs and timeframe contracts', () => {
+    it('builds multimodal prompt with image parts and horizon descriptions', () => {
       const agent = createBottomCaller('anthropic/claude-haiku-4.5');
       const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
-      expect(prompt).toContain('chart-15m.png');
-      expect(prompt).toContain('chart-1h.png');
-      expect(prompt).toContain('chart-4h.png');
-      expect(prompt).toContain('chart-24h.png');
-      expect(prompt).toContain('15m Timeframe');
-      expect(prompt).toContain('1h Timeframe');
-      expect(prompt).toContain('4h Timeframe');
-      expect(prompt).toContain('24h Timeframe');
+      const textContent = getTextContent(prompt);
+      const imageParts = getImageParts(prompt);
+      expect(imageParts).toHaveLength(4);
+      expect(textContent).toContain('15m horizon chart');
+      expect(textContent).toContain('1h horizon chart');
+      expect(textContent).toContain('4h horizon chart');
+      expect(textContent).toContain('24h horizon chart');
     });
 
     it('builds compaction prompt with round count', () => {
@@ -84,8 +105,9 @@ describe('bottom-caller', () => {
         roundNumber: 10,
         compactionSummary: 'Previous learnings: momentum divergence works well',
       });
-      expect(prompt).toContain('Your past learnings:');
-      expect(prompt).toContain('momentum divergence works well');
+      const textContent = getTextContent(prompt);
+      expect(textContent).toContain('Your past learnings:');
+      expect(textContent).toContain('momentum divergence works well');
     });
   });
 });

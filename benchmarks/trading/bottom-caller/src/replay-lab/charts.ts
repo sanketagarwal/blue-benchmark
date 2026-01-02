@@ -48,18 +48,31 @@ export async function getSignedChartUrl(params: ChartParams): Promise<string> {
 }
 
 export interface ForecastingCharts {
+  chartByHorizon: Record<TimeframeId, Uint8Array>;
+}
+
+export interface ForecastingChartUrls {
   chartByHorizon: Record<TimeframeId, string>;
 }
 
-export async function getForecastingCharts(
+async function fetchImageBytes(url: string): Promise<Uint8Array> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch chart image: ${String(response.status)} ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
+
+export async function getForecastingChartUrls(
   symbolId: string,
   snapTime: Date
-): Promise<ForecastingCharts> {
+): Promise<ForecastingChartUrls> {
   const chartPromises = TIMEFRAME_IDS.map(async (timeframeId) => {
     const config = getTimeframeConfig(timeframeId);
     const rangeMs = config.chart.range.fromMinutesAgo * 60_000;
     const fromTime = new Date(snapTime.getTime() - rangeMs);
-    const timeframe = config.chart.barTimeframe; // Direct access, no helper needed
+    const timeframe = config.chart.barTimeframe;
 
     const url = await getSignedChartUrl({
       symbolId,
@@ -76,6 +89,37 @@ export async function getForecastingCharts(
   const chartByHorizon = Object.fromEntries(results) as Record<
     TimeframeId,
     string
+  >;
+
+  return { chartByHorizon };
+}
+
+export async function getForecastingCharts(
+  symbolId: string,
+  snapTime: Date
+): Promise<ForecastingCharts> {
+  const chartPromises = TIMEFRAME_IDS.map(async (timeframeId) => {
+    const config = getTimeframeConfig(timeframeId);
+    const rangeMs = config.chart.range.fromMinutesAgo * 60_000;
+    const fromTime = new Date(snapTime.getTime() - rangeMs);
+    const timeframe = config.chart.barTimeframe;
+
+    const url = await getSignedChartUrl({
+      symbolId,
+      timeframe,
+      from: fromTime,
+      to: snapTime,
+      layers: CHART_LAYERS,
+    });
+
+    const imageBytes = await fetchImageBytes(url);
+    return [timeframeId, imageBytes] as const;
+  });
+
+  const results = await Promise.all(chartPromises);
+  const chartByHorizon = Object.fromEntries(results) as Record<
+    TimeframeId,
+    Uint8Array
   >;
 
   return { chartByHorizon };

@@ -9,7 +9,68 @@ import {
 } from './history.js';
 import { getLLMClient, getModelId } from './llm.js';
 
-import type { AgentDefinition, Agent, RoundResult, RoundContext } from './types.js';
+import type { AgentDefinition, Agent, RoundResult, RoundContext, MultimodalPrompt, MessageContent, TextPart } from './types.js';
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+function extractPreviousOutput<TOutput>(messages: Message[]): TOutput | undefined {
+  if (messages.length < 2) {
+    return undefined;
+  }
+  const lastAssistantMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant');
+
+  if (!lastAssistantMessage) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(lastAssistantMessage.content) as TOutput;
+  } catch {
+    return undefined;
+  }
+}
+
+async function loadMessages(
+  agentId: string,
+  stateless: boolean | undefined,
+  since?: Date
+): Promise<Message[]> {
+  if (stateless) {
+    return [];
+  }
+  return await loadMessageHistory(agentId, since ? { since } : undefined);
+}
+
+function normalizePromptResult(promptResult: string | MultimodalPrompt): {
+  content: MessageContent;
+  text: string;
+} {
+  if (typeof promptResult === 'string') {
+    return { content: promptResult, text: promptResult };
+  }
+  
+  const content = promptResult.content;
+  if (typeof content === 'string') {
+    return { content, text: content };
+  }
+  
+  const textParts = content.filter(
+    (part): part is TextPart => part.type === 'text'
+  );
+  const textOnly = textParts.map((part) => part.text).join('\n');
+  
+  const imageCount = content.filter((part) => part.type === 'image').length;
+  
+  const historyText = imageCount > 0 
+    ? `${textOnly}\n\n[${String(imageCount)} image(s) attached - not stored in history]`
+    : textOnly;
+  
+  return { content, text: historyText };
+}
 
 /**
  * Define an agent from its definition
@@ -36,10 +97,7 @@ export async function runRound<TOutput>(
   const { definition } = agent;
   const traceId = options?.traceId ?? crypto.randomUUID();
 
-  const messages = await loadMessageHistory(
-    definition.id,
-    options?.since ? { since: options.since } : undefined
-  );
+  let messages = await loadMessages(definition.id, definition.stateless, options?.since);
   const roundNumber = await getCurrentRoundNumber(definition.id);
 
   let wasCompacted = false;
@@ -56,23 +114,11 @@ export async function runRound<TOutput>(
     if (shouldTriggerCompaction) {
       compactionSummary = await runCompaction(definition, options?.modelId);
       wasCompacted = true;
+      messages = await loadMessages(definition.id, definition.stateless, options?.since);
     }
   }
 
-  let previousOutput: TOutput | undefined;
-  if (messages.length >= 2) {
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((message) => message.role === 'assistant');
-
-    if (lastAssistantMessage) {
-      try {
-        previousOutput = JSON.parse(lastAssistantMessage.content) as TOutput;
-      } catch {
-        // If parsing fails, leave previousOutput undefined
-      }
-    }
-  }
+  const previousOutput = extractPreviousOutput<TOutput>(messages);
 
   const context: RoundContext<TOutput> = {
     roundNumber,
@@ -80,18 +126,20 @@ export async function runRound<TOutput>(
     ...(compactionSummary !== undefined && { compactionSummary }),
   };
 
-  const prompt = definition.buildRoundPrompt(context);
-  await saveRoundPrompt(definition.id, prompt, roundNumber, traceId);
+  const promptResult = definition.buildRoundPrompt(context);
+  const { content: promptContent, text: promptText } = normalizePromptResult(promptResult);
+
+  await saveRoundPrompt(definition.id, promptText, roundNumber, traceId);
+
+  const userMessage = { role: 'user' as const, content: promptContent };
 
   const client = getLLMClient();
   const modelId = options?.modelId ?? getModelId();
 
-  // Use .chat() explicitly to force chat completions API (not responses API)
-  // This is required for AI Gateway compatibility
   const generateConfig: Parameters<typeof generateObject>[0] = {
     model: client.chat(modelId) as unknown as Parameters<typeof generateObject>[0]['model'],
     schema: definition.outputSchema,
-    messages: [...messages, { role: 'user', content: prompt }],
+    messages: [...messages, userMessage],
   };
 
   if (definition.systemPrompt) {

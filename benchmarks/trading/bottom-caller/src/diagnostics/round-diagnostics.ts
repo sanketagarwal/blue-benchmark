@@ -1,3 +1,5 @@
+import { getHorizonBars } from '../timeframe-config.js';
+
 import type { TimeframeId } from '../timeframe-config.js';
 
 /**
@@ -61,22 +63,13 @@ const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /**
  * Get number of output candles per horizon
- * Based on outputCoordinateSystem from timeframe-config
+ * Derives from timeframe config: forwardWindowMinutes / barSizeMinutes
  *
  * @param horizon - The timeframe horizon
  * @returns Number of candles in the horizon window
  */
 function getCandlesPerHorizon(horizon: TimeframeId): number {
-  switch (horizon) {
-    case '15m':
-      return 3; // 15m / 5m bars = 3
-    case '1h':
-      return 4; // 60m / 15m bars = 4
-    case '4h':
-      return 4; // 240m / 60m bars = 4
-    case '24h':
-      return 6; // 1440m / 240m bars = 6
-  }
+  return getHorizonBars(horizon);
 }
 
 /**

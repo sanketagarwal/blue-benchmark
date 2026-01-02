@@ -13,7 +13,7 @@ import {
   marketMaker,
   setMarketMakerContext,
 } from '@/market-maker';
-import { getForecastingCharts } from '@/replay-lab/charts';
+import { getForecastingChartUrls } from '@/replay-lab/charts';
 import {
   formatOrderbookForPrompt,
   getBestBidAsk,
@@ -102,8 +102,8 @@ export async function POST(request: Request): Promise<NextResponse<PlayResponse>
       const clockState = getClockState();
       const predictionTime = clockState.currentTime;
 
-      // Get chart data
-      const charts = await getForecastingCharts(symbolId, predictionTime);
+      // Get chart data (URLs for market-maker which embeds them in prompt)
+      const charts = await getForecastingChartUrls(symbolId, predictionTime);
 
       // Get orderbook data and compute best bid/ask
       const orderbook = await getOrderbookSnapshot(symbolId, predictionTime);

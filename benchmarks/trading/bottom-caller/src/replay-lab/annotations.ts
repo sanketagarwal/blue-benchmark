@@ -405,3 +405,265 @@ export async function getLocalExtremaAnnotations(
 export function filterPivotLows(annotations: LocalExtremaAnnotation[]): LocalExtremaAnnotation[] {
   return annotations.filter(a => a.payload.direction === 'low');
 }
+
+const BOTTOM_HOLD_METHOD = 'bottom-hold' as const;
+
+/** Parameters for bottom-hold detection method */
+export interface BottomHoldParams {
+  lookbackCandles: number;
+  horizonCandles: number;
+  maxDrawdownFrac: number;
+  candleTimeframe?: string;
+  minPreDropFrac?: number;
+  minBounceFrac?: number;
+}
+
+export interface BottomHoldAnnotation {
+  id: string;
+  time_start: string;
+  time_end: string | null;
+  type: 'bottom_event';
+  method: 'bottom-hold';
+  schema_version: string;
+  payload: {
+    refLow: number;
+    fwdLow: number;
+    drawdownFrac: number;
+    params: {
+      horizonCandles: number;
+      lookbackCandles: number;
+      maxDrawdownFrac: number;
+      candleTimeframe: string;
+    };
+  };
+  source: string;
+  created_at: string;
+  available_at?: string;
+}
+
+export function didBottomHold(annotation: BottomHoldAnnotation): boolean {
+  return annotation.payload.drawdownFrac <= annotation.payload.params.maxDrawdownFrac;
+}
+
+/** Response type from stored bottom_event annotations API */
+interface StoredBottomHoldAnnotationsResponse {
+  symbol_id: string;
+  annotations: BottomHoldAnnotation[];
+}
+
+/** Request body for the bottom-hold compute endpoint */
+interface BottomHoldComputeRequestBody {
+  type: 'bottom_event';
+  method: 'bottom-hold';
+  params: {
+    lookbackCandles: number;
+    horizonCandles: number;
+    maxDrawdownFrac: number;
+    candleTimeframe?: string;
+    minPreDropFrac?: number;
+    minBounceFrac?: number;
+  };
+  from: string;
+  to: string;
+  cachePolicy: 'none';
+}
+
+/** Response type from compute endpoint for bottom-hold */
+interface ComputeBottomHoldAnnotation {
+  timeStart: string;
+  timeEnd?: string | null;
+  payload: {
+    refLow: number;
+    fwdLow: number;
+    drawdownFrac: number;
+    params: {
+      horizonCandles: number;
+      lookbackCandles: number;
+      maxDrawdownFrac: number;
+      candleTimeframe: string;
+    };
+    availability?: {
+      availableAt: string;
+      futureBarsUsed: number;
+      mode: string;
+    };
+  };
+}
+
+interface ComputeBottomHoldAnnotationsResponse {
+  symbol_id: string;
+  annotations: ComputeBottomHoldAnnotation[];
+}
+
+function transformComputeBottomHoldAnnotation(a: ComputeBottomHoldAnnotation): BottomHoldAnnotation {
+  const result: BottomHoldAnnotation = {
+    id: crypto.randomUUID(),
+    time_start: a.timeStart,
+    // eslint-disable-next-line unicorn/no-null -- BottomHoldAnnotation interface requires null for time_end
+    time_end: a.timeEnd ?? null,
+    type: 'bottom_event',
+    method: BOTTOM_HOLD_METHOD,
+    schema_version: '1.0',
+    payload: {
+      refLow: a.payload.refLow,
+      fwdLow: a.payload.fwdLow,
+      drawdownFrac: a.payload.drawdownFrac,
+      params: a.payload.params,
+    },
+    source: 'compute',
+    created_at: new Date().toISOString(),
+  };
+
+  if (a.payload.availability?.availableAt !== undefined) {
+    result.available_at = a.payload.availability.availableAt;
+  }
+
+  return result;
+}
+
+/**
+ * Compute bottom_event annotations on-demand via the /compute endpoint.
+ *
+ * @param symbolId - Trading symbol
+ * @param params - Bottom-hold detection parameters
+ * @param from - Start of prediction window
+ * @param to - End of prediction window
+ * @returns Array of bottom-hold annotations
+ */
+async function computeBottomHoldAnnotations(
+  symbolId: string,
+  params: BottomHoldParams,
+  from: Date,
+  to: Date
+): Promise<BottomHoldAnnotation[]> {
+  const requestBody: BottomHoldComputeRequestBody = {
+    type: 'bottom_event',
+    method: BOTTOM_HOLD_METHOD,
+    params: {
+      lookbackCandles: params.lookbackCandles,
+      horizonCandles: params.horizonCandles,
+      maxDrawdownFrac: params.maxDrawdownFrac,
+    },
+    from: from.toISOString(),
+    to: to.toISOString(),
+    cachePolicy: 'none',
+  };
+
+  if (params.candleTimeframe !== undefined) {
+    requestBody.params.candleTimeframe = params.candleTimeframe;
+  }
+  if (params.minPreDropFrac !== undefined) {
+    requestBody.params.minPreDropFrac = params.minPreDropFrac;
+  }
+  if (params.minBounceFrac !== undefined) {
+    requestBody.params.minBounceFrac = params.minBounceFrac;
+  }
+
+  const path = `/api/annotations/${symbolId}/compute`;
+
+  const response = await replayLabFetch<ComputeBottomHoldAnnotationsResponse>(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  return response.annotations.map(transformComputeBottomHoldAnnotation);
+}
+
+/**
+ * Fetch stored bottom_event annotations with bottom-hold method.
+ *
+ * @param symbolId - Trading symbol
+ * @param params - Bottom-hold detection parameters
+ * @param from - Start of prediction window
+ * @param to - End of prediction window
+ * @param availableAt - Only return annotations confirmed by this time
+ * @returns Array of bottom-hold annotations
+ */
+async function getStoredBottomHoldAnnotations(
+  symbolId: string,
+  params: BottomHoldParams,
+  from: Date,
+  to: Date,
+  availableAt: Date
+): Promise<BottomHoldAnnotation[]> {
+  const queryParams = new URLSearchParams({
+    type: 'bottom_event',
+    method: BOTTOM_HOLD_METHOD,
+    from: from.toISOString(),
+    to: to.toISOString(),
+    availableAt: availableAt.toISOString(),
+    lookbackCandles: String(params.lookbackCandles),
+    horizonCandles: String(params.horizonCandles),
+    maxDrawdownFrac: String(params.maxDrawdownFrac),
+  });
+
+  if (params.candleTimeframe !== undefined) {
+    queryParams.set('candleTimeframe', params.candleTimeframe);
+  }
+  if (params.minPreDropFrac !== undefined) {
+    queryParams.set('minPreDropFrac', String(params.minPreDropFrac));
+  }
+  if (params.minBounceFrac !== undefined) {
+    queryParams.set('minBounceFrac', String(params.minBounceFrac));
+  }
+
+  const path = `/api/annotations/${symbolId}?${queryParams.toString()}`;
+  const response = await replayLabFetch<StoredBottomHoldAnnotationsResponse>(path);
+
+  return response.annotations.filter((annotation) => {
+    const p = annotation.payload.params;
+    return (
+      p.lookbackCandles === params.lookbackCandles &&
+      p.horizonCandles === params.horizonCandles &&
+      p.maxDrawdownFrac === params.maxDrawdownFrac &&
+      (params.candleTimeframe === undefined || p.candleTimeframe === params.candleTimeframe)
+    );
+  });
+}
+
+/**
+ * Fetch bottom_event annotations with bottom-hold method within a time window.
+ * First tries stored annotations, then falls back to compute endpoint if none found.
+ * Uses availableAt filter to prevent lookahead bias when fetching stored annotations.
+ *
+ * @param symbolId - Trading symbol
+ * @param params - Bottom-hold detection parameters
+ * @param from - Start of prediction window
+ * @param to - End of prediction window
+ * @param availableAt - Only return annotations confirmed by this time
+ * @returns Array of bottom-hold annotations
+ */
+export async function getBottomHoldAnnotations(
+  symbolId: string,
+  params: BottomHoldParams,
+  from: Date,
+  to: Date,
+  availableAt: Date
+): Promise<BottomHoldAnnotation[]> {
+  const storedAnnotations = await getStoredBottomHoldAnnotations(
+    symbolId,
+    params,
+    from,
+    to,
+    availableAt
+  );
+
+  if (storedAnnotations.length > 0) {
+    return storedAnnotations;
+  }
+
+  const computedAnnotations = await computeBottomHoldAnnotations(symbolId, params, from, to);
+
+  // Filter by availableAt to prevent lookahead
+  const availableAtMs = availableAt.getTime();
+  return computedAnnotations.filter((annotation) => {
+    // If available_at is undefined, exclude to be safe (prevent lookahead)
+    if (annotation.available_at === undefined) {
+      return false;
+    }
+    return new Date(annotation.available_at).getTime() <= availableAtMs;
+  });
+}

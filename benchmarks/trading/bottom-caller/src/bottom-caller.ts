@@ -1,10 +1,19 @@
 import { defineAgent } from '@nullagent/agent-core';
 import { z } from 'zod';
 
-import { TIMEFRAME_IDS, getTimeframeConfig } from './timeframe-config.js';
+import {
+  TIMEFRAME_IDS,
+  getTimeframeConfig,
+  getLookbackBars,
+} from './timeframe-config.js';
 
 import type { TimeframeId } from './timeframe-config.js';
-import type { Agent } from '@nullagent/agent-core';
+import type {
+  Agent,
+  MultimodalPrompt,
+  TextPart,
+  ImagePart,
+} from '@nullagent/agent-core';
 
 /**
  * Bottom prediction contract IDs for multi-horizon structural bottom detection
@@ -22,8 +31,8 @@ export type BottomContractId = (typeof BOTTOM_CONTRACT_IDS)[number];
  * Context interface for bottom predictions
  */
 export interface BottomCallerContext {
-  /** Per-timeframe chart URLs */
-  chartByHorizon: Record<TimeframeId, string>;
+  /** Per-timeframe chart image data (PNG bytes) */
+  chartByHorizon: Record<TimeframeId, Uint8Array>;
   /** Current prediction time */
   currentTime: string;
   /** Trading symbol identifier */
@@ -53,7 +62,7 @@ export function clearBottomCallerContext(): void {
 // Output schema: structured prediction for each horizon with candlesBack
 const HorizonPredictionSchema = z.object({
   hasBottomed: z.boolean(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.number().min(0.5).max(1),
   // Optional - some models omit when hasBottomed=false
   candlesBack: z.number().int().min(0).optional(),
 });
@@ -88,13 +97,14 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
     id: agentId,
     systemPrompt: 'You are an expert technical analyst specializing in identifying structural market bottoms across multiple timeframes.',
     outputSchema: OutputSchema,
+    stateless: true,
 
     compactionTrigger: {
       type: 'custom',
       shouldCompact: (context) => context.roundNumber > 0 && context.roundNumber % 10 === 0,
     },
 
-    buildRoundPrompt: (context) => {
+    buildRoundPrompt: (context): MultimodalPrompt => {
       if (currentContext === undefined) {
         throw new Error(CONTEXT_NOT_SET_ERROR);
       }
@@ -106,80 +116,86 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
           ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
           : '';
 
-      // Build chart sections dynamically
-      const chartSections = TIMEFRAME_IDS.map((id) => {
+      const tolerancePct = (getTimeframeConfig('15m').task.maxDrawdown * 100).toFixed(1);
+
+      const parts: (TextPart | ImagePart)[] = [];
+
+      // Build image descriptions dynamically from config
+      const imageDescriptions = TIMEFRAME_IDS.map((id, index) => {
         const config = getTimeframeConfig(id);
         const barSize = config.chart.barSizeMinutes;
-        const range = config.chart.range.fromMinutesAgo;
-        const rangeString =
-          range >= 1440
-            ? `${String(range / 1440)}d`
-            : (range >= 60
-              ? `${String(range / 60)}h`
-              : `${String(range)}m`);
-        const barString =
-          barSize >= 60 ? `${String(barSize / 60)}h` : `${String(barSize)}m`;
-        // eslint-disable-next-line security/detect-object-injection -- id from TIMEFRAME_IDS typed array
-        const chartUrl = chartByHorizon[id];
-        return `${id} Timeframe Chart (${barString} candles, ${rangeString} lookback):
-${chartUrl}`;
+        const barString = barSize >= 60 ? `${String(barSize / 60)}-hour` : `${String(barSize)}-minute`;
+        const lookbackBars = getLookbackBars(id);
+        const lookbackMinutes = config.chart.range.fromMinutesAgo;
+        const lookbackString =
+          lookbackMinutes >= 1440
+            ? `${String(lookbackMinutes / 1440)} days`
+            : (lookbackMinutes >= 60
+              ? `${String(lookbackMinutes / 60)} hours`
+              : `${String(lookbackMinutes)} minutes`);
+        const horizonMinutes = config.task.forwardWindowMinutes;
+        const horizonString =
+          horizonMinutes >= 60 ? `${String(horizonMinutes / 60)} hour${horizonMinutes >= 120 ? 's' : ''}` : `${String(horizonMinutes)} minutes`;
+        const tolerance = (config.task.maxDrawdown * 100).toFixed(1);
+
+        return `${String(index + 1)}. **Image ${String(index + 1)} – ${id} horizon chart**
+   - Bar size: ${barString} candles
+   - Lookback: ${String(lookbackBars)} bars (${lookbackString})
+   - Prediction horizon: next ${horizonString}
+   - Tolerance: ${tolerance}%
+   - Valid candlesBack: 0 to ${String(lookbackBars - 1)}`;
       }).join('\n\n');
 
-      // Build task questions dynamically
-      const questions = TIMEFRAME_IDS.map((id) => {
-        const config = getTimeframeConfig(id);
-        return `- ${id}: ${config.task.questionTemplate}`;
-      }).join('\n');
+      // Add text intro
+      parts.push({
+        type: 'text',
+        text: `You are given 4 attached candlestick chart images of the same market (${symbolId}).
+Current time: ${currentTime}
 
-      // Build max drawdown list
-      const drawdowns = TIMEFRAME_IDS.map((id) => {
-        const config = getTimeframeConfig(id);
-        const pct = (config.task.maxDrawdown * 100).toFixed(1);
-        return `   - ${id}: ${pct}% max drawdown`;
-      }).join('\n');
+The images are ordered and used as follows:
 
-      return `You are predicting structural market bottoms for ${symbolId}.
+${imageDescriptions}
+`,
+      });
 
-Current Time: ${currentTime}
+      // Add images in order
+      for (const horizon of TIMEFRAME_IDS) {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from TIMEFRAME_IDS typed array
+        parts.push({ type: 'image', image: chartByHorizon[horizon] });
+      }
 
-**OUTPUT FORMAT (exact JSON structure required):**
-\`\`\`json
+      // Add task instructions
+      parts.push({
+        type: 'text',
+        text: `
+### Task
+For each horizon, decide whether the market has already put in a structural bottom within the visible lookback window.
+
+### Definition of "hasBottomed"
+- hasBottomed = true: The selected bottom's low will NOT be undercut by more than ${tolerancePct}% within the prediction horizon
+- hasBottomed = false: Price will make a new low beyond ${tolerancePct}% tolerance within the prediction horizon
+
+### candlesBack
+- candlesBack = 0 → rightmost (most recent) closed bar
+- Must be within valid range for each horizon
+- Required when hasBottomed = true
+
+### Confidence
+- Range: 0.5 to 1.0
+- 0.5 = uncertain/guess, 1.0 = high conviction
+
+### Output format
+JSON only:
 {
-  "reasoning": "brief explanation of your analysis",
-  "predictions": {
-    "15m": { "hasBottomed": true, "confidence": 0.75, "candlesBack": 2 },
-    "1h": { "hasBottomed": false, "confidence": 0.60, "candlesBack": 0 },
-    "4h": { "hasBottomed": true, "confidence": 0.85, "candlesBack": 5 },
-    "24h": { "hasBottomed": false, "confidence": 0.40, "candlesBack": 0 }
-  }
+  "15m": { "hasBottomed": boolean, "confidence": number, "candlesBack": number },
+  "1h": { "hasBottomed": boolean, "confidence": number, "candlesBack": number },
+  "4h": { "hasBottomed": boolean, "confidence": number, "candlesBack": number },
+  "24h": { "hasBottomed": boolean, "confidence": number, "candlesBack": number }
 }
-\`\`\`
+${compactionSection}`,
+      });
 
-**CHART ANALYSIS** (Analyze each chart for its corresponding timeframe):
-
-${chartSections}
-
-All charts include: SMA(20), EMA(20), Bollinger Bands(20,2), VWAP, Volume.
-
-**CANDLE INDEXING:**
-The rightmost candle in each chart is the most recent closed candle.
-Use this candle as candlesBack = 0.
-candlesBack = 3 means three closed candles before that.
-
-**YOUR TASK:**
-For each timeframe, answer the question and predict:
-${questions}
-
-Output for each timeframe:
-1. hasBottomed: boolean - Has downside selling pressure been structurally exhausted?
-2. confidence: number (0.0 to 1.0) - How confident are you?
-3. candlesBack: integer >= 0 - If bottomed, which candle? (0 = rightmost)
-
-**WHAT MAKES A STRUCTURAL BOTTOM:**
-1. A local extrema pivot LOW must occur (confirmed by future price action)
-2. Max drawdown from prediction time must not exceed threshold:
-${drawdowns}
-${compactionSection}`;
+      return { content: parts };
     },
 
     buildCompactionPrompt: (history) => `
