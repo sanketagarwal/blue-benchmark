@@ -15,14 +15,20 @@ const SYSTEM_PROMPT = 'You are an expert technical analyst specializing in ident
 const HORIZON_PREDICTION_SCHEMA_TYPE = 'HorizonPredictionSchema';
 const CODE_BLOCK_TYPESCRIPT = '```typescript';
 
+function pluralize(value: number, singular: string, plural: string): string {
+  return value === 1 ? `1 ${singular}` : `${String(value)} ${plural}`;
+}
+
 function formatMinutesAsTime(minutes: number): string {
   if (minutes >= 1440) {
     const days = minutes / 1440;
-    return days === 1 ? '1 day' : `${String(days)} days`;
+    if (Number.isInteger(days)) {
+      return pluralize(days, 'day', 'days');
+    }
+    return pluralize(minutes / 60, 'hour', 'hours');
   }
   if (minutes >= 60) {
-    const hours = minutes / 60;
-    return hours === 1 ? '1 hour' : `${String(hours)} hours`;
+    return pluralize(minutes / 60, 'hour', 'hours');
   }
   return `${String(minutes)} minutes`;
 }
@@ -173,10 +179,7 @@ export function generateTaskSpecTable(): string {
 export function generateScoringMethodology(): string {
   const lines: string[] = [];
 
-  lines.push('# Scoring Methodology');
-  lines.push('');
-
-  lines.push('## Probability Conversion (from benchmark.ts)');
+  lines.push('### Probability Conversion (from benchmark.ts)');
   lines.push('');
   lines.push('Converts prediction to probability of no new low occurring:');
   lines.push('');
@@ -190,7 +193,7 @@ export function generateScoringMethodology(): string {
   lines.push('- If `noNewLow=false`: p = 1 - confidence (model believes new low likely)');
   lines.push('');
 
-  lines.push('## Log Loss (from log-loss-scorer.ts)');
+  lines.push('### Log Loss (from log-loss-scorer.ts)');
   lines.push('');
   lines.push('Formula: `LL = -(y*log(p) + (1-y)*log(1-p))`');
   lines.push('');
@@ -198,7 +201,7 @@ export function generateScoringMethodology(): string {
   lines.push('- Lower is better; perfect prediction = 0');
   lines.push('');
 
-  lines.push('## Brier Score (from brier-scorer.ts)');
+  lines.push('### Brier Score (from brier-scorer.ts)');
   lines.push('');
   lines.push('Formula: `BS = (p - y)²` where y is 0 or 1');
   lines.push('');
@@ -206,7 +209,7 @@ export function generateScoringMethodology(): string {
   lines.push('- Brier Skill Score: `BSS = 1 - (model / baseline)`');
   lines.push('');
 
-  lines.push('## Baselines (from phase-0-scorer.ts)');
+  lines.push('### Baselines (from phase-0-scorer.ts)');
   lines.push('');
   lines.push('| Baseline      | Strategy                              | Log Loss       |');
   lines.push('| ------------- | ------------------------------------- | -------------- |');
@@ -231,13 +234,10 @@ export function generateScoringMethodology(): string {
  */
 export function generateGroundTruthMethodology(): string {
   const lines: string[] = [];
-
-  lines.push('# Ground Truth Methodology');
-  lines.push('');
   lines.push('Ground truth is computed from no-new-low.ts using OHLCV candle data.');
   lines.push('');
 
-  lines.push('## Step 1: Compute Reference Low (computeReferenceLow)');
+  lines.push('### Step 1: Compute Reference Low (computeReferenceLow)');
   lines.push('');
   lines.push('Find the lowest low price across all candles in the lookback window.');
   lines.push('');
@@ -250,7 +250,7 @@ export function generateGroundTruthMethodology(): string {
   lines.push('```');
   lines.push('');
 
-  lines.push('## Step 2: Compute Forward Window Low (computeForwardWindow)');
+  lines.push('### Step 2: Compute Forward Window Low (computeForwardWindow)');
   lines.push('');
   lines.push('Find the lowest low price in the forward window (prediction horizon).');
   lines.push('');
@@ -261,7 +261,7 @@ export function generateGroundTruthMethodology(): string {
   lines.push('```');
   lines.push('');
 
-  lines.push('## Step 3: Label Assignment (labelNoNewLow)');
+  lines.push('### Step 3: Label Assignment (labelNoNewLow)');
   lines.push('');
   lines.push('Compare forward low to reference low:');
   lines.push('');
@@ -275,20 +275,19 @@ export function generateGroundTruthMethodology(): string {
   lines.push('- **Label = 0 (noNewLow = false)**: Forward low < reference low (new low made)');
   lines.push('');
 
-  lines.push('## Window Configuration (from TIMEFRAME_CONFIG)');
+  lines.push('### Window Configuration (from TIMEFRAME_CONFIG)');
   lines.push('');
-  lines.push('| Horizon | Lookback Window | Forward Window | Max Drawdown |');
-  lines.push('| ------- | --------------- | -------------- | ------------ |');
+  lines.push('| Horizon | Lookback Window | Forward Window |');
+  lines.push('| ------- | --------------- | -------------- |');
 
   for (const id of TIMEFRAME_IDS) {
     const config = getTimeframeConfig(id);
     const lookback = formatMinutesAsTime(config.chart.range.fromMinutesAgo);
     const forward = formatMinutesAsTime(config.task.forwardWindowMinutes);
-    const maxDrawdown = `${String(config.task.maxDrawdown * 100)}%`;
-    lines.push(`| ${id}     | ${padRight(lookback, 15)} | ${padRight(forward, 14)} | ${maxDrawdown}       |`);
+    lines.push(`| ${id}     | ${padRight(lookback, 15)} | ${padRight(forward, 14)} |`);
   }
   lines.push('');
-  lines.push('Max drawdown tolerance is 0% - any undercut of the reference low means a new low was made (strict definition).');
+  lines.push('*Strict undercut definition: any break of reference low counts as new low (0% tolerance).*');
 
   return lines.join('\n');
 }
@@ -301,8 +300,8 @@ export function generateAllDocumentation(): string {
   const sections = [
     generatePromptDocumentation(),
     generateTaskSpecTable(),
-    generateScoringMethodology(),
-    generateGroundTruthMethodology(),
+    '# Scoring Methodology\n\n' + generateScoringMethodology(),
+    '# Ground Truth Methodology\n\n' + generateGroundTruthMethodology(),
   ];
 
   return sections.join('\n\n---\n\n');

@@ -85,6 +85,10 @@ const SECTION_DATASET_DIAGNOSTICS = '## Dataset Diagnostics';
 const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
 const NO_DATA_COLLECTED = '*No data collected.*';
 
+// Dataset diagnostics table headers
+const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL |';
+const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|';
+
 /**
  * Format a number to fixed decimal places
  * @param value - Number to format
@@ -311,6 +315,8 @@ function generateMethodology(): string[] {
     '- **Phase 1 – Percentile filter**: Retains models above performance threshold per horizon',
     '- **Phase 2 – Stability filter**: Evaluates consistency using rolling windows; eliminates models with no qualified horizons remaining',
     '- **Phase 3 – Final ranking**: Composite scoring of surviving models',
+    '',
+    '> **Quick mode note:** This verification run only calculates raw log loss per horizon. Full Phase 0–3 elimination is applied in the complete benchmark only.',
     '',
     '**Status codes:**',
     '- `✅ Active`: Survived all phases with ≥1 qualified horizon',
@@ -628,8 +634,8 @@ function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | und
     '',
     '*Label distribution and baseline performance for interpreting model skill.*',
     '',
-    '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL |',
-    '|---------|---|------|-------|-------|-----------|---------------|',
+    DATASET_DIAGNOSTICS_TABLE_HEADER,
+    DATASET_DIAGNOSTICS_TABLE_SEPARATOR,
   ];
 
   for (const horizon of HORIZONS) {
@@ -929,6 +935,10 @@ export function getResultsFilePath(): string {
   return join(process.cwd(), RESULTS_FILE);
 }
 
+function pluralize(value: number, singular: string, plural: string): string {
+  return value === 1 ? `1 ${singular}` : `${String(value)} ${plural}`;
+}
+
 /**
  * Format minutes as human-readable time string
  * @param minutes - Duration in minutes
@@ -937,11 +947,13 @@ export function getResultsFilePath(): string {
 function formatMinutesAsTime(minutes: number): string {
   if (minutes >= 1440) {
     const days = minutes / 1440;
-    return days === 1 ? '1 day' : `${String(days)} days`;
+    if (Number.isInteger(days)) {
+      return pluralize(days, 'day', 'days');
+    }
+    return pluralize(minutes / 60, 'hour', 'hours');
   }
   if (minutes >= 60) {
-    const hours = minutes / 60;
-    return hours === 1 ? '1 hour' : `${String(hours)} hours`;
+    return pluralize(minutes / 60, 'hour', 'hours');
   }
   return `${String(minutes)} minutes`;
 }
@@ -986,9 +998,14 @@ function generateTaskSpecSection(): string[] {
 }
 
 /**
- * Minority class threshold for label imbalance warning
+ * Minority class threshold for label imbalance warning (percentage)
  */
 const LABEL_IMBALANCE_THRESHOLD = 0.05;
+
+/**
+ * Minority class threshold for label imbalance warning (absolute count)
+ */
+const LABEL_IMBALANCE_MIN_COUNT = 5;
 
 /**
  * Generate dataset diagnostics section for quick mode report
@@ -1007,8 +1024,8 @@ function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics 
     return lines;
   }
 
-  lines.push('| Horizon | N | True | False | pTrue | Baseline Random | Baseline Prevalence |');
-  lines.push('|---------|---|------|-------|-------|-----------------|---------------------|');
+  lines.push(DATASET_DIAGNOSTICS_TABLE_HEADER);
+  lines.push(DATASET_DIAGNOSTICS_TABLE_SEPARATOR);
 
   const warnings: string[] = [];
 
@@ -1024,17 +1041,24 @@ function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics 
 
     lines.push(`| ${horizon} | ${n} | ${countTrue} | ${countFalse} | ${pTrue} | ${randomLL} | ${prevalenceLL} |`);
 
+    const minorityCount = Math.min(d.labels.countTrue, d.labels.countFalse);
     const minorityPct = Math.min(d.labels.pTrue, 1 - d.labels.pTrue);
-    if (d.labels.n > 0 && minorityPct < LABEL_IMBALANCE_THRESHOLD) {
-      warnings.push(`${horizon}: Horizon not rankable, labels too imbalanced (minority class ${(minorityPct * 100).toFixed(1)}%)`);
+    const minorityLabel = d.labels.countTrue < d.labels.countFalse ? 'positive' : 'negative';
+
+    if (d.labels.n > 0 && (minorityPct < LABEL_IMBALANCE_THRESHOLD || minorityCount < LABEL_IMBALANCE_MIN_COUNT)) {
+      warnings.push(
+        `⚠️ **Warning**: ${horizon} horizon has only ${String(minorityCount)} ${minorityLabel} examples out of ${String(d.labels.n)} (${(minorityPct * 100).toFixed(1)}%). Metrics are dominated by base rate.`
+      );
     }
   }
 
   lines.push('');
+  lines.push(`*Unique prediction timestamps: ${String(diagnostics.totalRounds)}*`);
+  lines.push('');
 
   if (warnings.length > 0) {
     for (const w of warnings) {
-      lines.push(`⚠️ ${w}`);
+      lines.push(w);
     }
     lines.push('');
   }
@@ -1186,6 +1210,11 @@ function generateQuickResultsTable(models: Map<string, ModelState>): string[] {
     lines.push(`| ${row.join(' | ')} |`);
   }
 
+  lines.push('');
+  lines.push('**Quick-run interpretation:**');
+  lines.push('- With N=3 rounds per horizon, treat rankings as indicative only.');
+  lines.push('- When pTrue=1.0 (all labels noNewLow=true), the optimal strategy is high confidence on noNewLow=true.');
+  lines.push('- Models with LL < 0.693 beat random baseline; models with LL → 0 approach optimal.');
   lines.push('');
   return lines;
 }

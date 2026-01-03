@@ -21,7 +21,7 @@ import {
 } from './diagnostics/index.js';
 import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
-import { persistResults, persistQuickResults, persistScoredDatapoints } from './persist-results.js';
+import { persistResults, persistQuickResults, persistScoredDatapoints, type BenchmarkDiagnostics } from './persist-results.js';
 import { prefetchAllRoundData } from './prefetch-warmup.js';
 import { getForecastingCharts, getForecastingChartUrls } from './replay-lab/charts.js';
 import { getCandles } from './replay-lab/ohlcv.js';
@@ -859,6 +859,100 @@ function computeFinalDiagnostics(diagnosticsState: DiagnosticsState): RunDiagnos
     parseByModel: diagnosticsState.parseDiagnosticsByModel,
     inputRecords: [],
   };
+}
+
+/**
+ * Convert RunDiagnostics to BenchmarkDiagnostics format for persistence
+ * @param runDiagnostics - RunDiagnostics from computeFinalDiagnostics
+ * @returns BenchmarkDiagnostics for persistResults/persistQuickResults
+ */
+function convertToBenchmarkDiagnostics(runDiagnostics: RunDiagnostics): BenchmarkDiagnostics {
+  const datasetByHorizon: Record<string, {
+    horizon: TimeframeId;
+    labels: { n: number; countTrue: number; countFalse: number; pTrue: number };
+    baselines: { randomLogLoss: number; prevalenceLogLoss: number };
+  }> = {};
+
+  let totalRounds = 0;
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const d = runDiagnostics.datasetByHorizon[horizon];
+    totalRounds = Math.max(totalRounds, d.n);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    datasetByHorizon[horizon] = {
+      horizon,
+      labels: {
+        n: d.n,
+        countTrue: d.countTrue,
+        countFalse: d.countFalse,
+        pTrue: d.pTrue,
+      },
+      baselines: {
+        randomLogLoss: d.baselineRandomLL,
+        prevalenceLogLoss: d.baselinePrevalenceLL,
+      },
+    };
+  }
+
+  const predictionDiversity: NonNullable<BenchmarkDiagnostics['predictionDiversity']> = [];
+  for (const [modelId, byHorizon] of runDiagnostics.diversityByModel) {
+    const horizonData: Record<string, {
+      n: number;
+      uniquePCount: number;
+      pMin: number;
+      pMax: number;
+      pStdDev: number;
+      confidenceStdDev: number;
+      noNewLowTrueRate: number;
+    }> = {};
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+      const d = byHorizon[horizon];
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+      horizonData[horizon] = {
+        n: totalRounds,
+        uniquePCount: d.uniquePCount,
+        pMin: d.pMin,
+        pMax: d.pMax,
+        pStdDev: d.pStdDev,
+        confidenceStdDev: d.confidenceStdDev,
+        noNewLowTrueRate: d.noNewLowTrueRate,
+      };
+    }
+    predictionDiversity.push({
+      modelId,
+      byHorizon: horizonData as Record<TimeframeId, typeof horizonData[string]>,
+    });
+  }
+
+  const parseDiagnostics: NonNullable<BenchmarkDiagnostics['parseDiagnostics']> = [];
+  for (const [modelId, diag] of runDiagnostics.parseByModel) {
+    parseDiagnostics.push({
+      modelId,
+      parseSuccessCount: diag.parseSuccessCount,
+      parseFailCount: diag.parseFailCount,
+      schemaFailCount: diag.schemaFailCount,
+      missingHorizonCount: diag.missingHorizonCount,
+      missingByHorizon: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
+    });
+  }
+
+  const result: BenchmarkDiagnostics = {
+    dataset: {
+      byHorizon: datasetByHorizon as Record<TimeframeId, typeof datasetByHorizon[string]>,
+      totalRounds,
+    },
+  };
+
+  if (predictionDiversity.length > 0) {
+    result.predictionDiversity = predictionDiversity;
+  }
+
+  if (parseDiagnostics.length > 0) {
+    result.parseDiagnostics = parseDiagnostics;
+  }
+
+  return result;
 }
 
 /**
@@ -2440,12 +2534,17 @@ async function main(): Promise<void> {
     // Print smoke test summary
     printSmokeTestSummary(smokeTestStatus, models, totalRounds);
 
+    // Compute diagnostics for quick mode report
+    const quickDiagnostics = computeFinalDiagnostics(diagnosticsState);
+    const benchmarkDiagnostics = convertToBenchmarkDiagnostics(quickDiagnostics);
+
     // Write quick mode report with full methodology documentation
     persistQuickResults(models, {
       startTime: benchmarkStartTime.toISOString(),
       symbolId: SYMBOL_ID,
       totalRounds,
       modelCount: models.size,
+      diagnostics: benchmarkDiagnostics,
     });
     logger.log(`Quick mode report written to BENCHMARK_RESULTS_QUICK.md`);
 
@@ -2499,14 +2598,15 @@ async function main(): Promise<void> {
   const finalDiagnostics = computeFinalDiagnostics(diagnosticsState);
   printDiagnosticsSummary(finalDiagnostics);
 
-  // Final persistence
+  // Final persistence with diagnostics
+  const fullRunDiagnostics = convertToBenchmarkDiagnostics(finalDiagnostics);
   persistResults(models, {
     startTime,
     symbolId: SYMBOL_ID,
     totalRounds,
     currentRound: roundNumber,
     currentPhase: 3,
-  }, perHorizonRankings, { logger });
+  }, perHorizonRankings, { logger, diagnostics: fullRunDiagnostics });
 
   // Persist scored datapoints for exact re-scoring
   if (scoredDatapoints.length > 0) {
