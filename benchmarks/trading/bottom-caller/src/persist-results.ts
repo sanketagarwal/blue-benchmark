@@ -13,6 +13,7 @@ import {
 } from './verbose-documentation.js';
 
 import type { DatasetDiagnostics } from './diagnostics/dataset-diagnostics.js';
+import type { ScoredDatapointRecord } from './diagnostics/index.js';
 import type { ModelParseDiagnostics } from './diagnostics/parse-diagnostics.js';
 import type {
   HorizonPredictionDiversity,
@@ -82,7 +83,7 @@ const LOG_LOSS_OK = 0.8;
 // Common section headers
 const SECTION_DATASET_DIAGNOSTICS = '## Dataset Diagnostics';
 const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
-const QUICK_MODE_PLACEHOLDER = '*Not available in quick mode.*';
+const NO_DATA_COLLECTED = '*No data collected.*';
 
 /**
  * Format a number to fixed decimal places
@@ -985,6 +986,98 @@ function generateTaskSpecSection(): string[] {
 }
 
 /**
+ * Minority class threshold for label imbalance warning
+ */
+const LABEL_IMBALANCE_THRESHOLD = 0.05;
+
+/**
+ * Generate dataset diagnostics section for quick mode report
+ * @param diagnostics - Dataset diagnostics or undefined
+ * @returns Array of markdown lines
+ */
+function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | undefined): string[] {
+  const lines: string[] = [
+    SECTION_DATASET_DIAGNOSTICS,
+    '',
+  ];
+
+  if (diagnostics === undefined) {
+    lines.push(NO_DATA_COLLECTED);
+    lines.push('');
+    return lines;
+  }
+
+  lines.push('| Horizon | N | True | False | pTrue | Baseline Random | Baseline Prevalence |');
+  lines.push('|---------|---|------|-------|-------|-----------------|---------------------|');
+
+  const warnings: string[] = [];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const d = diagnostics.byHorizon[horizon];
+    const n = String(d.labels.n);
+    const countTrue = String(d.labels.countTrue);
+    const countFalse = String(d.labels.countFalse);
+    const pTrue = d.labels.pTrue.toFixed(3);
+    const randomLL = d.baselines.randomLogLoss.toFixed(3);
+    const prevalenceLL = d.baselines.prevalenceLogLoss.toFixed(3);
+
+    lines.push(`| ${horizon} | ${n} | ${countTrue} | ${countFalse} | ${pTrue} | ${randomLL} | ${prevalenceLL} |`);
+
+    const minorityPct = Math.min(d.labels.pTrue, 1 - d.labels.pTrue);
+    if (d.labels.n > 0 && minorityPct < LABEL_IMBALANCE_THRESHOLD) {
+      warnings.push(`${horizon}: Horizon not rankable, labels too imbalanced (minority class ${(minorityPct * 100).toFixed(1)}%)`);
+    }
+  }
+
+  lines.push('');
+
+  if (warnings.length > 0) {
+    for (const w of warnings) {
+      lines.push(`⚠️ ${w}`);
+    }
+    lines.push('');
+  }
+
+  return lines;
+}
+
+/**
+ * Generate prediction diversity section for quick mode report
+ * @param diversities - Array of model prediction diversity metrics or undefined
+ * @returns Array of markdown lines
+ */
+function generateQuickPredictionDiversitySection(diversities: ModelPredictionDiversity[] | undefined): string[] {
+  const lines: string[] = [
+    SECTION_PREDICTION_DIVERSITY,
+    '',
+  ];
+
+  if (diversities === undefined || diversities.length === 0) {
+    lines.push(NO_DATA_COLLECTED);
+    lines.push('');
+    return lines;
+  }
+
+  for (const model of diversities) {
+    lines.push(`### ${model.modelId}`);
+    lines.push('');
+    lines.push('| Horizon | Unique P | Min | Max | Std Dev |');
+    lines.push('|---------|----------|-----|-----|---------|');
+
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+      const d = model.byHorizon[horizon];
+      lines.push(`| ${horizon} | ${String(d.uniquePCount)} | ${d.pMin.toFixed(3)} | ${d.pMax.toFixed(3)} | ${d.pStdDev.toFixed(3)} |`);
+    }
+
+    lines.push('');
+  }
+
+  return lines;
+}
+
+/**
  * Quick mode metadata for quick report
  */
 interface QuickRunMetadata {
@@ -992,15 +1085,122 @@ interface QuickRunMetadata {
   symbolId: string;
   totalRounds: number;
   modelCount: number;
+  diagnostics?: BenchmarkDiagnostics;
+}
+
+/**
+ * Quick mode model metrics for results table
+ */
+interface QuickModelMetrics {
+  modelId: string;
+  logLoss15m: number;
+  logLoss1h: number;
+  logLoss4h: number;
+  logLoss24h: number;
+  meanLogLoss: number;
+  parseFails: number;
+}
+
+/**
+ * Calculate quick mode metrics for a model
+ * @param model - Model state
+ * @returns Quick model metrics
+ */
+function calculateQuickModelMetrics(model: ModelState): QuickModelMetrics {
+  const logLoss15m = calculateMean(model.logLossByHorizon['15m']);
+  const logLoss1h = calculateMean(model.logLossByHorizon['1h']);
+  const logLoss4h = calculateMean(model.logLossByHorizon['4h']);
+  const logLoss24h = calculateMean(model.logLossByHorizon['24h']);
+
+  const horizonMeans = [logLoss15m, logLoss1h, logLoss4h, logLoss24h].filter(v => v > 0);
+  const meanLogLoss = horizonMeans.length > 0 ? calculateMean(horizonMeans) : 0;
+
+  return {
+    modelId: model.modelId,
+    logLoss15m,
+    logLoss1h,
+    logLoss4h,
+    logLoss24h,
+    meanLogLoss,
+    parseFails: model.failedRounds?.length ?? 0,
+  };
+}
+
+/**
+ * Generate models tested section for quick report
+ * @param models - Map of model states
+ * @returns Array of markdown lines
+ */
+function generateQuickModelsList(models: Map<string, ModelState>): string[] {
+  const modelIds = [...models.keys()].sort();
+  const lines: string[] = [
+    '## Models Tested',
+    '',
+  ];
+
+  for (const modelId of modelIds) {
+    lines.push(`- ${modelId}`);
+  }
+
+  lines.push('');
+  return lines;
+}
+
+/**
+ * Format log loss value for table display
+ * @param value - Log loss value
+ * @returns Formatted string or '-' if no data
+ */
+function formatLogLossCell(value: number): string {
+  return value > 0 ? formatNumber(value, 3) : '-';
+}
+
+/**
+ * Generate results summary table for quick report
+ * @param models - Map of model states
+ * @returns Array of markdown lines
+ */
+function generateQuickResultsTable(models: Map<string, ModelState>): string[] {
+  const allModels = [...models.values()];
+  const metrics = allModels
+    .map(m => calculateQuickModelMetrics(m))
+    .sort((a, b) => a.meanLogLoss - b.meanLogLoss);
+
+  const lines: string[] = [
+    '## Results Summary',
+    '',
+    '| Model | 15m LL | 1h LL | 4h LL | 24h LL | Mean LL | Parse Fails |',
+    '|-------|--------|-------|-------|--------|---------|-------------|',
+  ];
+
+  for (const m of metrics) {
+    const row = [
+      m.modelId,
+      formatLogLossCell(m.logLoss15m),
+      formatLogLossCell(m.logLoss1h),
+      formatLogLossCell(m.logLoss4h),
+      formatLogLossCell(m.logLoss24h),
+      formatLogLossCell(m.meanLogLoss),
+      String(m.parseFails),
+    ];
+    lines.push(`| ${row.join(' | ')} |`);
+  }
+
+  lines.push('');
+  return lines;
 }
 
 /**
  * Generate markdown content for quick mode verification report
- * Includes full methodology documentation with placeholder data
+ * Includes full methodology documentation with actual model data
+ * @param models - Map of model states
  * @param meta - Quick mode run metadata
  * @returns Markdown string
  */
-function generateQuickMarkdown(meta: QuickRunMetadata): string {
+function generateQuickMarkdown(
+  models: Map<string, ModelState>,
+  meta: QuickRunMetadata
+): string {
   const lines: string[] = [
     '# agent_006 Benchmark Results (QUICK MODE)',
     '',
@@ -1029,26 +1229,12 @@ function generateQuickMarkdown(meta: QuickRunMetadata): string {
   lines.push(generateGroundTruthMethodology());
   lines.push('');
 
-  lines.push('## Results Preview');
-  lines.push('');
-  lines.push('*Quick mode completed. Run without `--quick` for full results.*');
-  lines.push('');
-  lines.push('### Models Tested');
-  lines.push('');
-  lines.push('| Model | Status |');
-  lines.push('|-------|--------|');
-  lines.push('| (run full benchmark to see results) | - |');
-  lines.push('');
+  lines.push(...generateQuickModelsList(models));
+  lines.push(...generateQuickResultsTable(models));
 
-  lines.push(SECTION_DATASET_DIAGNOSTICS);
-  lines.push('');
-  lines.push(QUICK_MODE_PLACEHOLDER);
-  lines.push('');
+  lines.push(...generateQuickDatasetDiagnosticsSection(meta.diagnostics?.dataset));
 
-  lines.push(SECTION_PREDICTION_DIVERSITY);
-  lines.push('');
-  lines.push(QUICK_MODE_PLACEHOLDER);
-  lines.push('');
+  lines.push(...generateQuickPredictionDiversitySection(meta.diagnostics?.predictionDiversity));
 
   lines.push('---');
   lines.push('*Quick mode verification - auto-generated by agent_006 benchmark*');
@@ -1058,11 +1244,73 @@ function generateQuickMarkdown(meta: QuickRunMetadata): string {
 
 /**
  * Persist quick mode verification results to markdown file
+ * @param models - Map of model states
  * @param meta - Quick mode run metadata
  */
-export function persistQuickResults(meta: QuickRunMetadata): void {
-  const markdown = generateQuickMarkdown(meta);
+export function persistQuickResults(
+  models: Map<string, ModelState>,
+  meta: QuickRunMetadata
+): void {
+  const markdown = generateQuickMarkdown(models, meta);
   const filePath = join(process.cwd(), QUICK_RESULTS_FILE);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
   writeFileSync(filePath, markdown, 'utf8');
+}
+
+const SCORED_DATAPOINTS_FILE = 'BENCHMARK_SCORED_DATAPOINTS.json';
+
+/**
+ * Serializable version of ScoredDatapointRecord with Date as ISO string
+ */
+interface SerializableScoredDatapoint {
+  snapTime: string;
+  horizonId: TimeframeId;
+  refLowCandlesBack: number;
+  refLowPrice: number;
+  forwardLowPrice: number;
+  labelNoNewLow: 0 | 1;
+  modelId: string;
+  modelOutputRaw: string;
+  predictionNoNewLow: boolean;
+  predictionConfidence: number;
+  pUsedForScoring: number;
+  logLoss: number;
+  brierScore: number;
+  promptHash: string;
+  imageHash: string;
+}
+
+/**
+ * Persist scored datapoints to a JSON file for exact re-scoring
+ * @param datapoints - Array of scored datapoint records
+ * @param filePath - Optional custom file path (defaults to BENCHMARK_SCORED_DATAPOINTS.json)
+ */
+export function persistScoredDatapoints(
+  datapoints: ScoredDatapointRecord[],
+  filePath?: string
+): void {
+  const outputPath = filePath ?? join(process.cwd(), SCORED_DATAPOINTS_FILE);
+
+  const serializable: SerializableScoredDatapoint[] = datapoints.map((dp) => ({
+    snapTime: dp.snapTime.toISOString(),
+    horizonId: dp.horizonId,
+    refLowCandlesBack: dp.refLowCandlesBack,
+    refLowPrice: dp.refLowPrice,
+    forwardLowPrice: dp.forwardLowPrice,
+    labelNoNewLow: dp.labelNoNewLow,
+    modelId: dp.modelId,
+    modelOutputRaw: dp.modelOutputRaw,
+    predictionNoNewLow: dp.predictionNoNewLow,
+    predictionConfidence: dp.predictionConfidence,
+    pUsedForScoring: dp.pUsedForScoring,
+    logLoss: dp.logLoss,
+    brierScore: dp.brierScore,
+    promptHash: dp.promptHash,
+    imageHash: dp.imageHash,
+  }));
+
+  // eslint-disable-next-line unicorn/no-null -- null required for JSON.stringify replacer parameter
+  const json = JSON.stringify(serializable, null, 2);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants or user-provided
+  writeFileSync(outputPath, json, 'utf8');
 }

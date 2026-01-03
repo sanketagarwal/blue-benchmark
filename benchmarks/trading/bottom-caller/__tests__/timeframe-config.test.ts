@@ -40,7 +40,7 @@ describe('timeframe-config', () => {
     it('should return correct task config', () => {
       const config = getTimeframeConfig('1h');
       expect(config.task.forwardWindowMinutes).toBe(60);
-      expect(config.task.maxDrawdown).toBe(0.001);
+      expect(config.task.maxDrawdown).toBe(0);
     });
   });
 
@@ -55,10 +55,17 @@ describe('timeframe-config', () => {
 
   describe('maxDrawdown thresholds', () => {
     it('has correct thresholds', () => {
-      expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0.001);
-      expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0.001);
-      expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0.001);
-      expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0.001);
+      expect(TIMEFRAME_CONFIG['15m'].task.maxDrawdown).toBe(0);
+      expect(TIMEFRAME_CONFIG['1h'].task.maxDrawdown).toBe(0);
+      expect(TIMEFRAME_CONFIG['4h'].task.maxDrawdown).toBe(0);
+      expect(TIMEFRAME_CONFIG['24h'].task.maxDrawdown).toBe(0);
+    });
+
+    it('all maxDrawdown values are exactly 0 to enforce strict undercut definition', () => {
+      for (const id of TIMEFRAME_IDS) {
+        const config = getTimeframeConfig(id);
+        expect(config.task.maxDrawdown).toBe(0);
+      }
     });
   });
 

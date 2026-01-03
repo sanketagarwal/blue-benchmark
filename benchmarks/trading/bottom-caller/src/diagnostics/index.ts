@@ -9,6 +9,7 @@ export type {
   ParseDiagnostics,
   PredictionDiversityDiagnostics,
   RunDiagnostics,
+  ScoredDatapointRecord,
 } from './types.js';
 
 export {

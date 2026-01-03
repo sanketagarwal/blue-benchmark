@@ -113,10 +113,9 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 15 minutes?',
       outputCoordinateSystem: 'bars_5m',
-      // Tolerance: 0.1% uniform across all horizons
-      // Exists only to filter tick noise, not to forgive real price movement
-      // If low is broken by >0.1%, the bottom was NOT in
-      maxDrawdown: 0.001,
+      // Tolerance: 0% - strict undercut only
+      // Any undercut of the reference low means a new low was made
+      maxDrawdown: 0,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',
@@ -159,10 +158,9 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 1 hour?',
       outputCoordinateSystem: 'bars_15m',
-      // Tolerance: 0.1% uniform across all horizons
-      // Exists only to filter tick noise, not to forgive real price movement
-      // If low is broken by >0.1%, the bottom was NOT in
-      maxDrawdown: 0.001,
+      // Tolerance: 0% - strict undercut only
+      // Any undercut of the reference low means a new low was made
+      maxDrawdown: 0,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',
@@ -205,10 +203,9 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 4 hours?',
       outputCoordinateSystem: 'bars_1h',
-      // Tolerance: 0.1% uniform across all horizons
-      // Exists only to filter tick noise, not to forgive real price movement
-      // If low is broken by >0.1%, the bottom was NOT in
-      maxDrawdown: 0.001,
+      // Tolerance: 0% - strict undercut only
+      // Any undercut of the reference low means a new low was made
+      maxDrawdown: 0,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',
@@ -251,10 +248,9 @@ export const TIMEFRAME_CONFIG: Record<TimeframeId, TimeframeConfig> = {
       questionTemplate:
         'Based on the chart shown, has downside already been exhausted for the next 24 hours?',
       outputCoordinateSystem: 'bars_4h',
-      // Tolerance: 0.1% uniform across all horizons
-      // Exists only to filter tick noise, not to forgive real price movement
-      // If low is broken by >0.1%, the bottom was NOT in
-      maxDrawdown: 0.001,
+      // Tolerance: 0% - strict undercut only
+      // Any undercut of the reference low means a new low was made
+      maxDrawdown: 0,
     },
     candleIndexing: {
       rule: 'rightmost_closed_is_zero',

@@ -288,7 +288,7 @@ export function generateGroundTruthMethodology(): string {
     lines.push(`| ${id}     | ${padRight(lookback, 15)} | ${padRight(forward, 14)} | ${maxDrawdown}       |`);
   }
   lines.push('');
-  lines.push('Max drawdown is a noise tolerance: if low is broken by > maxDrawdown, the bottom was NOT in.');
+  lines.push('Max drawdown tolerance is 0% - any undercut of the reference low means a new low was made (strict definition).');
 
   return lines.join('\n');
 }

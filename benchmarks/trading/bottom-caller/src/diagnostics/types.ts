@@ -93,3 +93,39 @@ export interface RunDiagnostics {
   /** Input uniqueness for each scored example */
   inputRecords: InputUniquenessRecord[];
 }
+
+/**
+ * Record of a single scored datapoint with all fields needed for exact re-scoring
+ */
+export interface ScoredDatapointRecord {
+  /** Prediction timestamp */
+  snapTime: Date;
+  /** Prediction horizon */
+  horizonId: TimeframeId;
+  /** Candles back to reference low in lookback window */
+  refLowCandlesBack: number;
+  /** Reference low price in lookback window */
+  refLowPrice: number;
+  /** Lowest price in forward window */
+  forwardLowPrice: number;
+  /** Ground truth label: 1 if no new low, 0 otherwise */
+  labelNoNewLow: 0 | 1;
+  /** Model identifier */
+  modelId: string;
+  /** Raw text response from model */
+  modelOutputRaw: string;
+  /** Parsed prediction: whether model predicted no new low */
+  predictionNoNewLow: boolean;
+  /** Parsed prediction: model confidence (0-1) */
+  predictionConfidence: number;
+  /** Probability used for scoring after conversion */
+  pUsedForScoring: number;
+  /** Log loss for this prediction */
+  logLoss: number;
+  /** Brier score for this prediction */
+  brierScore: number;
+  /** SHA-256 hash of prompt text */
+  promptHash: string;
+  /** SHA-256 hash of chart image bytes for this horizon */
+  imageHash: string;
+}

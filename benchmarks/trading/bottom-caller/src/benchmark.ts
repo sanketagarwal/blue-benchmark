@@ -17,10 +17,11 @@ import {
 import {
   computeHorizonDatasetDiagnostics,
   computePredictionDiversity,
+  createHashFromInputs,
 } from './diagnostics/index.js';
 import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
-import { persistResults, persistQuickResults } from './persist-results.js';
+import { persistResults, persistQuickResults, persistScoredDatapoints } from './persist-results.js';
 import { prefetchAllRoundData } from './prefetch-warmup.js';
 import { getForecastingCharts, getForecastingChartUrls } from './replay-lab/charts.js';
 import { getCandles } from './replay-lab/ohlcv.js';
@@ -82,7 +83,9 @@ import type {
   HorizonDatasetDiagnostics,
   PredictionDiversityDiagnostics,
   ParseDiagnostics,
+  ScoredDatapointRecord,
 } from './diagnostics/index.js';
+import type { NoNewLowResult } from './ground-truth/no-new-low.js';
 import type { Candle } from './replay-lab/ohlcv.js';
 import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
@@ -998,7 +1001,7 @@ function recordModelScore(
 /**
  * Resolve ground truth for all horizons using the no-new-low labeler
  * @param ohlcvByHorizon - OHLCV data with lookback and forward candles per horizon
- * @returns Labels, time-to-pivot ratios, and first pivot timestamps for all horizons
+ * @returns Labels, time-to-pivot ratios, first pivot timestamps, and full ground truth results for all horizons
  */
 function resolveAllHorizonsGroundTruth(
   ohlcvByHorizon: OHLCVByHorizon
@@ -1007,11 +1010,13 @@ function resolveAllHorizonsGroundTruth(
   timeToPivotRatios: Record<TimeframeId, number | undefined>;
   firstPivotAts: Record<TimeframeId, Date | undefined>;
   secondaryLabels: Record<TimeframeId, boolean>;
+  groundTruthByHorizon: Record<TimeframeId, NoNewLowResult>;
 } {
   const labels: Record<string, boolean> = {};
   const ratios: Record<string, number | undefined> = {};
   const firstPivots: Record<string, Date | undefined> = {};
   const secondaryLabels: Record<string, boolean> = {};
+  const groundTruthByHorizon: Record<string, NoNewLowResult> = {};
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -1025,6 +1030,8 @@ function resolveAllHorizonsGroundTruth(
     firstPivots[horizon] = undefined;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     secondaryLabels[horizon] = result.labelNoNewLow === 1;
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    groundTruthByHorizon[horizon] = result;
   }
 
   return {
@@ -1032,6 +1039,7 @@ function resolveAllHorizonsGroundTruth(
     timeToPivotRatios: ratios as Record<TimeframeId, number | undefined>,
     firstPivotAts: firstPivots as Record<TimeframeId, Date | undefined>,
     secondaryLabels: secondaryLabels as Record<TimeframeId, boolean>,
+    groundTruthByHorizon: groundTruthByHorizon as Record<TimeframeId, NoNewLowResult>,
   };
 }
 
@@ -1549,7 +1557,11 @@ function buildRoundDataForProfile(
   briers: Record<TimeframeId, number>;
 }[] {
   return trackBRounds
-    .filter((round) =>
+    .filter((round): round is RoundScore & {
+      predictions: Record<TimeframeId, number>;
+      labels: Record<TimeframeId, boolean>;
+      logLossByHorizon: Record<TimeframeId, number>;
+    } =>
       round.predictions !== undefined &&
       round.labels !== undefined &&
       round.logLossByHorizon !== undefined
@@ -1560,15 +1572,13 @@ function buildRoundDataForProfile(
       const logLosses: Record<string, number> = {};
       const briers: Record<string, number> = {};
 
-      // Only include data for qualified horizons
-      // Include data for ALL horizons
       for (const horizon of HORIZONS) {
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        const pred = round.predictions?.[horizon] ?? 0.5;
+        const pred = round.predictions[horizon];
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        const label = round.labels?.[horizon] ?? false;
+        const label = round.labels[horizon];
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        const ll = round.logLossByHorizon?.[horizon] ?? 0;
+        const ll = round.logLossByHorizon[horizon];
 
         // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
         predictions[horizon] = pred;
@@ -1775,6 +1785,65 @@ function runPhase3(models: Map<string, ModelState>): PerHorizonRankings {
 }
 
 /**
+ * Collect scored datapoints for a single model prediction
+ * @param snapTime - Prediction timestamp
+ * @param modelId - Model identifier
+ * @param output - Bottom caller output with predictions
+ * @param probabilityPredictions - Converted probability predictions per horizon
+ * @param roundScore - Phase 0 round score
+ * @param groundTruthByHorizon - Ground truth results per horizon
+ * @param promptHash - SHA-256 hash of prompt text
+ * @param imageHashes - SHA-256 hashes of chart images per horizon
+ * @param scoredDatapoints - Array to collect scored datapoint records
+ */
+function collectScoredDatapoints(
+  snapTime: Date,
+  modelId: string,
+  output: BottomCallerOutput,
+  probabilityPredictions: Record<TimeframeId, number>,
+  roundScore: Phase0RoundScore,
+  groundTruthByHorizon: Record<TimeframeId, NoNewLowResult>,
+  promptHash: string,
+  imageHashes: Record<TimeframeId, string>,
+  scoredDatapoints: ScoredDatapointRecord[]
+): void {
+  const modelOutputRaw = JSON.stringify(output);
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const gt = groundTruthByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const pred = output.predictions[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const pUsed = probabilityPredictions[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const ll = roundScore.logLossByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const bs = roundScore.brierByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const imageHash = imageHashes[horizon];
+
+    scoredDatapoints.push({
+      snapTime,
+      horizonId: horizon,
+      refLowCandlesBack: gt.refLowCandlesBack,
+      refLowPrice: gt.refLowPrice,
+      forwardLowPrice: gt.forwardLow,
+      labelNoNewLow: gt.labelNoNewLow,
+      modelId,
+      modelOutputRaw,
+      predictionNoNewLow: pred.noNewLow,
+      predictionConfidence: pred.confidence,
+      pUsedForScoring: pUsed,
+      logLoss: ll,
+      brierScore: bs,
+      promptHash,
+      imageHash,
+    });
+  }
+}
+
+/**
  * Update label counts for base rate calculation
  * @param labelCounts - Label counts to update
  * @param labels - Ground truth labels for this round
@@ -1805,6 +1874,7 @@ function updateLabelCounts(
  * @param benchmarkStartTime - Real wall-clock time when benchmark started (for session isolation)
  * @param labelCounts - Label counts for trivial baseline calculation
  * @param diagnosticsState - Diagnostics state for instrumentation
+ * @param scoredDatapoints - Array to collect scored datapoint records for persistence
  */
 async function runBenchmarkRound(
   models: Map<string, ModelState>,
@@ -1815,7 +1885,8 @@ async function runBenchmarkRound(
   currentPhase: number,
   benchmarkStartTime: Date,
   labelCounts: Record<TimeframeId, { total: number; positive: number }>,
-  diagnosticsState: DiagnosticsState
+  diagnosticsState: DiagnosticsState,
+  scoredDatapoints: ScoredDatapointRecord[]
 ): Promise<void> {
   // Output methodology documentation once at start (verbose mode only)
   if (!methodologyPrinted) {
@@ -1854,7 +1925,7 @@ async function runBenchmarkRound(
 
   // Get ground truth (secondaryLabels captured for future analysis)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
-  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels } = resolveAllHorizonsGroundTruth(ohlcvByHorizon);
+  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels, groundTruthByHorizon } = resolveAllHorizonsGroundTruth(ohlcvByHorizon);
 
   // Update label counts for base rate calculation in audit records
   updateLabelCounts(labelCounts, labels);
@@ -1925,6 +1996,25 @@ async function runBenchmarkRound(
       '24h': output.predictions['24h'].noNewLow,
     };
     trackPredictionDiversity(diagnosticsState, state.modelId, probabilityPredictions, noNewLowPredictions);
+
+    // Collect scored datapoints for exact re-scoring
+    const inputRecord = createHashFromInputs(
+      JSON.stringify({ symbolId, currentTime: currentTime.toISOString(), refLowByHorizon }),
+      charts.chartByHorizon,
+      { refLowPrice: 0, candlesBack: 0, forwardLowPrice: 0, label: false },
+      currentTime
+    );
+    collectScoredDatapoints(
+      currentTime,
+      state.modelId,
+      output,
+      probabilityPredictions,
+      roundScore,
+      groundTruthByHorizon,
+      inputRecord.promptHash,
+      inputRecord.imageHashes,
+      scoredDatapoints
+    );
 
     // Compute baselines from accumulated labels for this model
     const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
@@ -2248,6 +2338,9 @@ async function main(): Promise<void> {
   // Initialize diagnostics state
   const diagnosticsState = createDiagnosticsState();
 
+  // Initialize scored datapoints collection for exact re-scoring
+  const scoredDatapoints: ScoredDatapointRecord[] = [];
+
   // Initialize clock
   resetClockState();
   let clockState = initializeClock();
@@ -2279,7 +2372,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 0 rounds (1-${String(phase0Rounds)}) ---`);
   for (let phase0Round = 1; phase0Round <= phase0Rounds; phase0Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, benchmarkStartTime, labelCounts, diagnosticsState);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, benchmarkStartTime, labelCounts, diagnosticsState, scoredDatapoints);
     clockState = advanceClock();
   }
 
@@ -2293,7 +2386,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 1 rounds (${String(phase1Start)}-${String(phase1End)}) ---`);
   for (let phase1Round = 1; phase1Round <= phase1Rounds; phase1Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, benchmarkStartTime, labelCounts, diagnosticsState);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, benchmarkStartTime, labelCounts, diagnosticsState, scoredDatapoints);
     clockState = advanceClock();
   }
 
@@ -2307,7 +2400,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 2 rounds (${String(phase2Start)}-${String(phase2End)}) ---`);
   for (let phase2Round = 1; phase2Round <= phase2Rounds; phase2Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, benchmarkStartTime, labelCounts, diagnosticsState);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, benchmarkStartTime, labelCounts, diagnosticsState, scoredDatapoints);
     clockState = advanceClock();
   }
 
@@ -2348,7 +2441,7 @@ async function main(): Promise<void> {
     printSmokeTestSummary(smokeTestStatus, models, totalRounds);
 
     // Write quick mode report with full methodology documentation
-    persistQuickResults({
+    persistQuickResults(models, {
       startTime: benchmarkStartTime.toISOString(),
       symbolId: SYMBOL_ID,
       totalRounds,
@@ -2414,6 +2507,12 @@ async function main(): Promise<void> {
     currentRound: roundNumber,
     currentPhase: 3,
   }, perHorizonRankings, { logger });
+
+  // Persist scored datapoints for exact re-scoring
+  if (scoredDatapoints.length > 0) {
+    persistScoredDatapoints(scoredDatapoints);
+    logger.log(`Saved ${String(scoredDatapoints.length)} scored datapoints to BENCHMARK_SCORED_DATAPOINTS.json`);
+  }
 
   logger.newline();
   logger.log('=== Benchmark Complete ===');

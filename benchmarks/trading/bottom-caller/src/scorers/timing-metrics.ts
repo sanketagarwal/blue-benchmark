@@ -49,12 +49,16 @@ function validateTimingFields(_round: RoundScore, _horizon: TimeframeId): void {
 function getCorrectRounds(rounds: RoundScore[], horizon: TimeframeId): RoundScore[] {
   return rounds.filter(r => {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const hasLabel = r.labels?.[horizon] !== undefined;
+    const label = r.labels?.[horizon];
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const labelTrue = r.labels?.[horizon] === true;
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const predictionCorrect = (r.predictions?.[horizon] ?? 0) > 0.5;
-    return hasLabel && labelTrue && predictionCorrect;
+    const prediction = r.predictions?.[horizon];
+
+    // Skip rounds with missing data (failed parses are not scored)
+    if (label === undefined || prediction === undefined) {
+      return false;
+    }
+
+    return label && prediction > 0.5;
   });
 }
 
