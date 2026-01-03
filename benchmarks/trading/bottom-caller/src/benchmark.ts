@@ -14,6 +14,10 @@ import {
   advanceClock,
   resetClockState,
 } from './clock-state.js';
+import {
+  computeHorizonDatasetDiagnostics,
+  computePredictionDiversity,
+} from './diagnostics/index.js';
 import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
@@ -73,6 +77,12 @@ import {
 } from './verbose-documentation.js';
 
 import type { BottomCallerOutput, BottomContractId, BottomPredictions, RefLowInfo } from './bottom-caller.js';
+import type {
+  RunDiagnostics,
+  HorizonDatasetDiagnostics,
+  PredictionDiversityDiagnostics,
+  ParseDiagnostics,
+} from './diagnostics/index.js';
 import type { Candle } from './replay-lab/ohlcv.js';
 import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
@@ -708,6 +718,213 @@ function createModelState(modelId: string): ModelState {
     qualifiedHorizons: new Set<TimeframeId>(['15m', '1h', '4h', '24h']),
     disqualifiedHorizons: new Map(),
   };
+}
+
+/**
+ * Diagnostics state for benchmark hardening instrumentation
+ */
+interface DiagnosticsState {
+  allLabelsByHorizon: Record<TimeframeId, boolean[]>;
+  predictionsByModelByHorizon: Map<string, Record<TimeframeId, number[]>>;
+  noNewLowByModelByHorizon: Map<string, Record<TimeframeId, boolean[]>>;
+  parseDiagnosticsByModel: Map<string, ParseDiagnostics>;
+}
+
+/**
+ * Create initial diagnostics state
+ * @returns Empty diagnostics state object
+ */
+function createDiagnosticsState(): DiagnosticsState {
+  return {
+    allLabelsByHorizon: { '15m': [], '1h': [], '4h': [], '24h': [] },
+    predictionsByModelByHorizon: new Map(),
+    noNewLowByModelByHorizon: new Map(),
+    parseDiagnosticsByModel: new Map(),
+  };
+}
+
+/**
+ * Create initial parse diagnostics for a model
+ * @returns Empty parse diagnostics object
+ */
+function createParseDiagnostics(): ParseDiagnostics {
+  return {
+    parseSuccessCount: 0,
+    parseFailCount: 0,
+    schemaFailCount: 0,
+    missingHorizonCount: 0,
+    failedRounds: [],
+  };
+}
+
+/**
+ * Track prediction diversity for a model
+ * @param diagnosticsState - Diagnostics state to update
+ * @param modelId - Model identifier
+ * @param predictions - Probability predictions per horizon
+ * @param noNewLowPredictions - Boolean noNewLow predictions per horizon
+ */
+function trackPredictionDiversity(
+  diagnosticsState: DiagnosticsState,
+  modelId: string,
+  predictions: Record<TimeframeId, number>,
+  noNewLowPredictions: Record<TimeframeId, boolean>
+): void {
+  let modelPreds = diagnosticsState.predictionsByModelByHorizon.get(modelId);
+  if (modelPreds === undefined) {
+    modelPreds = { '15m': [], '1h': [], '4h': [], '24h': [] };
+    diagnosticsState.predictionsByModelByHorizon.set(modelId, modelPreds);
+  }
+  let modelNoNewLow = diagnosticsState.noNewLowByModelByHorizon.get(modelId);
+  if (modelNoNewLow === undefined) {
+    modelNoNewLow = { '15m': [], '1h': [], '4h': [], '24h': [] };
+    diagnosticsState.noNewLowByModelByHorizon.set(modelId, modelNoNewLow);
+  }
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    modelPreds[horizon].push(predictions[horizon]);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    modelNoNewLow[horizon].push(noNewLowPredictions[horizon]);
+  }
+}
+
+/**
+ * Record parse failure for a model
+ * @param diagnosticsState - Diagnostics state to update
+ * @param modelId - Model identifier
+ * @param roundNumber - Round number where failure occurred
+ */
+function recordParseFailure(
+  diagnosticsState: DiagnosticsState,
+  modelId: string,
+  roundNumber: number
+): void {
+  let parseDiag = diagnosticsState.parseDiagnosticsByModel.get(modelId);
+  if (parseDiag === undefined) {
+    parseDiag = createParseDiagnostics();
+    diagnosticsState.parseDiagnosticsByModel.set(modelId, parseDiag);
+  }
+  parseDiag.parseFailCount++;
+  parseDiag.failedRounds.push(roundNumber);
+}
+
+/**
+ * Record parse success for a model
+ * @param diagnosticsState - Diagnostics state to update
+ * @param modelId - Model identifier
+ */
+function recordParseSuccess(
+  diagnosticsState: DiagnosticsState,
+  modelId: string
+): void {
+  let parseDiag = diagnosticsState.parseDiagnosticsByModel.get(modelId);
+  if (parseDiag === undefined) {
+    parseDiag = createParseDiagnostics();
+    diagnosticsState.parseDiagnosticsByModel.set(modelId, parseDiag);
+  }
+  parseDiag.parseSuccessCount++;
+}
+
+/**
+ * Compute final diagnostics from accumulated state
+ * @param diagnosticsState - Accumulated diagnostics state
+ * @returns Computed run diagnostics
+ */
+function computeFinalDiagnostics(diagnosticsState: DiagnosticsState): RunDiagnostics {
+  const datasetByHorizon: Record<TimeframeId, HorizonDatasetDiagnostics> = {
+    '15m': computeHorizonDatasetDiagnostics(diagnosticsState.allLabelsByHorizon['15m']),
+    '1h': computeHorizonDatasetDiagnostics(diagnosticsState.allLabelsByHorizon['1h']),
+    '4h': computeHorizonDatasetDiagnostics(diagnosticsState.allLabelsByHorizon['4h']),
+    '24h': computeHorizonDatasetDiagnostics(diagnosticsState.allLabelsByHorizon['24h']),
+  };
+
+  const diversityByModel = new Map<string, Record<TimeframeId, PredictionDiversityDiagnostics>>();
+  for (const [modelId, preds] of diagnosticsState.predictionsByModelByHorizon) {
+    const noNewLowPreds = diagnosticsState.noNewLowByModelByHorizon.get(modelId);
+    const horizonDiversity: Record<TimeframeId, PredictionDiversityDiagnostics> = {
+      '15m': computePredictionDiversity(preds['15m'], noNewLowPreds?.['15m']),
+      '1h': computePredictionDiversity(preds['1h'], noNewLowPreds?.['1h']),
+      '4h': computePredictionDiversity(preds['4h'], noNewLowPreds?.['4h']),
+      '24h': computePredictionDiversity(preds['24h'], noNewLowPreds?.['24h']),
+    };
+    diversityByModel.set(modelId, horizonDiversity);
+  }
+
+  return {
+    datasetByHorizon,
+    diversityByModel,
+    parseByModel: diagnosticsState.parseDiagnosticsByModel,
+    inputRecords: [],
+  };
+}
+
+/**
+ * Print dataset diagnostics section
+ * @param datasetByHorizon - Dataset diagnostics per horizon
+ */
+function printDatasetDiagnostics(
+  datasetByHorizon: Record<TimeframeId, HorizonDatasetDiagnostics>
+): void {
+  logger.newline();
+  logger.log('=== Dataset Diagnostics ===');
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const d = datasetByHorizon[horizon];
+    logger.log(`  ${horizon}: N=${String(d.n)}, True=${String(d.countTrue)}, False=${String(d.countFalse)}, pTrue=${d.pTrue.toFixed(3)}`);
+    logger.log(`    Baselines: Random=${d.baselineRandomLL.toFixed(4)}, Prevalence=${d.baselinePrevalenceLL.toFixed(4)}`);
+  }
+}
+
+/**
+ * Print parse diagnostics section
+ * @param parseByModel - Parse diagnostics per model
+ */
+function printParseDiagnostics(
+  parseByModel: Map<string, ParseDiagnostics>
+): void {
+  logger.newline();
+  logger.log('=== Parse Diagnostics ===');
+  for (const [modelId, parseDiag] of parseByModel) {
+    const totalAttempts = parseDiag.parseSuccessCount + parseDiag.parseFailCount;
+    const successRate = totalAttempts > 0
+      ? (parseDiag.parseSuccessCount / totalAttempts * 100).toFixed(1)
+      : '0.0';
+    logger.log(`  ${modelId}: ${String(parseDiag.parseSuccessCount)} ok, ${String(parseDiag.parseFailCount)} failed (${successRate}% success)`);
+    if (parseDiag.failedRounds.length > 0) {
+      logger.log(`    Failed rounds: [${parseDiag.failedRounds.join(', ')}]`);
+    }
+  }
+}
+
+/**
+ * Print prediction diversity section
+ * @param diversityByModel - Prediction diversity per model per horizon
+ */
+function printPredictionDiversityDiagnostics(
+  diversityByModel: Map<string, Record<TimeframeId, PredictionDiversityDiagnostics>>
+): void {
+  logger.newline();
+  logger.log('=== Prediction Diversity ===');
+  for (const [modelId, horizonDiversity] of diversityByModel) {
+    logger.log(`  ${modelId}:`);
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const div = horizonDiversity[horizon];
+      const isConstant = div.pStdDev < 0.001;
+      const warning = isConstant ? chalk.red(' [CONSTANT]') : '';
+      logger.log(`    ${horizon}: unique=${String(div.uniquePCount)}, range=[${div.pMin.toFixed(2)}, ${div.pMax.toFixed(2)}], stdDev=${div.pStdDev.toFixed(4)}${warning}`);
+    }
+  }
+}
+
+/**
+ * Print diagnostics summary at end of run
+ * @param diagnostics - Complete run diagnostics
+ */
+function printDiagnosticsSummary(diagnostics: RunDiagnostics): void {
+  printDatasetDiagnostics(diagnostics.datasetByHorizon);
+  printParseDiagnostics(diagnostics.parseByModel);
+  printPredictionDiversityDiagnostics(diagnostics.diversityByModel);
 }
 
 /**
@@ -1587,6 +1804,7 @@ function updateLabelCounts(
  * @param currentPhase - Current phase number for persistence
  * @param benchmarkStartTime - Real wall-clock time when benchmark started (for session isolation)
  * @param labelCounts - Label counts for trivial baseline calculation
+ * @param diagnosticsState - Diagnostics state for instrumentation
  */
 async function runBenchmarkRound(
   models: Map<string, ModelState>,
@@ -1596,7 +1814,8 @@ async function runBenchmarkRound(
   currentTime: Date,
   currentPhase: number,
   benchmarkStartTime: Date,
-  labelCounts: Record<TimeframeId, { total: number; positive: number }>
+  labelCounts: Record<TimeframeId, { total: number; positive: number }>,
+  diagnosticsState: DiagnosticsState
 ): Promise<void> {
   // Output methodology documentation once at start (verbose mode only)
   if (!methodologyPrinted) {
@@ -1640,6 +1859,12 @@ async function runBenchmarkRound(
   // Update label counts for base rate calculation in audit records
   updateLabelCounts(labelCounts, labels);
 
+  // Collect labels for dataset diagnostics
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    diagnosticsState.allLabelsByHorizon[horizon].push(labels[horizon]);
+  }
+
   // Run all active models in parallel with concurrency limit
   const activeModels = [...models.values()].filter(state => !state.eliminated);
   const batchCount = Math.ceil(activeModels.length / MAX_CONCURRENT_LLM_CALLS);
@@ -1669,16 +1894,37 @@ async function runBenchmarkRound(
   for (const { state, output, error } of modelResults) {
     if (error !== undefined) {
       state.failedRounds.push(roundNumber);
+      recordParseFailure(diagnosticsState, state.modelId, roundNumber);
       const errorMessage = error.message;
       logger.log(`${chalk.red('✖')} ${state.modelId}: Failed - ${errorMessage.slice(0, 100)}`);
       continue;
     }
 
-    if (output === undefined) {continue;}
+    if (output === undefined) {
+      recordParseFailure(diagnosticsState, state.modelId, roundNumber);
+      continue;
+    }
+
+    recordParseSuccess(diagnosticsState, state.modelId);
 
     const legacyPredictions = convertPredictionsForScorer(output.predictions);
     const roundScore = scorePhase0Round(legacyPredictions, labels);
     recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
+
+    // Track prediction diversity
+    const probabilityPredictions: Record<TimeframeId, number> = {
+      '15m': legacyPredictions['bottom-15m'],
+      '1h': legacyPredictions['bottom-1h'],
+      '4h': legacyPredictions['bottom-4h'],
+      '24h': legacyPredictions['bottom-24h'],
+    };
+    const noNewLowPredictions: Record<TimeframeId, boolean> = {
+      '15m': output.predictions['15m'].noNewLow,
+      '1h': output.predictions['1h'].noNewLow,
+      '4h': output.predictions['4h'].noNewLow,
+      '24h': output.predictions['24h'].noNewLow,
+    };
+    trackPredictionDiversity(diagnosticsState, state.modelId, probabilityPredictions, noNewLowPredictions);
 
     // Compute baselines from accumulated labels for this model
     const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
@@ -1999,6 +2245,9 @@ async function main(): Promise<void> {
     '24h': { total: 0, positive: 0 },
   };
 
+  // Initialize diagnostics state
+  const diagnosticsState = createDiagnosticsState();
+
   // Initialize clock
   resetClockState();
   let clockState = initializeClock();
@@ -2030,7 +2279,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 0 rounds (1-${String(phase0Rounds)}) ---`);
   for (let phase0Round = 1; phase0Round <= phase0Rounds; phase0Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, benchmarkStartTime, labelCounts);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 0, benchmarkStartTime, labelCounts, diagnosticsState);
     clockState = advanceClock();
   }
 
@@ -2044,7 +2293,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 1 rounds (${String(phase1Start)}-${String(phase1End)}) ---`);
   for (let phase1Round = 1; phase1Round <= phase1Rounds; phase1Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, benchmarkStartTime, labelCounts);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 1, benchmarkStartTime, labelCounts, diagnosticsState);
     clockState = advanceClock();
   }
 
@@ -2058,7 +2307,7 @@ async function main(): Promise<void> {
   logger.log(`--- Starting Phase 2 rounds (${String(phase2Start)}-${String(phase2End)}) ---`);
   for (let phase2Round = 1; phase2Round <= phase2Rounds; phase2Round++) {
     roundNumber++;
-    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, benchmarkStartTime, labelCounts);
+    await runBenchmarkRound(models, roundNumber, totalRounds, SYMBOL_ID, clockState.currentTime, 2, benchmarkStartTime, labelCounts, diagnosticsState);
     clockState = advanceClock();
   }
 
@@ -2143,6 +2392,10 @@ async function main(): Promise<void> {
   const baselines = computeBaselinesFromModels(models);
   const { analysis: separabilityAnalysis, cohortSize } = buildSeparabilityData(models);
   printRecommendationsBlock(models, baselines, separabilityAnalysis, cohortSize, totalRounds);
+
+  // Print diagnostics summary
+  const finalDiagnostics = computeFinalDiagnostics(diagnosticsState);
+  printDiagnosticsSummary(finalDiagnostics);
 
   // Final persistence
   persistResults(models, {
