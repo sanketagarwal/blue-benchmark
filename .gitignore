@@ -37,3 +37,4 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+BENCHMARK_RESULTS_QUICK.md

@@ -20,7 +20,7 @@ import {
 } from './diagnostics/index.js';
 import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
-import { persistResults } from './persist-results.js';
+import { persistResults, persistQuickResults } from './persist-results.js';
 import { prefetchAllRoundData } from './prefetch-warmup.js';
 import { getForecastingCharts, getForecastingChartUrls } from './replay-lab/charts.js';
 import { getCandles } from './replay-lab/ohlcv.js';
@@ -2346,6 +2346,15 @@ async function main(): Promise<void> {
 
     // Print smoke test summary
     printSmokeTestSummary(smokeTestStatus, models, totalRounds);
+
+    // Write quick mode report with full methodology documentation
+    persistQuickResults({
+      startTime: benchmarkStartTime.toISOString(),
+      symbolId: SYMBOL_ID,
+      totalRounds,
+      modelCount: models.size,
+    });
+    logger.log(`Quick mode report written to BENCHMARK_RESULTS_QUICK.md`);
 
     logger.newline();
     logger.log('=== Smoke Test Complete ===');

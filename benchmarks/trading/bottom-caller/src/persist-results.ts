@@ -2,6 +2,15 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { isConstantPredictor } from './diagnostics/prediction-diagnostics.js';
+import {
+  TIMEFRAME_IDS,
+  getTimeframeConfig,
+  getLookbackBars,
+} from './timeframe-config.js';
+import {
+  generateScoringMethodology,
+  generateGroundTruthMethodology,
+} from './verbose-documentation.js';
 
 import type { DatasetDiagnostics } from './diagnostics/dataset-diagnostics.js';
 import type { ModelParseDiagnostics } from './diagnostics/parse-diagnostics.js';
@@ -64,10 +73,16 @@ interface ModelMetrics {
 
 const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
+const QUICK_RESULTS_FILE = 'BENCHMARK_RESULTS_QUICK.md';
 
 // Quality thresholds for log loss (lower is better)
 const LOG_LOSS_GOOD = 0.5;
 const LOG_LOSS_OK = 0.8;
+
+// Common section headers
+const SECTION_DATASET_DIAGNOSTICS = '## Dataset Diagnostics';
+const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
+const QUICK_MODE_PLACEHOLDER = '*Not available in quick mode.*';
 
 /**
  * Format a number to fixed decimal places
@@ -608,7 +623,7 @@ function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | und
   }
 
   const lines: string[] = [
-    '## Dataset Diagnostics',
+    SECTION_DATASET_DIAGNOSTICS,
     '',
     '*Label distribution and baseline performance for interpreting model skill.*',
     '',
@@ -911,4 +926,143 @@ export function persistResults(
  */
 export function getResultsFilePath(): string {
   return join(process.cwd(), RESULTS_FILE);
+}
+
+/**
+ * Format minutes as human-readable time string
+ * @param minutes - Duration in minutes
+ * @returns Human-readable time string
+ */
+function formatMinutesAsTime(minutes: number): string {
+  if (minutes >= 1440) {
+    const days = minutes / 1440;
+    return days === 1 ? '1 day' : `${String(days)} days`;
+  }
+  if (minutes >= 60) {
+    const hours = minutes / 60;
+    return hours === 1 ? '1 hour' : `${String(hours)} hours`;
+  }
+  return `${String(minutes)} minutes`;
+}
+
+/**
+ * Format bar size as human-readable string
+ * @param minutes - Bar size in minutes
+ * @returns Human-readable bar size string
+ */
+function formatBarSize(minutes: number): string {
+  if (minutes >= 60) {
+    const hours = minutes / 60;
+    return hours === 1 ? '1-hour' : `${String(hours)}-hour`;
+  }
+  return `${String(minutes)}-minute`;
+}
+
+/**
+ * Generate task specification table for quick report
+ * @returns Array of markdown lines
+ */
+function generateTaskSpecSection(): string[] {
+  const lines: string[] = [
+    '## Task Specification',
+    '',
+    '| Horizon | Bar Size | Lookback Bars | Lookback Time | Forward Window |',
+    '|---------|----------|---------------|---------------|----------------|',
+  ];
+
+  for (const id of TIMEFRAME_IDS) {
+    const config = getTimeframeConfig(id);
+    const lookbackBars = getLookbackBars(id);
+    const barSize = formatBarSize(config.chart.barSizeMinutes);
+    const lookbackTime = formatMinutesAsTime(config.chart.range.fromMinutesAgo);
+    const forwardWindow = formatMinutesAsTime(config.task.forwardWindowMinutes);
+
+    lines.push(`| ${id} | ${barSize} | ${String(lookbackBars)} | ${lookbackTime} | ${forwardWindow} |`);
+  }
+
+  lines.push('');
+  return lines;
+}
+
+/**
+ * Quick mode metadata for quick report
+ */
+interface QuickRunMetadata {
+  startTime: string;
+  symbolId: string;
+  totalRounds: number;
+  modelCount: number;
+}
+
+/**
+ * Generate markdown content for quick mode verification report
+ * Includes full methodology documentation with placeholder data
+ * @param meta - Quick mode run metadata
+ * @returns Markdown string
+ */
+function generateQuickMarkdown(meta: QuickRunMetadata): string {
+  const lines: string[] = [
+    '# agent_006 Benchmark Results (QUICK MODE)',
+    '',
+    '> **This is a quick mode verification run - not a full benchmark.**',
+    '',
+    `**Symbol:** ${meta.symbolId}`,
+    `**Generated:** ${new Date().toISOString()}`,
+    `**Rounds:** ${String(meta.totalRounds)}`,
+    `**Models Tested:** ${String(meta.modelCount)}`,
+    '',
+    '---',
+    '',
+  ];
+
+  lines.push(...generateBenchmarkOverview());
+  lines.push(...generateMethodology());
+  lines.push(...generateTaskSpecSection());
+
+  lines.push('## Scoring Methodology');
+  lines.push('');
+  lines.push(generateScoringMethodology());
+  lines.push('');
+
+  lines.push('## Ground Truth Methodology');
+  lines.push('');
+  lines.push(generateGroundTruthMethodology());
+  lines.push('');
+
+  lines.push('## Results Preview');
+  lines.push('');
+  lines.push('*Quick mode completed. Run without `--quick` for full results.*');
+  lines.push('');
+  lines.push('### Models Tested');
+  lines.push('');
+  lines.push('| Model | Status |');
+  lines.push('|-------|--------|');
+  lines.push('| (run full benchmark to see results) | - |');
+  lines.push('');
+
+  lines.push(SECTION_DATASET_DIAGNOSTICS);
+  lines.push('');
+  lines.push(QUICK_MODE_PLACEHOLDER);
+  lines.push('');
+
+  lines.push(SECTION_PREDICTION_DIVERSITY);
+  lines.push('');
+  lines.push(QUICK_MODE_PLACEHOLDER);
+  lines.push('');
+
+  lines.push('---');
+  lines.push('*Quick mode verification - auto-generated by agent_006 benchmark*');
+
+  return lines.join('\n');
+}
+
+/**
+ * Persist quick mode verification results to markdown file
+ * @param meta - Quick mode run metadata
+ */
+export function persistQuickResults(meta: QuickRunMetadata): void {
+  const markdown = generateQuickMarkdown(meta);
+  const filePath = join(process.cwd(), QUICK_RESULTS_FILE);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
+  writeFileSync(filePath, markdown, 'utf8');
 }
