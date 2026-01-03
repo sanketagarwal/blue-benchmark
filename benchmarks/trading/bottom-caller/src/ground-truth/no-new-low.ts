@@ -6,6 +6,8 @@ import type { Candle } from '../replay-lab/ohlcv.js';
 export interface ReferenceLowResult {
   price: number;
   candleIndex: number;
+  /** How many candles back from the most recent (0 = most recent closed bar) */
+  candlesBack: number;
 }
 
 /**
@@ -20,6 +22,7 @@ export interface ForwardWindowResult {
  */
 export interface NoNewLowResult {
   refLowPrice: number;
+  refLowCandlesBack: number;
   forwardLow: number;
   labelNoNewLow: 0 | 1;
 }
@@ -32,22 +35,23 @@ export interface NoNewLowResult {
  */
 export function computeReferenceLow(lookbackCandles: Candle[]): ReferenceLowResult {
   if (lookbackCandles.length === 0) {
-    return { price: 0, candleIndex: -1 };
+    return { price: 0, candleIndex: -1, candlesBack: -1 };
   }
 
-  let minLow = lookbackCandles[0]?.low ?? 0;
+  let minLow = lookbackCandles[0]?.low ?? Infinity;
   let minIndex = 0;
 
   for (let index = 1; index < lookbackCandles.length; index++) {
     // eslint-disable-next-line security/detect-object-injection -- index from loop iteration
     const candle = lookbackCandles[index];
-    if (candle !== undefined && candle.low < minLow) {
+    if (candle !== undefined && candle.low <= minLow) {
       minLow = candle.low;
       minIndex = index;
     }
   }
 
-  return { price: minLow, candleIndex: minIndex };
+  const candlesBack = lookbackCandles.length - 1 - minIndex;
+  return { price: minLow, candleIndex: minIndex, candlesBack };
 }
 
 /**
@@ -99,6 +103,7 @@ export function resolveNoNewLowGroundTruth(
 
   return {
     refLowPrice: refLow.price,
+    refLowCandlesBack: refLow.candlesBack,
     forwardLow: forwardWindow.lowestPrice,
     labelNoNewLow: labelNoNewLow(refLow.price, forwardWindow.lowestPrice),
   };

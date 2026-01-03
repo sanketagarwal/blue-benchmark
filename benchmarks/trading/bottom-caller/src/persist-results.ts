@@ -1,6 +1,14 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isConstantPredictor } from './diagnostics/prediction-diagnostics.js';
+
+import type { DatasetDiagnostics } from './diagnostics/dataset-diagnostics.js';
+import type { ModelParseDiagnostics } from './diagnostics/parse-diagnostics.js';
+import type {
+  HorizonPredictionDiversity,
+  ModelPredictionDiversity,
+} from './diagnostics/prediction-diagnostics.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { HorizonRanking, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 import type { TimeframeId } from './timeframe-config.js';
@@ -590,6 +598,177 @@ function generateEliminatedSection(models: ModelState[]): string[] {
 }
 
 /**
+ * Generate dataset diagnostics section
+ * @param diagnostics - Dataset diagnostics for all horizons
+ * @returns Array of markdown lines
+ */
+function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | undefined): string[] {
+  if (diagnostics === undefined) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '## Dataset Diagnostics',
+    '',
+    '*Label distribution and baseline performance for interpreting model skill.*',
+    '',
+    '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL |',
+    '|---------|---|------|-------|-------|-----------|---------------|',
+  ];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const d = diagnostics.byHorizon[horizon];
+    const n = String(d.labels.n);
+    const countTrue = String(d.labels.countTrue);
+    const countFalse = String(d.labels.countFalse);
+    const pTrue = d.labels.pTrue.toFixed(3);
+    const randomLL = d.baselines.randomLogLoss.toFixed(3);
+    const prevalenceLL = d.baselines.prevalenceLogLoss.toFixed(3);
+
+    lines.push(`| ${horizon} | ${n} | ${countTrue} | ${countFalse} | ${pTrue} | ${randomLL} | ${prevalenceLL} |`);
+  }
+
+  lines.push('');
+  lines.push('**Interpretation:**');
+  lines.push('- *pTrue*: Label prevalence. If extremely skewed (>0.9 or <0.1), models may achieve good log loss without skill.');
+  lines.push('- *Random LL*: Baseline log loss for p=0.5 predictor (always 0.693).');
+  lines.push('- *Prevalence LL*: Baseline log loss for optimal constant predictor. Models must beat this to show skill.');
+  lines.push('');
+
+  return lines;
+}
+
+/**
+ * Format a single horizon diversity row
+ * @param horizon - Timeframe ID
+ * @param d - Horizon prediction diversity metrics
+ * @param constant - Whether this is a constant predictor
+ * @returns Formatted table row string
+ */
+function formatHorizonDiversityRow(
+  horizon: TimeframeId,
+  d: HorizonPredictionDiversity,
+  constant: boolean
+): string {
+  const warningMark = constant ? ' ⚠️' : '';
+  return (
+    `| ${horizon}${warningMark} | ${String(d.n)} | ${String(d.uniquePCount)} | ` +
+    `${d.pMin.toFixed(3)} | ${d.pMax.toFixed(3)} | ${d.pStdDev.toFixed(3)} | ` +
+    `${d.noNewLowTrueRate.toFixed(2)} |`
+  );
+}
+
+/**
+ * Generate diversity table for a single model
+ * @param model - Model prediction diversity metrics
+ * @param warnings - Array to collect constant predictor warnings
+ * @returns Array of markdown lines
+ */
+function generateModelDiversityTable(
+  model: ModelPredictionDiversity,
+  warnings: string[]
+): string[] {
+  const lines: string[] = [
+    `### ${model.modelId}`,
+    '',
+    '| Horizon | N | Unique P | pMin | pMax | pStdDev | NoNewLow Rate |',
+    '|---------|---|----------|------|------|---------|---------------|',
+  ];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const d: HorizonPredictionDiversity = model.byHorizon[horizon];
+    const constant = isConstantPredictor(d);
+
+    if (constant) {
+      warnings.push(`${model.modelId} (${horizon}): Constant predictor detected`);
+    }
+
+    lines.push(formatHorizonDiversityRow(horizon, d, constant));
+  }
+
+  lines.push('');
+  return lines;
+}
+
+/**
+ * Generate prediction diversity section for all models
+ * @param diversities - Array of model prediction diversity metrics
+ * @returns Array of markdown lines
+ */
+function generatePredictionDiversitySection(diversities: ModelPredictionDiversity[] | undefined): string[] {
+  if (diversities === undefined || diversities.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '## Prediction Diversity',
+    '',
+    '*Variety of predictions per model. Low diversity suggests caching or degenerate behavior.*',
+    '',
+  ];
+
+  const warnings: string[] = [];
+
+  for (const model of diversities) {
+    lines.push(...generateModelDiversityTable(model, warnings));
+  }
+
+  if (warnings.length > 0) {
+    lines.push('**Warnings:**');
+    for (const w of warnings) {
+      lines.push(`- ⚠️ ${w}`);
+    }
+    lines.push('');
+  }
+
+  return lines;
+}
+
+/**
+ * Generate parse diagnostics section for all models
+ * @param parseDiagnostics - Array of model parse diagnostics
+ * @returns Array of markdown lines
+ */
+function generateParseDiagnosticsSection(parseDiagnostics: ModelParseDiagnostics[] | undefined): string[] {
+  if (parseDiagnostics === undefined || parseDiagnostics.length === 0) {
+    return [];
+  }
+
+  const hasIssues = parseDiagnostics.some(
+    d => d.parseFailCount > 0 || d.schemaFailCount > 0 || d.missingHorizonCount > 0
+  );
+
+  if (!hasIssues) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '## Parse Diagnostics',
+    '',
+    '*Parsing and validation issues encountered during the run.*',
+    '',
+    '| Model | Success | Parse Fail | Schema Fail | Missing Horizons |',
+    '|-------|---------|------------|-------------|------------------|',
+  ];
+
+  for (const d of parseDiagnostics) {
+    if (d.parseFailCount === 0 && d.schemaFailCount === 0 && d.missingHorizonCount === 0) {
+      continue;
+    }
+    lines.push(
+      `| ${d.modelId} | ${String(d.parseSuccessCount)} | ${String(d.parseFailCount)} | ` +
+      `${String(d.schemaFailCount)} | ${String(d.missingHorizonCount)} |`
+    );
+  }
+
+  lines.push('');
+
+  return lines;
+}
+
+/**
  * Generate failed rounds section
  * @param models - All model states
  * @returns Array of markdown lines
@@ -622,16 +801,27 @@ function generateFailedSection(models: ModelState[]): string[] {
 }
 
 /**
+ * Diagnostics bundle for benchmark run
+ */
+export interface BenchmarkDiagnostics {
+  dataset?: DatasetDiagnostics;
+  predictionDiversity?: ModelPredictionDiversity[];
+  parseDiagnostics?: ModelParseDiagnostics[];
+}
+
+/**
  * Generate markdown content for current benchmark state
  * @param models - Map of model states
  * @param meta - Run metadata
  * @param perHorizonRankings - Optional per-horizon rankings from phase-3-scorer
+ * @param diagnostics - Optional diagnostics bundle
  * @returns Markdown string
  */
 function generateMarkdown(
   models: Map<string, ModelState>,
   meta: RunMetadata,
-  perHorizonRankings?: PerHorizonRankings
+  perHorizonRankings?: PerHorizonRankings,
+  diagnostics?: BenchmarkDiagnostics
 ): string {
   const allModels = [...models.values()];
   const activeModels = allModels.filter(m => !m.eliminated);
@@ -663,6 +853,9 @@ function generateMarkdown(
     ...generateHeader(meta),
     ...generateBenchmarkOverview(),
     ...generateMethodology(),
+    ...generateDatasetDiagnosticsSection(diagnostics?.dataset),
+    ...generatePredictionDiversitySection(diagnostics?.predictionDiversity),
+    ...generateParseDiagnosticsSection(diagnostics?.parseDiagnostics),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateArenaResultsByHorizon(perHorizonRankings),
     ...generateCrossHorizonStrength(perHorizonRankings),
@@ -685,6 +878,8 @@ interface PersistOptions {
   skipWrite?: boolean;
   /** Logger instance for output messages */
   logger?: BenchmarkLogger;
+  /** Diagnostics bundle for the run */
+  diagnostics?: BenchmarkDiagnostics;
 }
 
 /**
@@ -704,7 +899,7 @@ export function persistResults(
     options.logger?.log('Skipping results file update in quick mode');
     return;
   }
-  const markdown = generateMarkdown(models, meta, perHorizonRankings);
+  const markdown = generateMarkdown(models, meta, perHorizonRankings, options?.diagnostics);
   const filePath = join(process.cwd(), RESULTS_FILE);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
   writeFileSync(filePath, markdown, 'utf8');

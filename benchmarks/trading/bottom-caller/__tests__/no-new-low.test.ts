@@ -23,7 +23,7 @@ function makeCandle(low: number, index = 0): Candle {
 describe('computeReferenceLow', () => {
   it('returns price 0 and index -1 for empty array', () => {
     const result = computeReferenceLow([]);
-    expect(result).toEqual({ price: 0, candleIndex: -1 });
+    expect(result).toEqual({ price: 0, candleIndex: -1, candlesBack: -1 });
   });
 
   it('finds the minimum low in lookback candles', () => {
@@ -33,17 +33,42 @@ describe('computeReferenceLow', () => {
       makeCandle(95, 2),
     ];
     const result = computeReferenceLow(candles);
-    expect(result).toEqual({ price: 90, candleIndex: 1 });
+    expect(result).toEqual({ price: 90, candleIndex: 1, candlesBack: 1 });
   });
 
-  it('returns first candle if all lows are equal', () => {
+  it('returns most recent candle when lows are equal (tie-breaking)', () => {
     const candles = [
       makeCandle(100, 0),
       makeCandle(100, 1),
       makeCandle(100, 2),
     ];
     const result = computeReferenceLow(candles);
-    expect(result).toEqual({ price: 100, candleIndex: 0 });
+    expect(result).toEqual({ price: 100, candleIndex: 2, candlesBack: 0 });
+  });
+
+  it('computes candlesBack correctly (0 = most recent)', () => {
+    const candles = [
+      makeCandle(100, 0),
+      makeCandle(90, 1),
+      makeCandle(95, 2),
+      makeCandle(92, 3),
+    ];
+    const result = computeReferenceLow(candles);
+    expect(result.candleIndex).toBe(1);
+    expect(result.candlesBack).toBe(2);
+  });
+
+  it('chooses most recent when multiple candles share the same low', () => {
+    const candles = [
+      makeCandle(50, 0),
+      makeCandle(100, 1),
+      makeCandle(50, 2),
+      makeCandle(100, 3),
+    ];
+    const result = computeReferenceLow(candles);
+    expect(result.price).toBe(50);
+    expect(result.candleIndex).toBe(2);
+    expect(result.candlesBack).toBe(1);
   });
 });
 
@@ -85,6 +110,7 @@ describe('resolveNoNewLowGroundTruth', () => {
     const result = resolveNoNewLowGroundTruth(lookback, forward);
     expect(result).toEqual({
       refLowPrice: 90,
+      refLowCandlesBack: 0,
       forwardLow: 92,
       labelNoNewLow: 1,
     });
@@ -96,6 +122,7 @@ describe('resolveNoNewLowGroundTruth', () => {
     const result = resolveNoNewLowGroundTruth(lookback, forward);
     expect(result).toEqual({
       refLowPrice: 90,
+      refLowCandlesBack: 0,
       forwardLow: 85,
       labelNoNewLow: 0,
     });
@@ -105,6 +132,7 @@ describe('resolveNoNewLowGroundTruth', () => {
     const forward = [makeCandle(85, 0)];
     const result = resolveNoNewLowGroundTruth([], forward);
     expect(result.refLowPrice).toBe(0);
+    expect(result.refLowCandlesBack).toBe(-1);
     expect(result.labelNoNewLow).toBe(1);
   });
 
@@ -112,6 +140,21 @@ describe('resolveNoNewLowGroundTruth', () => {
     const lookback = [makeCandle(100, 0)];
     const result = resolveNoNewLowGroundTruth(lookback, []);
     expect(result.forwardLow).toBe(Infinity);
+    expect(result.refLowCandlesBack).toBe(0);
     expect(result.labelNoNewLow).toBe(1);
+  });
+
+  it('returns correct refLowCandlesBack for reference low in middle of lookback', () => {
+    const lookback = [
+      makeCandle(100, 0),
+      makeCandle(80, 1),
+      makeCandle(95, 2),
+      makeCandle(90, 3),
+    ];
+    const forward = [makeCandle(75, 4)];
+    const result = resolveNoNewLowGroundTruth(lookback, forward);
+    expect(result.refLowPrice).toBe(80);
+    expect(result.refLowCandlesBack).toBe(2);
+    expect(result.labelNoNewLow).toBe(0);
   });
 });
