@@ -4,7 +4,7 @@
  * Generates leaderboards showing model rankings per horizon with key metrics:
  * - Log Loss and Brier Score (provided)
  * - Win Rate (prediction > 0.5 matches label)
- * - Precision (TP / (TP + FP) for hasBottomed=true predictions)
+ * - Precision (TP / (TP + FP) for positive predictions where p > 0.5)
  * - Expected Calibration Error (ECE)
  */
 import chalk from 'chalk';
@@ -22,7 +22,7 @@ export interface LeaderboardEntry {
   meanBrier: number;
   /** Percentage of rounds where prediction > 0.5 matched the actual label */
   winRate: number;
-  /** TP / (TP + FP) for predictions where hasBottomed=true (p > 0.5) */
+  /** TP / (TP + FP) for predictions where noNewLow=true (p > 0.5) */
   precision: number;
   /** Expected Calibration Error - measures how well-calibrated predictions are */
   calibrationError: number;

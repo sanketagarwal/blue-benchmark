@@ -47,7 +47,7 @@ export interface TaskConfig {
   forwardWindowMinutes: number;
   /** Human-readable question shown to model */
   questionTemplate: string;
-  /** Coordinate system for candlesBack output */
+  /** Coordinate system for bar-based output */
   outputCoordinateSystem: OutputCoordinateSystem;
   /** Maximum allowed drawdown as decimal (e.g., 0.004 = 0.4%) */
   maxDrawdown: number;

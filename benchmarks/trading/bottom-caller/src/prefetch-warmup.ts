@@ -1,11 +1,7 @@
 import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
-import { resolveDualGroundTruth } from './ground-truth/bottom-checker.js';
 import { getForecastingCharts } from './replay-lab/charts.js';
 
-import type { TimeframeId } from './timeframe-config.js';
-
-const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const ROUND_INTERVAL_MS = 15 * 60 * 1000;
 
 interface PrefetchResult {
@@ -45,13 +41,6 @@ export async function prefetchAllRoundData(
   const prefetchPromises = roundTimestamps.map(async (timestamp, index) => {
     await getForecastingCharts(symbolId, timestamp);
     totalDataPoints++;
-
-    await Promise.all(
-      HORIZONS.map(async (horizon) => {
-        await resolveDualGroundTruth(symbolId, horizon, timestamp);
-        totalDataPoints++;
-      })
-    );
 
     if (verbose) {
       logger.log(`  Round ${String(index + 1)}/${String(totalRounds)} data cached`);

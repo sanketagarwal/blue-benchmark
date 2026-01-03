@@ -169,7 +169,7 @@ SIMULATION_START_TIME="2025-01-01T12:00:00Z" pnpm benchmark --verbose
 | `src/bottom-caller.ts` | Bottom prediction agent definition |
 | `src/clock-state.ts` | Simulation time (15-min intervals) |
 | `src/horizon-config.ts` | Horizon durations and annotation methods |
-| `src/ground-truth/bottom-checker.ts` | Pivot detection via annotations |
+| `src/ground-truth/no-new-low.ts` | No-new-low ground truth computation |
 | `src/replay-lab/annotations.ts` | Local extrema annotation fetcher |
 | `src/replay-lab/charts.ts` | Chart URL generation |
 | `src/scorers/phase-0-scorer.ts` | Sanity filter (degenerate detection) |

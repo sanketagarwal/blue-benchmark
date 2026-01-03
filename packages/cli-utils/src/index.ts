@@ -396,6 +396,73 @@ export class BenchmarkLogger {
   }
 
   /**
+   * Log methodology section with title and content (verbose only)
+   */
+  logMethodology(title: string, content: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(chalk.cyan.bold(`\n=== ${title} ===`));
+    console.log(content);
+  }
+
+  /**
+   * Log the prompt template used for all models (verbose only)
+   */
+  logPromptTemplate(prompt: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(chalk.cyan.bold('\n=== PROMPT TEMPLATE ==='));
+    console.log(prompt);
+  }
+
+  /**
+   * Log a single chart URL (verbose only)
+   */
+  logChartUrls(horizon: string, url: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(`  ${horizon}: ${url}`);
+  }
+
+  /**
+   * Log all chart URLs for a round (verbose only)
+   */
+  logRoundChartUrls(urls: Record<string, string>): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log('Chart URLs for this round:');
+    for (const [horizon, url] of Object.entries(urls)) {
+      this.logChartUrls(horizon, url);
+    }
+  }
+
+  /**
+   * Log the scoring methodology explanation (verbose only)
+   */
+  logScoringExplanation(explanation: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(chalk.cyan.bold('\n=== SCORING METHODOLOGY ==='));
+    console.log(explanation);
+  }
+
+  /**
+   * Log the ground truth methodology explanation (verbose only)
+   */
+  logGroundTruthExplanation(explanation: string): void {
+    if (!this.verbose) {
+      return;
+    }
+    console.log(chalk.cyan.bold('\n=== GROUND TRUTH METHODOLOGY ==='));
+    console.log(explanation);
+  }
+
+  /**
    * Output benchmark info header (always displayed)
    */
   logBenchmarkInfo(info: { symbol?: string; startTime?: string; models?: string[]; rounds?: number }): void {

@@ -28,11 +28,23 @@ export const BOTTOM_CONTRACT_IDS = [
 export type BottomContractId = (typeof BOTTOM_CONTRACT_IDS)[number];
 
 /**
+ * Reference low information for a horizon
+ */
+export interface RefLowInfo {
+  /** The reference low price */
+  price: number;
+  /** How many candles back from current the reference low occurred */
+  candlesBack: number;
+}
+
+/**
  * Context interface for bottom predictions
  */
 export interface BottomCallerContext {
   /** Per-timeframe chart image data (PNG bytes) */
   chartByHorizon: Record<TimeframeId, Uint8Array>;
+  /** Per-timeframe reference low information */
+  refLowByHorizon: Record<TimeframeId, RefLowInfo>;
   /** Current prediction time */
   currentTime: string;
   /** Trading symbol identifier */
@@ -59,12 +71,10 @@ export function clearBottomCallerContext(): void {
   currentContext = undefined;
 }
 
-// Output schema: structured prediction for each horizon with candlesBack
+// Output schema: structured prediction for each horizon
 const HorizonPredictionSchema = z.object({
-  hasBottomed: z.boolean(),
+  noNewLow: z.boolean(),
   confidence: z.number().min(0.5).max(1),
-  // Optional - some models omit when hasBottomed=false
-  candlesBack: z.number().int().min(0).optional(),
 });
 
 const PredictionSchema = z.object({
@@ -109,14 +119,12 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
         throw new Error(CONTEXT_NOT_SET_ERROR);
       }
 
-      const { chartByHorizon, currentTime, symbolId } = currentContext;
+      const { chartByHorizon, refLowByHorizon, currentTime, symbolId } = currentContext;
 
       const compactionSection =
         context.compactionSummary !== undefined && context.compactionSummary !== ''
           ? `\n\nYour past learnings:\n${context.compactionSummary}\n`
           : '';
-
-      const tolerancePct = (getTimeframeConfig('15m').task.maxDrawdown * 100).toFixed(1);
 
       const parts: (TextPart | ImagePart)[] = [];
 
@@ -136,14 +144,13 @@ export function createBottomCaller(modelId: string): Agent<BottomCallerOutput> {
         const horizonMinutes = config.task.forwardWindowMinutes;
         const horizonString =
           horizonMinutes >= 60 ? `${String(horizonMinutes / 60)} hour${horizonMinutes >= 120 ? 's' : ''}` : `${String(horizonMinutes)} minutes`;
-        const tolerance = (config.task.maxDrawdown * 100).toFixed(1);
-
+        // eslint-disable-next-line security/detect-object-injection -- id from TIMEFRAME_IDS typed array
+        const refLow = refLowByHorizon[id];
         return `${String(index + 1)}. **Image ${String(index + 1)} – ${id} horizon chart**
    - Bar size: ${barString} candles
    - Lookback: ${String(lookbackBars)} bars (${lookbackString})
    - Prediction horizon: next ${horizonString}
-   - Tolerance: ${tolerance}%
-   - Valid candlesBack: 0 to ${String(lookbackBars - 1)}`;
+   - Reference low: ${String(refLow.price)} (${String(refLow.candlesBack)} candles back)`;
       }).join('\n\n');
 
       // Add text intro
@@ -169,16 +176,11 @@ ${imageDescriptions}
         type: 'text',
         text: `
 ### Task
-For each horizon, decide whether the market has already put in a structural bottom within the visible lookback window.
+For each horizon, predict whether the reference low will hold or be undercut within the prediction horizon.
 
-### Definition of "hasBottomed"
-- hasBottomed = true: The selected bottom's low will NOT be undercut by more than ${tolerancePct}% within the prediction horizon
-- hasBottomed = false: Price will make a new low beyond ${tolerancePct}% tolerance within the prediction horizon
-
-### candlesBack
-- candlesBack = 0 → rightmost (most recent) closed bar
-- Must be within valid range for each horizon
-- Required when hasBottomed = true
+### Definition of noNewLow
+- noNewLow = true: The reference low will NOT be undercut within the prediction horizon
+- noNewLow = false: Price will make a new low below the reference low within the prediction horizon
 
 ### Confidence
 - Range: 0.5 to 1.0
@@ -187,10 +189,10 @@ For each horizon, decide whether the market has already put in a structural bott
 ### Output format
 JSON only:
 {
-  "15m": { "hasBottomed": boolean, "confidence": number, "candlesBack": number },
-  "1h": { "hasBottomed": boolean, "confidence": number, "candlesBack": number },
-  "4h": { "hasBottomed": boolean, "confidence": number, "candlesBack": number },
-  "24h": { "hasBottomed": boolean, "confidence": number, "candlesBack": number }
+  "15m": { "noNewLow": boolean, "confidence": number },
+  "1h": { "noNewLow": boolean, "confidence": number },
+  "4h": { "noNewLow": boolean, "confidence": number },
+  "24h": { "noNewLow": boolean, "confidence": number }
 }
 ${compactionSection}`,
       });

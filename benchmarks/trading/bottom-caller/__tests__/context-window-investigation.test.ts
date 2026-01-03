@@ -16,6 +16,12 @@ describe('context-window-investigation', () => {
       '4h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
       '24h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
     },
+    refLowByHorizon: {
+      '15m': { candlesBack: 5, price: 99500 },
+      '1h': { candlesBack: 10, price: 99000 },
+      '4h': { candlesBack: 15, price: 98500 },
+      '24h': { candlesBack: 20, price: 98000 },
+    },
     currentTime: '2025-01-01T00:00:00Z',
     symbolId: 'COINBASE_SPOT_BTC_USD',
   };

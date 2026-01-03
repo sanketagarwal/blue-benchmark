@@ -49,6 +49,12 @@ describe('bottom-caller', () => {
         '4h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
         '24h': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
       },
+      refLowByHorizon: {
+        '15m': { candlesBack: 5, price: 99500 },
+        '1h': { candlesBack: 10, price: 99000 },
+        '4h': { candlesBack: 15, price: 98500 },
+        '24h': { candlesBack: 20, price: 98000 },
+      },
       currentTime: '2025-01-01T00:00:00Z',
       symbolId: 'COINBASE_SPOT_BTC_USD',
     };
@@ -89,6 +95,25 @@ describe('bottom-caller', () => {
       expect(textContent).toContain('1h horizon chart');
       expect(textContent).toContain('4h horizon chart');
       expect(textContent).toContain('24h horizon chart');
+    });
+
+    it('prompt uses noNewLow schema, not hasBottomed or candlesBack in output', () => {
+      const agent = createBottomCaller('anthropic/claude-haiku-4.5');
+      const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
+      const textContent = getTextContent(prompt);
+      expect(textContent).toContain('noNewLow');
+      expect(textContent).not.toContain('hasBottomed');
+      expect(textContent).not.toContain('"candlesBack"');
+    });
+
+    it('prompt includes reference low information for each horizon', () => {
+      const agent = createBottomCaller('anthropic/claude-haiku-4.5');
+      const prompt = agent.definition.buildRoundPrompt({ roundNumber: 0 });
+      const textContent = getTextContent(prompt);
+      expect(textContent).toContain('Reference low: 99500');
+      expect(textContent).toContain('5 candles back');
+      expect(textContent).toContain('Reference low: 99000');
+      expect(textContent).toContain('10 candles back');
     });
 
     it('builds compaction prompt with round count', () => {

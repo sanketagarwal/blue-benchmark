@@ -1,4 +1,4 @@
-import { getLookbackBars, type TimeframeId } from './timeframe-config.js';
+import type { TimeframeId } from './timeframe-config.js';
 
 /** Worst-case log loss for invalid predictions (ln(1e-6) ≈ 13.8) */
 export const INVALID_PREDICTION_LOG_LOSS = -Math.log(1e-6);
@@ -12,60 +12,33 @@ export interface ValidationResult {
 }
 
 export interface HorizonPrediction {
-  hasBottomed: boolean;
+  noNewLow: boolean;
   confidence: number;
-  candlesBack?: number;
 }
 
 /**
  * Validate a single horizon prediction
  * @param prediction - The horizon prediction to validate
- * @param horizon - The timeframe identifier
+ * @param _horizon - The timeframe identifier (reserved for future horizon-specific validation)
  * @returns Validation result indicating if prediction is valid
  */
 export function validateHorizonPrediction(
   prediction: HorizonPrediction,
-  horizon: TimeframeId
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future horizon-specific validation rules
+  _horizon: TimeframeId
 ): ValidationResult {
-  const lookbackBars = getLookbackBars(horizon);
-  const maxCandlesBack = lookbackBars - 1;
+  if (typeof prediction.noNewLow !== 'boolean') {
+    return {
+      valid: false,
+      invalidReason: `noNewLow must be a boolean, got ${typeof prediction.noNewLow}`,
+    };
+  }
 
-  // confidence must be in [0.5, 1.0]
   if (prediction.confidence < 0.5 || prediction.confidence > 1) {
     return {
       valid: false,
       invalidReason: `confidence ${String(prediction.confidence)} outside valid range [0.5, 1.0]`,
     };
-  }
-
-  // candlesBack required when hasBottomed=true
-  if (prediction.hasBottomed && prediction.candlesBack === undefined) {
-    return {
-      valid: false,
-      invalidReason: 'candlesBack required when hasBottomed=true',
-    };
-  }
-
-  // candlesBack must be in valid range when provided
-  if (prediction.candlesBack !== undefined) {
-    if (!Number.isInteger(prediction.candlesBack)) {
-      return {
-        valid: false,
-        invalidReason: `candlesBack must be integer, got ${String(prediction.candlesBack)}`,
-      };
-    }
-    if (prediction.candlesBack < 0) {
-      return {
-        valid: false,
-        invalidReason: `candlesBack ${String(prediction.candlesBack)} < 0`,
-      };
-    }
-    if (prediction.candlesBack > maxCandlesBack) {
-      return {
-        valid: false,
-        invalidReason: `candlesBack ${String(prediction.candlesBack)} > max ${String(maxCandlesBack)} for ${horizon}`,
-      };
-    }
   }
 
   return { valid: true };

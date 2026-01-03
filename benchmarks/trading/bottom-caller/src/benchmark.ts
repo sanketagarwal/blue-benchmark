@@ -14,16 +14,12 @@ import {
   advanceClock,
   resetClockState,
 } from './clock-state.js';
-import {
-  initAuditFile,
-  writeAuditRecord,
-  buildAuditRecord,
-} from './diagnostics/audit-writer.js';
-import { resolveDualGroundTruth } from './ground-truth/bottom-checker.js';
+import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
 import { persistResults } from './persist-results.js';
 import { prefetchAllRoundData } from './prefetch-warmup.js';
-import { getForecastingCharts } from './replay-lab/charts.js';
+import { getForecastingCharts, getForecastingChartUrls } from './replay-lab/charts.js';
+import { getCandles } from './replay-lab/ohlcv.js';
 import {
   buildLeaderboardScoreData,
   countQualifiedModels,
@@ -68,8 +64,16 @@ import {
   printTimingDiagnosticsTable,
   printCrossHorizonBehaviorMap,
 } from './table.js';
+import { getTimeframeConfig, TIMEFRAME_IDS } from './timeframe-config.js';
+import {
+  generatePromptDocumentation,
+  generateTaskSpecTable,
+  generateScoringMethodology,
+  generateGroundTruthMethodology,
+} from './verbose-documentation.js';
 
-import type { BottomCallerOutput, BottomContractId, BottomPredictions } from './bottom-caller.js';
+import type { BottomCallerOutput, BottomContractId, BottomPredictions, RefLowInfo } from './bottom-caller.js';
+import type { Candle } from './replay-lab/ohlcv.js';
 import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
@@ -78,8 +82,20 @@ import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phas
 import type { RoundScore } from './state/model-state.js';
 import type { TimeframeId } from './timeframe-config.js';
 
-const logger = createBenchmarkLogger(process.argv.includes('--verbose'));
+/**
+ * OHLCV data by horizon, containing lookback and forward candles
+ */
+interface OHLCVByHorizon {
+  '15m': { lookback: Candle[]; forward: Candle[] };
+  '1h': { lookback: Candle[]; forward: Candle[] };
+  '4h': { lookback: Candle[]; forward: Candle[] };
+  '24h': { lookback: Candle[]; forward: Candle[] };
+}
+
+const isVerboseMode = process.argv.includes('--verbose');
+const logger = createBenchmarkLogger(isVerboseMode);
 const isQuickMode = process.argv.includes('--quick');
+let methodologyPrinted = false;
 
 const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const LOG_LOSS_GOOD = 0.5;
@@ -87,23 +103,23 @@ const LOG_LOSS_OK = 0.8;
 
 /**
  * Convert prediction to probability of bottom occurring.
- * If hasBottomed=true: p = confidence (model believes bottom occurred)
- * If hasBottomed=false: p = 1 - confidence (model believes no bottom, so low p)
+ * If noNewLow=true: p = confidence (model believes no new low will occur)
+ * If noNewLow=false: p = 1 - confidence (model believes new low likely, so low p)
  * @param pred - Single horizon prediction object
- * @param pred.hasBottomed - Whether model predicts bottom occurred
+ * @param pred.noNewLow - Whether model predicts no new low will occur
  * @param pred.confidence - Model's confidence in its prediction (0-1)
- * @returns Probability of bottom occurring (0-1)
+ * @returns Probability of no new low occurring (0-1)
  */
-function predictionToProbability(pred: { hasBottomed: boolean; confidence: number }): number {
-  return pred.hasBottomed ? pred.confidence : (1 - pred.confidence);
+function predictionToProbability(pred: { noNewLow: boolean; confidence: number }): number {
+  return pred.noNewLow ? pred.confidence : (1 - pred.confidence);
 }
 
 /**
  * Convert new prediction format to legacy scorer format
- * New format: { '15m': { hasBottomed, confidence, candlesBack }, ... }
+ * New format: { '15m': { noNewLow, confidence }, ... }
  * Legacy format: { 'bottom-15m': number, ... }
  * @param predictions - Predictions in new per-horizon format
- * @returns Predictions in legacy scorer format (probability of bottom)
+ * @returns Predictions in legacy scorer format (probability of no new low)
  */
 function convertPredictionsForScorer(
   predictions: BottomPredictions
@@ -125,6 +141,84 @@ function formatLogLoss(value: number): string {
     return chalk.yellow(formatted);
   }
   return chalk.red(formatted);
+}
+
+async function computeRefLowByHorizon(
+  symbolId: string,
+  snapTime: Date
+): Promise<Record<TimeframeId, RefLowInfo>> {
+  const results = await Promise.all(
+    TIMEFRAME_IDS.map(async (horizonId) => {
+      const config = getTimeframeConfig(horizonId);
+      const rangeMs = config.chart.range.fromMinutesAgo * 60_000;
+      const fromTime = new Date(snapTime.getTime() - rangeMs);
+      const timeframe = config.chart.barTimeframe;
+
+      const candles = await getCandles(
+        symbolId,
+        timeframe,
+        fromTime,
+        snapTime
+      );
+
+      if (candles.length === 0) {
+        return [horizonId, { price: 0, candlesBack: 0 }] as const;
+      }
+
+      let minLow = candles[0]?.low ?? 0;
+      let minIndex = 0;
+      for (let index = 1; index < candles.length; index++) {
+        // eslint-disable-next-line security/detect-object-injection -- index is a controlled loop variable
+        const candle = candles[index];
+        if (candle !== undefined && candle.low < minLow) {
+          minLow = candle.low;
+          minIndex = index;
+        }
+      }
+
+      const candlesBack = candles.length - 1 - minIndex;
+      return [horizonId, { price: minLow, candlesBack }] as const;
+    })
+  );
+
+  return Object.fromEntries(results) as Record<TimeframeId, RefLowInfo>;
+}
+
+/**
+ * Fetch OHLCV data (lookback and forward candles) for all horizons
+ * @param symbolId - Trading symbol identifier
+ * @param snapTime - Prediction time (boundary between lookback and forward)
+ * @returns OHLCV data with lookback and forward candles per horizon
+ */
+async function fetchOHLCVByHorizon(
+  symbolId: string,
+  snapTime: Date
+): Promise<OHLCVByHorizon> {
+  const fetchForHorizon = async (horizonId: TimeframeId): Promise<{ lookback: Candle[]; forward: Candle[] }> => {
+    const config = getTimeframeConfig(horizonId);
+    const lookbackMs = config.chart.range.fromMinutesAgo * 60_000;
+    const forwardMs = config.task.forwardWindowMinutes * 60_000;
+    const timeframe = config.chart.barTimeframe;
+
+    const lookbackFrom = new Date(snapTime.getTime() - lookbackMs);
+    const forwardEnd = new Date(snapTime.getTime() + forwardMs);
+
+    const [lookback, forward] = await Promise.all([
+      getCandles(symbolId, timeframe, lookbackFrom, snapTime),
+      getCandles(symbolId, timeframe, snapTime, forwardEnd),
+    ]);
+
+    return { lookback, forward };
+  };
+
+  const [h15m, h1h, h4h, h24h] = await Promise.all([
+    fetchForHorizon('15m'),
+    fetchForHorizon('1h'),
+    fetchForHorizon('4h'),
+    fetchForHorizon('24h'),
+  ]);
+
+  return { '15m': h15m, '1h': h1h, '4h': h4h, '24h': h24h };
 }
 
 /**
@@ -685,45 +779,35 @@ function recordModelScore(
 }
 
 /**
- * Resolve ground truth for all horizons using dual pivot methods
- * @param symbolId - Trading symbol identifier
- * @param predictionTime - Time of prediction
- * @returns Labels, time-to-pivot ratios, and first pivot timestamps for all horizons (using primary method)
+ * Resolve ground truth for all horizons using the no-new-low labeler
+ * @param ohlcvByHorizon - OHLCV data with lookback and forward candles per horizon
+ * @returns Labels, time-to-pivot ratios, and first pivot timestamps for all horizons
  */
-async function resolveAllHorizonsGroundTruth(
-  symbolId: string,
-  predictionTime: Date
-): Promise<{
+function resolveAllHorizonsGroundTruth(
+  ohlcvByHorizon: OHLCVByHorizon
+): {
   labels: Record<TimeframeId, boolean>;
   timeToPivotRatios: Record<TimeframeId, number | undefined>;
   firstPivotAts: Record<TimeframeId, Date | undefined>;
-  // Secondary labels for analysis (not used for scoring)
   secondaryLabels: Record<TimeframeId, boolean>;
-}> {
+} {
   const labels: Record<string, boolean> = {};
   const ratios: Record<string, number | undefined> = {};
   const firstPivots: Record<string, Date | undefined> = {};
   const secondaryLabels: Record<string, boolean> = {};
 
-  // Resolve each horizon using dual ground truth in parallel
-  const results = await Promise.all(
-    HORIZONS.map(async (horizon) => {
-      const dualResult = await resolveDualGroundTruth(symbolId, horizon, predictionTime);
-      return { horizon, dualResult };
-    })
-  );
-
-  for (const { horizon, dualResult } of results) {
-    // Primary method for scoring/elimination
+  for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    labels[horizon] = dualResult.primary.hasStructuralBottom;
+    const { lookback, forward } = ohlcvByHorizon[horizon];
+    const result = resolveNoNewLowGroundTruth(lookback, forward);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    ratios[horizon] = dualResult.primary.timeToPivotRatio;
+    labels[horizon] = result.labelNoNewLow === 1;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    firstPivots[horizon] = dualResult.primary.firstPivotAt;
-    // Secondary for analysis
+    ratios[horizon] = undefined;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    secondaryLabels[horizon] = dualResult.secondary.hasStructuralBottom;
+    firstPivots[horizon] = undefined;
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    secondaryLabels[horizon] = result.labelNoNewLow === 1;
   }
 
   return {
@@ -1494,55 +1578,6 @@ function updateLabelCounts(
 }
 
 /**
- * Write audit records for all horizons for a single model prediction
- * @param params - Parameters for writing audit records
- * @param params.currentTime - Current prediction time
- * @param params.roundNumber - Current round number
- * @param params.modelId - Model identifier
- * @param params.predictions - Model predictions by horizon
- * @param params.labels - Ground truth labels by horizon
- * @param params.firstPivotAts - First pivot times by horizon
- * @param params.timeToPivotRatios - Time to pivot ratios by horizon
- * @param params.labelCounts - Label counts for base rate calculation
- */
-function writeModelAuditRecords(params: {
-  currentTime: Date;
-  roundNumber: number;
-  modelId: string;
-  predictions: BottomPredictions;
-  labels: Record<TimeframeId, boolean>;
-  firstPivotAts: Record<TimeframeId, Date | undefined>;
-  timeToPivotRatios: Record<TimeframeId, number | undefined>;
-  labelCounts: Record<TimeframeId, { total: number; positive: number }>;
-}): void {
-  const { currentTime, roundNumber, modelId, predictions, labels, firstPivotAts, timeToPivotRatios, labelCounts } = params;
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const counts = labelCounts[horizon];
-    const labelBaseRate = counts.total > 0 ? counts.positive / counts.total : 0.5;
-
-    const auditRecord = buildAuditRecord({
-      timestamp: currentTime,
-      roundNumber,
-      modelId,
-      horizon,
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      prediction: predictions[horizon],
-      groundTruth: {
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        label: labels[horizon],
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        firstPivotAt: firstPivotAts[horizon],
-        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-        timeToPivotRatio: timeToPivotRatios[horizon],
-      },
-      labelBaseRate,
-    });
-    writeAuditRecord(auditRecord);
-  }
-}
-
-/**
  * Run a single benchmark round for all active models
  * @param models - Map of model states
  * @param roundNumber - Current round number
@@ -1563,24 +1598,44 @@ async function runBenchmarkRound(
   benchmarkStartTime: Date,
   labelCounts: Record<TimeframeId, { total: number; positive: number }>
 ): Promise<void> {
+  // Output methodology documentation once at start (verbose mode only)
+  if (!methodologyPrinted) {
+    logger.logMethodology('TASK SPECIFICATION', generateTaskSpecTable());
+    logger.logPromptTemplate(generatePromptDocumentation());
+    logger.logScoringExplanation(generateScoringMethodology());
+    logger.logGroundTruthExplanation(generateGroundTruthMethodology());
+    methodologyPrinted = true;
+  }
+
   logger.logRoundHeader(roundNumber, totalRounds, currentTime);
   logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Fetching market data...`);
 
-  // Fetch chart data for this round (no orderbook needed for bottom prediction)
-  const charts = await getForecastingCharts(symbolId, currentTime);
+  // Fetch chart data, reference lows, and OHLCV for ground truth in parallel
+  const [charts, refLowByHorizon, ohlcvByHorizon] = await Promise.all([
+    getForecastingCharts(symbolId, currentTime),
+    computeRefLowByHorizon(symbolId, currentTime),
+    fetchOHLCVByHorizon(symbolId, currentTime),
+  ]);
 
   // Set context
   setBottomCallerContext({
     chartByHorizon: charts.chartByHorizon,
     currentTime: currentTime.toISOString(),
     symbolId,
+    refLowByHorizon,
   });
 
   logger.succeedSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Market data loaded`);
 
+  // Log chart URLs in verbose mode (fetch URLs separately since charts already contains bytes)
+  if (isVerboseMode) {
+    const chartUrls = await getForecastingChartUrls(symbolId, currentTime);
+    logger.logRoundChartUrls(chartUrls.chartByHorizon);
+  }
+
   // Get ground truth (secondaryLabels captured for future analysis)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
-  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels } = await resolveAllHorizonsGroundTruth(symbolId, currentTime);
+  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels } = resolveAllHorizonsGroundTruth(ohlcvByHorizon);
 
   // Update label counts for base rate calculation in audit records
   updateLabelCounts(labelCounts, labels);
@@ -1624,18 +1679,6 @@ async function runBenchmarkRound(
     const legacyPredictions = convertPredictionsForScorer(output.predictions);
     const roundScore = scorePhase0Round(legacyPredictions, labels);
     recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
-
-    // Write audit records for each horizon
-    writeModelAuditRecords({
-      currentTime,
-      roundNumber,
-      modelId: state.modelId,
-      predictions: output.predictions,
-      labels,
-      firstPivotAts,
-      timeToPivotRatios,
-      labelCounts,
-    });
 
     // Compute baselines from accumulated labels for this model
     const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
@@ -1903,9 +1946,6 @@ function printSmokeTestSummary(
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Main entry point orchestrates phases, complexity is acceptable
 async function main(): Promise<void> {
   logger.header('agent_006 Bitcoin Bottom Arena Benchmark');
-
-  // Initialize audit file (writes even in quick mode)
-  initAuditFile();
 
   // Load all vision models
   const allModelIds = getModelIds();
