@@ -238,6 +238,65 @@ function calculateModelMetrics(
 }
 
 /**
+ * Generate benchmark overview section
+ * Explains the prediction task for data scientists
+ * @returns Array of markdown lines
+ */
+function generateBenchmarkOverview(): string[] {
+  return [
+    '## Benchmark Overview',
+    '',
+    'This benchmark evaluates LLMs on a **binary classification task** across 4 horizons (15m, 1h, 4h, 24h):',
+    '',
+    '> For each horizon, predict whether the current reference low will hold (*no new low*) or be undercut within the forward window.',
+    '',
+    '**Label definition (`noNewLow`):**',
+    '- `1` (true): Forward window low ≥ reference low (bottom held)',
+    '- `0` (false): Forward window low < reference low (new low made)',
+    '',
+    '**Horizons** share the same symbol and time but differ in bar size, lookback window, and forward prediction window.',
+    '',
+  ];
+}
+
+/**
+ * Generate methodology section
+ * Documents ground truth, scoring, and phase definitions
+ * @returns Array of markdown lines
+ */
+function generateMethodology(): string[] {
+  return [
+    '## Methodology',
+    '',
+    '### Ground Truth',
+    '- **Reference low**: Minimum low price across lookback candles',
+    '- **Forward low**: Minimum low price in the forward window (prediction horizon)',
+    '- **Label**: `y = 1` if forward low ≥ reference low, else `y = 0`',
+    '',
+    '### Probability Mapping',
+    'Models output `{ noNewLow: boolean; confidence ∈ [0.5, 1.0] }` per horizon.',
+    '- Probability of no new low: `p = noNewLow ? confidence : (1 - confidence)`',
+    '',
+    '### Scoring',
+    '- **Log loss** (primary): `LL = -(y·log(p) + (1−y)·log(1−p))`, with p clipped to [ε, 1−ε]',
+    '- **Random baseline**: p=0.5 gives LL ≈ 0.693',
+    '- **Brier score**: Used in Phase 0 sanity checks only (not shown in tables)',
+    '',
+    '### Phases & Elimination',
+    '- **Phase 0 – Sanity filter**: Disqualifies horizons where model performs worse than random baseline, shows degenerate predictions (all >0.9 or <0.1), or has high extreme error rate (>20% confidently wrong)',
+    '- **Phase 1 – Percentile filter**: Retains models above performance threshold per horizon',
+    '- **Phase 2 – Stability filter**: Evaluates consistency using rolling windows; eliminates models with no qualified horizons remaining',
+    '- **Phase 3 – Final ranking**: Composite scoring of surviving models',
+    '',
+    '**Status codes:**',
+    '- `✅ Active`: Survived all phases with ≥1 qualified horizon',
+    '- `❌ P0`: Eliminated in Phase 0 (all horizons failed sanity checks)',
+    '- `❌ P2`: Eliminated in Phase 2 (no qualified horizons remaining)',
+    '',
+  ];
+}
+
+/**
  * Generate markdown header section
  * @param meta - Run metadata
  * @returns Array of markdown lines
@@ -311,10 +370,19 @@ function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
 
   lines.push('');
   lines.push('**Legend:**');
-  lines.push('- 🟢 Good (≤0.5) | 🟡 OK (≤0.8) | 🔴 Poor (>0.8)');
-  lines.push('- %Rank: Percentile rank (higher=better) | BestWin: Best rolling window avg (lower=better)');
-  lines.push('- Stabil: Std dev of log loss (lower=better) | TtP: Time-to-pivot ratio (lower=better)');
-  lines.push('- Score: Composite (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹)');
+  lines.push('');
+  lines.push('*Log loss color coding:*');
+  lines.push('- 🟢 Good (≤ 0.5) | 🟡 OK (≤ 0.8) | 🔴 Poor (> 0.8)');
+  lines.push('');
+  lines.push('*Column definitions:*');
+  lines.push('- `15m, 1h, 4h, 24h`: Mean log loss for that horizon across all valid rounds');
+  lines.push('- `Mean`: Arithmetic mean of the four horizon log losses');
+  lines.push('- `%Rank`: Percentile rank among all models by composite Score (higher = better)');
+  lines.push('- `BestWin`: Best rolling-window average log loss (lower = better)');
+  lines.push('- `Stabil`: Standard deviation of per-round log loss (lower = better)');
+  lines.push('- `TtP`: Time-to-pivot ratio (lower = better). *Note: With the current no-new-low ground truth system, timing data is not available; all models show TtP = 0.50.*');
+  lines.push('- `Score`: Composite metric combining rank, best window, stability, and timing (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹)');
+  lines.push('- `Rnds`: Number of successful rounds (failed rounds are excluded from metrics)');
   lines.push('');
 
   return lines;
@@ -539,6 +607,8 @@ function generateFailedSection(models: ModelState[]): string[] {
   const lines: string[] = [
     '## Model Failures',
     '',
+    '*Note: Failed rounds (API errors, malformed responses) are excluded from scoring. The `Rnds` column shows successful rounds used in metric calculation.*',
+    '',
     '| Model | Failed Rounds |',
     '|-------|---------------|',
   ];
@@ -591,6 +661,8 @@ function generateMarkdown(
 
   const lines: string[] = [
     ...generateHeader(meta),
+    ...generateBenchmarkOverview(),
+    ...generateMethodology(),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateArenaResultsByHorizon(perHorizonRankings),
     ...generateCrossHorizonStrength(perHorizonRankings),
