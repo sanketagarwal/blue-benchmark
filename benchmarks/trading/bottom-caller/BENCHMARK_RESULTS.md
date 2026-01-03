@@ -3,13 +3,13 @@
 **Symbol:** COINBASE_SPOT_BTC_USD
 **Start Time:** 2025-12-26T17:00:00.000Z
 **Progress:** Round 12/12 (Phase 3)
-**Last Updated:** 2026-01-01T16:22:34.416Z
+**Last Updated:** 2026-01-03T01:19:41.669Z
 
 ## Summary
 
-- **Active Models:** 17
-- **Eliminated:** 11
-- **Models with Failures:** 1
+- **Active Models:** 16
+- **Eliminated:** 12
+- **Models with Failures:** 8
 
 ## Arena Results by Horizon
 
@@ -17,41 +17,48 @@
 
 | Rank | Model | Score | Log Loss | Best Window | Stability |
 |------|-------|-------|----------|-------------|-----------|
-| 🥇 | google/gemini-2.5-flash | 0.90 | 🟢0.09 | 0.08 | 0.000 |
-| 🥈 | anthropic/claude-haiku-4-5 | 0.73 | 🟢0.13 | 0.13 | 0.000 |
-| 🥉 | openai/gpt-4.1 | 0.45 | 🟢0.20 | 0.20 | 0.000 |
-| 4 | anthropic/claude-opus-4-5 | 0.10 | 🟢0.29 | 0.29 | 0.000 |
-| 5 | anthropic/claude-3-5-sonnet-20241022 | 0.10 | 🟢0.29 | 0.29 | 0.000 |
-| 6 | anthropic/claude-3-5-haiku-latest | 0.10 | 🟢0.29 | 0.29 | 0.000 |
-| 7 | openai/gpt-4o | 0.10 | 🟢0.29 | 0.29 | 0.000 |
-| 8 | openai/gpt-4o-mini | 0.10 | 🟢0.29 | 0.29 | 0.000 |
+| 🥇 | mistral/ministral-8b-latest | 0.85 | 🟢0.09 | 0.06 | 0.000 |
+| 🥈 | mistral/ministral-3b-latest | 0.72 | 🟢0.26 | 0.00 | 0.000 |
+| 🥉 | google/gemini-3-pro-preview | 0.68 | 🟢0.16 | 0.12 | 0.000 |
+| 4 | openai/gpt-4o | 0.57 | 🟢0.36 | 0.00 | 0.000 |
+| 5 | perplexity/sonar-pro | 0.49 | 🟢0.24 | 0.23 | 0.000 |
+| 6 | xai/grok-4 | 0.46 | 🟢0.21 | 0.17 | 0.001 |
+| 7 | anthropic/claude-opus-4-5 | 0.41 | 🟢0.27 | 0.24 | 0.000 |
+| 8 | anthropic/claude-sonnet-4-5 | 0.35 | 🟢0.33 | 0.32 | 0.000 |
 
 ### 1h Arena Winners
 
 | Rank | Model | Score | Log Loss | Best Window | Stability |
 |------|-------|-------|----------|-------------|-----------|
-| 🥇 | openai/gpt-5-mini | 0.85 | 🟡0.67 | 0.64 | 0.001 |
-| 🥈 | google/gemini-2.5-flash-lite | 0.15 | 🟡0.77 | 0.58 | 0.020 |
-| 🥉 | xai/grok-4-fast-non-reasoning | 0.15 | 🟡0.69 | 0.58 | 0.010 |
+| 🥇 | mistral/ministral-8b-latest | 0.94 | 🟢0.09 | 0.08 | 0.000 |
+| 🥈 | mistral/ministral-3b-latest | 0.81 | 🟢0.27 | 0.00 | 0.000 |
+| 🥉 | perplexity/sonar-pro | 0.54 | 🟢0.31 | 0.29 | 0.000 |
+| 4 | google/gemini-3-pro-preview | 0.50 | 🟢0.30 | 0.22 | 0.002 |
+| 5 | openai/gpt-4o | 0.50 | 🟡0.71 | 0.00 | 0.000 |
+| 6 | anthropic/claude-opus-4-5 | 0.43 | 🟢0.38 | 0.35 | 0.000 |
+| 7 | anthropic/claude-sonnet-4-5 | 0.42 | 🟢0.38 | 0.37 | 0.000 |
+| 8 | anthropic/claude-3-5-haiku-latest | 0.38 | 🟢0.38 | 0.29 | 0.002 |
 
 ### 4h Arena Winners
 
 | Rank | Model | Score | Log Loss | Best Window | Stability |
 |------|-------|-------|----------|-------------|-----------|
-| 🥇 | openai/gpt-5 | 0.50 | 🟡0.60 | 0.60 | 0.000 |
+| 🥇 | mistral/ministral-8b-latest | 0.87 | 🟢0.18 | 0.17 | 0.000 |
+| 🥈 | mistral/ministral-3b-latest | 0.50 | 🔴0.89 | 0.00 | 0.000 |
+| 🥉 | anthropic/claude-3-5-haiku-latest | 0.40 | 🟢0.40 | 0.40 | 0.001 |
+| 4 | perplexity/sonar-pro | 0.26 | 🟢0.43 | 0.31 | 0.008 |
+| 5 | xai/grok-2-vision | 0.10 | 🟢0.49 | 0.40 | 0.010 |
+| 6 | xai/grok-4.1-fast-reasoning | 0.00 | 🟡0.57 | 0.43 | 0.010 |
 
 ### 24h Arena Winners
 
 | Rank | Model | Score | Log Loss | Best Window | Stability |
 |------|-------|-------|----------|-------------|-----------|
-| 🥇 | openai/gpt-5 | 0.85 | 🟡0.67 | 0.63 | 0.001 |
-| 🥈 | anthropic/claude-3-7-sonnet-latest | 0.57 | 🟡0.72 | 0.64 | 0.004 |
-| 🥉 | xai/grok-4-fast-non-reasoning | 0.48 | 🟡0.77 | 0.62 | 0.012 |
-| 4 | openai/gpt-5.2 | 0.37 | 🟡0.74 | 0.65 | 0.005 |
-| 5 | anthropic/claude-opus-4-5 | 0.19 | 🟡0.78 | 0.65 | 0.010 |
-| 6 | anthropic/claude-3-5-sonnet-20241022 | 0.19 | 🟡0.78 | 0.65 | 0.010 |
-| 7 | anthropic/claude-3-5-haiku-latest | 0.19 | 🟡0.78 | 0.65 | 0.010 |
-| 8 | openai/gpt-4o | 0.19 | 🟡0.78 | 0.65 | 0.010 |
+| 🥇 | google/gemini-3-pro-preview | 0.98 | 🟢0.24 | 0.19 | 0.001 |
+| 🥈 | mistral/ministral-8b-latest | 0.94 | 🟢0.26 | 0.23 | 0.000 |
+| 🥉 | openai/gpt-4.1-mini | 0.64 | 🟢0.34 | 0.37 | 0.001 |
+| 4 | anthropic/claude-3-5-haiku-latest | 0.00 | 🟡0.53 | 0.49 | 0.003 |
+| 5 | xai/grok-4.1-fast-reasoning | 0.00 | 🟡0.68 | 0.58 | 0.004 |
 
 ## Cross-Horizon Strength
 
@@ -59,12 +66,15 @@
 
 | Model | Arenas | Horizons | Avg Rank |
 |-------|--------|----------|----------|
-| openai/gpt-5 | 2/4 | 4h, 24h | 1.0 |
-| xai/grok-4-fast-non-reasoning | 2/4 | 1h, 24h | 3.0 |
-| anthropic/claude-opus-4-5 | 2/4 | 15m, 24h | 4.5 |
-| anthropic/claude-3-5-sonnet-20241022 | 2/4 | 15m, 24h | 5.5 |
-| anthropic/claude-3-5-haiku-latest | 2/4 | 15m, 24h | 6.5 |
-| openai/gpt-4o | 2/4 | 15m, 24h | 7.5 |
+| ⭐ mistral/ministral-8b-latest | 4/4 | 15m, 1h, 4h, 24h | 1.3 |
+| mistral/ministral-3b-latest | 3/4 | 15m, 1h, 4h | 2.0 |
+| google/gemini-3-pro-preview | 3/4 | 15m, 1h, 24h | 2.7 |
+| perplexity/sonar-pro | 3/4 | 15m, 1h, 4h | 4.0 |
+| anthropic/claude-3-5-haiku-latest | 3/4 | 1h, 4h, 24h | 5.0 |
+| openai/gpt-4o | 2/4 | 15m, 1h | 4.5 |
+| xai/grok-4.1-fast-reasoning | 2/4 | 4h, 24h | 5.5 |
+| anthropic/claude-opus-4-5 | 2/4 | 15m, 1h | 6.5 |
+| anthropic/claude-sonnet-4-5 | 2/4 | 15m, 1h | 7.5 |
 
 **Legend:** ⭐ = Top performer across all horizons
 
@@ -72,34 +82,29 @@
 
 | Rank | Model | Status | Rnds | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |
 |------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|
-| 🥇 | mistral/pixtral-12b-2409 | ❌ P2 | 12 | 🟢0.420 | 🟡0.710 | 🟢0.479 | 🟡0.682 | 🟡0.573 | 100.0 | 0.261 | 0.279 | 0.42 | **0.8628** |
-| 🥈 | anthropic/claude-3-7-sonnet-latest | ✅ Active | 12 | 🟢0.183 | 🔴0.860 | 🔴1.005 | 🟡0.720 | 🟡0.692 | 92.9 | 0.163 | 0.415 | 0.42 | **0.8219** |
-| 🥉 | google/gemini-2.5-flash-lite | ✅ Active | 12 | 🟢0.288 | 🟡0.769 | 🔴0.958 | 🔴0.857 | 🟡0.718 | 89.3 | 0.288 | 0.367 | 0.42 | **0.7985** |
-| 4 | mistral/pixtral-large-latest | ❌ P2 | 12 | 🟢0.351 | 🟡0.724 | 🔴0.916 | 🔴0.909 | 🟡0.725 | 85.7 | 0.311 | 0.307 | 0.42 | **0.7927** |
-| 5 | openai/gpt-5 | ✅ Active | 12 | 🔴1.022 | 🟡0.714 | 🟡0.598 | 🟡0.675 | 🟡0.752 | 82.1 | 0.511 | 0.192 | 0.42 | **0.7712** |
-| 6 | google/gemini-2.5-pro | ❌ P2 | 12 | 🟢0.376 | 🔴1.030 | 🟢0.105 | 🔴1.033 | 🟡0.636 | 96.4 | 0.051 | 0.933 | 0.42 | **0.7493** |
-| 7 | openai/gpt-5-mini | ✅ Active | 12 | 🟢0.351 | 🟡0.674 | 🔴1.140 | 🔴1.244 | 🔴0.852 | 78.6 | 0.334 | 0.481 | 0.42 | **0.7259** |
-| 8 | openai/gpt-5.2 | ✅ Active | 12 | 🟢0.316 | 🟡0.699 | 🔴1.671 | 🟡0.745 | 🔴0.858 | 75.0 | 0.306 | 0.508 | 0.42 | **0.7103** |
-| 9 | anthropic/claude-sonnet-4-5 | ❌ P2 | 12 | 🟢0.333 | 🟡0.760 | 🔴1.388 | 🔴1.134 | 🔴0.904 | 67.9 | 0.275 | 0.533 | 0.42 | **0.6814** |
-| 10 | anthropic/claude-haiku-4-5 | ✅ Active | 12 | 🟢0.128 | 🔴1.251 | 🔴1.386 | 🔴0.804 | 🔴0.892 | 71.4 | 0.094 | 0.768 | 0.42 | **0.6758** |
-| 11 | xai/grok-4-fast-non-reasoning | ✅ Active | 12 | 🟢0.293 | 🟡0.695 | 🔴1.873 | 🟡0.768 | 🔴0.907 | 64.3 | 0.288 | 0.605 | 0.42 | **0.6508** |
-| 12 | anthropic/claude-opus-4-5 | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 13 | anthropic/claude-3-5-sonnet-20241022 | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 14 | anthropic/claude-3-5-haiku-latest | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 15 | openai/gpt-4o | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 16 | openai/gpt-4o-mini | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 17 | openai/gpt-4.1-mini | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 18 | openai/gpt-5-nano | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 19 | xai/grok-2-vision | ✅ Active | 12 | 🟢0.288 | 🟡0.714 | 🔴1.897 | 🟡0.781 | 🔴0.920 | 60.7 | 0.288 | 0.611 | 0.42 | **0.6353** |
-| 20 | mistral/ministral-3b-latest | ❌ P2 | 11 | 🟢0.109 | 🔴0.967 | 🔴1.813 | 🔴0.890 | 🔴0.945 | 32.1 | 0.083 | 0.801 | 0.42 | **0.5140** |
-| 21 | google/gemini-2.0-flash | ❌ P2 | 12 | 🟢0.357 | 🔴0.837 | 🔴1.897 | 🔴1.570 | 🔴1.165 | 28.6 | 0.105 | 0.842 | 0.42 | **0.4879** |
-| 22 | openai/gpt-4.1 | ✅ Active | 12 | 🟢0.198 | 🔴1.090 | 🔴2.040 | 🔴1.456 | 🔴1.196 | 25.0 | 0.128 | 0.945 | 0.42 | **0.4496** |
-| 23 | xai/grok-4.1-fast-reasoning | ❌ P2 | 12 | 🟢0.072 | 🔴0.977 | 🔴2.683 | 🔴1.374 | 🔴1.276 | 21.4 | 0.027 | 1.114 | 0.42 | **0.4394** |
-| 24 | perplexity/sonar-pro | ❌ P2 | 12 | 🟢0.163 | 🔴0.992 | 🔴3.111 | 🔴1.101 | 🔴1.342 | 17.9 | 0.124 | 1.200 | 0.42 | **0.4106** |
-| 25 | mistral/ministral-8b-latest | ❌ P2 | 12 | 🟢0.074 | 🔴1.324 | 🔴2.317 | 🔴2.046 | 🔴1.440 | 14.3 | 0.051 | 1.342 | 0.42 | **0.4072** |
-| 26 | xai/grok-4 | ❌ P2 | 12 | 🟢0.103 | 🔴1.194 | 🔴3.461 | 🔴1.008 | 🔴1.441 | 10.7 | 0.044 | 1.409 | 0.42 | **0.3940** |
-| 27 | google/gemini-3-pro-preview | ❌ P0 | 4 | 🔴2.303 | 🔴2.260 | 🟢0.051 | 🔴2.303 | 🔴1.729 | 7.1 | 0.051 | 1.160 | 0.36 | **0.3852** |
-| 28 | google/gemini-2.5-flash | ✅ Active | 12 | 🟢0.085 | 🔴1.495 | 🔴3.464 | 🔴3.074 | 🔴2.030 | 3.6 | 0.010 | 1.872 | 0.42 | **0.3706** |
+| 🥇 | mistral/ministral-8b-latest | ✅ Active | 12 | 🟢0.086 | 🟢0.090 | 🟢0.184 | 🟢0.255 | 🟢0.154 | 100.0 | 0.051 | 0.091 | 0.50 | **0.9241** |
+| 🥈 | google/gemini-3-pro-preview | ✅ Active | 12 | 🟢0.160 | 🟢0.304 | 🟡0.542 | 🟢0.242 | 🟢0.312 | 95.7 | 0.087 | 0.248 | 0.50 | **0.8698** |
+| 🥉 | anthropic/claude-3-5-haiku-latest | ✅ Active | 12 | 🟢0.368 | 🟢0.376 | 🟢0.404 | 🟡0.528 | 🟢0.419 | 91.3 | 0.247 | 0.221 | 0.50 | **0.8339** |
+| 4 | perplexity/sonar-pro | ✅ Active | 12 | 🟢0.241 | 🟢0.313 | 🟢0.434 | 🔴0.828 | 🟢0.454 | 87.0 | 0.204 | 0.387 | 0.50 | **0.7897** |
+| 5 | xai/grok-4.1-fast-reasoning | ✅ Active | 12 | 🟢0.254 | 🟢0.487 | 🟡0.567 | 🟡0.680 | 🟢0.497 | 78.3 | 0.117 | 0.386 | 0.50 | **0.7683** |
+| 6 | xai/grok-2-vision | ✅ Active | 12 | 🟢0.356 | 🟢0.372 | 🟢0.495 | 🟡0.729 | 🟢0.488 | 82.6 | 0.224 | 0.395 | 0.50 | **0.7677** |
+| 7 | anthropic/claude-opus-4-5 | ✅ Active | 12 | 🟢0.271 | 🟢0.376 | 🟡0.629 | 🔴0.953 | 🟡0.557 | 73.9 | 0.224 | 0.294 | 0.50 | **0.7532** |
+| 8 | openai/gpt-4.1-mini | ✅ Active | 9 | 🟢0.470 | 🟡0.706 | 🔴0.826 | 🟢0.337 | 🟡0.585 | 69.6 | 0.143 | 0.596 | 0.50 | **0.6876** |
+| 9 | xai/grok-4 | ✅ Active | 12 | 🟢0.214 | 🟢0.365 | 🟡0.733 | 🔴1.085 | 🟡0.599 | 65.2 | 0.143 | 0.536 | 0.50 | **0.6822** |
+| 10 | xai/grok-4-fast-non-reasoning | ✅ Active | 12 | 🟢0.443 | 🟡0.552 | 🟡0.711 | 🔴0.903 | 🟡0.652 | 60.9 | 0.269 | 0.426 | 0.50 | **0.6679** |
+| 11 | openai/gpt-5.2 | ✅ Active | 12 | 🟢0.438 | 🟡0.654 | 🟡0.775 | 🔴0.913 | 🟡0.695 | 52.2 | 0.323 | 0.245 | 0.50 | **0.6612** |
+| 12 | openai/gpt-4.1 | ✅ Active | 12 | 🟢0.367 | 🟡0.516 | 🔴0.856 | 🔴1.073 | 🟡0.703 | 47.8 | 0.232 | 0.401 | 0.50 | **0.6264** |
+| 13 | mistral/ministral-3b-latest | ✅ Active | 2 | 🟢0.260 | 🟢0.268 | 🔴0.886 | 🔴1.295 | 🟡0.677 | 56.5 | 0.233 | 0.765 | 0.50 | **0.5881** |
+| 14 | openai/gpt-4o | ✅ Active | 2 | 🟢0.357 | 🟡0.714 | 🔴0.983 | 🔴0.949 | 🟡0.750 | 43.5 | 0.408 | 0.428 | 0.50 | **0.5771** |
+| 15 | anthropic/claude-sonnet-4-5 | ✅ Active | 12 | 🟢0.326 | 🟢0.381 | 🔴1.046 | 🔴1.353 | 🟡0.777 | 39.1 | 0.315 | 0.444 | 0.50 | **0.5705** |
+| 16 | mistral/pixtral-large-latest | ❌ P2 | 12 | 🟢0.403 | 🟡0.622 | 🔴1.010 | 🔴1.297 | 🔴0.833 | 34.8 | 0.203 | 0.658 | 0.50 | **0.5271** |
+| 17 | google/gemini-2.5-pro | ❌ P2 | 12 | 🟢0.445 | 🔴0.889 | 🔴1.136 | 🔴0.937 | 🔴0.852 | 30.4 | 0.183 | 0.703 | 0.50 | **0.5037** |
+| 18 | google/gemini-2.0-flash | ❌ P0 | 4 | 🟡0.780 | 🔴1.076 | 🟡0.785 | 🔴0.867 | 🔴0.877 | 26.1 | 0.511 | 0.404 | 0.50 | **0.4969** |
+| 19 | anthropic/claude-haiku-4-5 | ❌ P2 | 12 | 🟢0.404 | 🔴1.052 | 🔴1.138 | 🔴1.119 | 🔴0.928 | 17.4 | 0.315 | 0.455 | 0.50 | **0.4813** |
+| 20 | google/gemini-2.5-flash-lite | ❌ P2 | 12 | 🟡0.748 | 🔴0.997 | 🔴0.920 | 🔴0.852 | 🔴0.879 | 21.7 | 0.349 | 0.677 | 0.50 | **0.4493** |
+| 21 | anthropic/claude-3-5-sonnet-20241022 | ✅ Active | 12 | 🟢0.400 | 🔴1.083 | 🔴1.342 | 🔴1.573 | 🔴1.099 | 13.0 | 0.334 | 0.529 | 0.50 | **0.4464** |
+| 22 | anthropic/claude-3-7-sonnet-latest | ❌ P0 | 4 | 🔴0.982 | 🔴1.508 | 🔴1.396 | 🔴0.994 | 🔴1.220 | 8.7 | 0.693 | 0.516 | 0.50 | **0.3777** |
+| 23 | google/gemini-2.5-flash | ❌ P2 | 12 | 🟢0.379 | 🟡0.714 | 🔴4.124 | 🔴0.833 | 🔴1.512 | 4.3 | 0.124 | 4.851 | 0.50 | **0.3487** |
 
 **Legend:**
 - 🟢 Good (≤0.5) | 🟡 OK (≤0.8) | 🔴 Poor (>0.8)
@@ -113,83 +118,91 @@
 
 | Rank | Model | Log Loss | Status |
 |------|-------|----------|--------|
-| 1 | xai/grok-4.1-fast-reasoning | 🟢0.0721 | ❌ P2 |
-| 2 | mistral/ministral-8b-latest | 🟢0.0741 | ❌ P2 |
-| 3 | google/gemini-2.5-flash | 🟢0.0852 | ✅ Active |
-| 4 | xai/grok-4 | 🟢0.1029 | ❌ P2 |
-| 5 | mistral/ministral-3b-latest | 🟢0.1093 | ❌ P2 |
-| 6 | anthropic/claude-haiku-4-5 | 🟢0.1278 | ✅ Active |
-| 7 | perplexity/sonar-pro | 🟢0.1631 | ❌ P2 |
-| 8 | anthropic/claude-3-7-sonnet-latest | 🟢0.1827 | ✅ Active |
-| 9 | openai/gpt-4.1 | 🟢0.1985 | ✅ Active |
-| 10 | google/gemini-2.5-flash-lite | 🟢0.2877 | ✅ Active |
+| 1 | mistral/ministral-8b-latest | 🟢0.0860 | ✅ Active |
+| 2 | google/gemini-3-pro-preview | 🟢0.1604 | ✅ Active |
+| 3 | xai/grok-4 | 🟢0.2140 | ✅ Active |
+| 4 | perplexity/sonar-pro | 🟢0.2413 | ✅ Active |
+| 5 | xai/grok-4.1-fast-reasoning | 🟢0.2540 | ✅ Active |
+| 6 | mistral/ministral-3b-latest | 🟢0.2596 | ✅ Active |
+| 7 | anthropic/claude-opus-4-5 | 🟢0.2707 | ✅ Active |
+| 8 | anthropic/claude-sonnet-4-5 | 🟢0.3265 | ✅ Active |
+| 9 | xai/grok-2-vision | 🟢0.3565 | ✅ Active |
+| 10 | openai/gpt-4o | 🟢0.3567 | ✅ Active |
 
 ### 1h Horizon (Top 10)
 
 | Rank | Model | Log Loss | Status |
 |------|-------|----------|--------|
-| 1 | openai/gpt-5-mini | 🟡0.6742 | ✅ Active |
-| 2 | xai/grok-4-fast-non-reasoning | 🟡0.6950 | ✅ Active |
-| 3 | openai/gpt-5.2 | 🟡0.6993 | ✅ Active |
-| 4 | mistral/pixtral-12b-2409 | 🟡0.7102 | ❌ P2 |
-| 5 | openai/gpt-5 | 🟡0.7136 | ✅ Active |
-| 6 | anthropic/claude-opus-4-5 | 🟡0.7136 | ✅ Active |
-| 7 | anthropic/claude-3-5-sonnet-20241022 | 🟡0.7136 | ✅ Active |
-| 8 | anthropic/claude-3-5-haiku-latest | 🟡0.7136 | ✅ Active |
-| 9 | openai/gpt-4o | 🟡0.7136 | ✅ Active |
-| 10 | openai/gpt-4o-mini | 🟡0.7136 | ✅ Active |
+| 1 | mistral/ministral-8b-latest | 🟢0.0901 | ✅ Active |
+| 2 | mistral/ministral-3b-latest | 🟢0.2681 | ✅ Active |
+| 3 | google/gemini-3-pro-preview | 🟢0.3037 | ✅ Active |
+| 4 | perplexity/sonar-pro | 🟢0.3126 | ✅ Active |
+| 5 | xai/grok-4 | 🟢0.3652 | ✅ Active |
+| 6 | xai/grok-2-vision | 🟢0.3720 | ✅ Active |
+| 7 | anthropic/claude-3-5-haiku-latest | 🟢0.3756 | ✅ Active |
+| 8 | anthropic/claude-opus-4-5 | 🟢0.3761 | ✅ Active |
+| 9 | anthropic/claude-sonnet-4-5 | 🟢0.3812 | ✅ Active |
+| 10 | xai/grok-4.1-fast-reasoning | 🟢0.4872 | ✅ Active |
 
 ### 4h Horizon (Top 10)
 
 | Rank | Model | Log Loss | Status |
 |------|-------|----------|--------|
-| 1 | google/gemini-3-pro-preview | 🟢0.0513 | ❌ P0 |
-| 2 | google/gemini-2.5-pro | 🟢0.1054 | ❌ P2 |
-| 3 | mistral/pixtral-12b-2409 | 🟢0.4790 | ❌ P2 |
-| 4 | openai/gpt-5 | 🟡0.5978 | ✅ Active |
-| 5 | mistral/pixtral-large-latest | 🔴0.9163 | ❌ P2 |
-| 6 | google/gemini-2.5-flash-lite | 🔴0.9576 | ✅ Active |
-| 7 | anthropic/claude-3-7-sonnet-latest | 🔴1.0053 | ✅ Active |
-| 8 | openai/gpt-5-mini | 🔴1.1395 | ✅ Active |
-| 9 | anthropic/claude-haiku-4-5 | 🔴1.3863 | ✅ Active |
-| 10 | anthropic/claude-sonnet-4-5 | 🔴1.3879 | ❌ P2 |
+| 1 | mistral/ministral-8b-latest | 🟢0.1840 | ✅ Active |
+| 2 | anthropic/claude-3-5-haiku-latest | 🟢0.4043 | ✅ Active |
+| 3 | perplexity/sonar-pro | 🟢0.4342 | ✅ Active |
+| 4 | xai/grok-2-vision | 🟢0.4946 | ✅ Active |
+| 5 | google/gemini-3-pro-preview | 🟡0.5421 | ✅ Active |
+| 6 | xai/grok-4.1-fast-reasoning | 🟡0.5675 | ✅ Active |
+| 7 | anthropic/claude-opus-4-5 | 🟡0.6294 | ✅ Active |
+| 8 | xai/grok-4-fast-non-reasoning | 🟡0.7105 | ✅ Active |
+| 9 | xai/grok-4 | 🟡0.7334 | ✅ Active |
+| 10 | openai/gpt-5.2 | 🟡0.7748 | ✅ Active |
 
 ### 24h Horizon (Top 10)
 
 | Rank | Model | Log Loss | Status |
 |------|-------|----------|--------|
-| 1 | openai/gpt-5 | 🟡0.6749 | ✅ Active |
-| 2 | mistral/pixtral-12b-2409 | 🟡0.6821 | ❌ P2 |
-| 3 | anthropic/claude-3-7-sonnet-latest | 🟡0.7197 | ✅ Active |
-| 4 | openai/gpt-5.2 | 🟡0.7448 | ✅ Active |
-| 5 | xai/grok-4-fast-non-reasoning | 🟡0.7683 | ✅ Active |
-| 6 | anthropic/claude-opus-4-5 | 🟡0.7811 | ✅ Active |
-| 7 | anthropic/claude-3-5-sonnet-20241022 | 🟡0.7811 | ✅ Active |
-| 8 | anthropic/claude-3-5-haiku-latest | 🟡0.7811 | ✅ Active |
-| 9 | openai/gpt-4o | 🟡0.7811 | ✅ Active |
-| 10 | openai/gpt-4o-mini | 🟡0.7811 | ✅ Active |
+| 1 | google/gemini-3-pro-preview | 🟢0.2417 | ✅ Active |
+| 2 | mistral/ministral-8b-latest | 🟢0.2555 | ✅ Active |
+| 3 | openai/gpt-4.1-mini | 🟢0.3370 | ✅ Active |
+| 4 | anthropic/claude-3-5-haiku-latest | 🟡0.5285 | ✅ Active |
+| 5 | xai/grok-4.1-fast-reasoning | 🟡0.6796 | ✅ Active |
+| 6 | xai/grok-2-vision | 🟡0.7291 | ✅ Active |
+| 7 | perplexity/sonar-pro | 🔴0.8277 | ✅ Active |
+| 8 | google/gemini-2.5-flash | 🔴0.8333 | ❌ P2 |
+| 9 | google/gemini-2.5-flash-lite | 🔴0.8516 | ❌ P2 |
+| 10 | google/gemini-2.0-flash | 🔴0.8668 | ❌ P0 |
 
 ## Eliminated Models
 
 | Model | Phase | Reason |
 |-------|-------|--------|
-| anthropic/claude-sonnet-4-5 | 2 | no qualified horizons remaining |
-| google/gemini-2.0-flash | 2 | no qualified horizons remaining |
+| anthropic/claude-haiku-4-5 | 2 | no qualified horizons remaining |
+| anthropic/claude-3-7-sonnet-latest | 0 | Failed sanity check on all horizons |
+| openai/gpt-4o-mini | 0 | Failed sanity check on all horizons |
+| openai/gpt-5 | 0 | Failed sanity check on all horizons |
+| openai/gpt-5-mini | 0 | Failed sanity check on all horizons |
+| openai/gpt-5-nano | 0 | Failed sanity check on all horizons |
+| google/gemini-2.0-flash | 0 | Failed sanity check on all horizons |
+| google/gemini-2.5-flash | 2 | no qualified horizons remaining |
+| google/gemini-2.5-flash-lite | 2 | no qualified horizons remaining |
 | google/gemini-2.5-pro | 2 | no qualified horizons remaining |
-| google/gemini-3-pro-preview | 0 | Failed sanity check on all horizons |
-| xai/grok-4.1-fast-reasoning | 2 | no qualified horizons remaining |
-| xai/grok-4 | 2 | no qualified horizons remaining |
 | mistral/pixtral-large-latest | 2 | no qualified horizons remaining |
-| mistral/pixtral-12b-2409 | 2 | no qualified horizons remaining |
-| mistral/ministral-3b-latest | 2 | no qualified horizons remaining |
-| mistral/ministral-8b-latest | 2 | no qualified horizons remaining |
-| perplexity/sonar-pro | 2 | no qualified horizons remaining |
+| mistral/pixtral-12b-2409 | 0 | Failed sanity check on all horizons |
 
 ## Model Failures
 
 | Model | Failed Rounds |
 |-------|---------------|
-| mistral/ministral-3b-latest | 12 |
+| openai/gpt-4o | 1, 2, 3, 5, 6, 7, 8, 9, 10, 12 |
+| openai/gpt-4o-mini | 1, 2, 3, 4 |
+| openai/gpt-4.1-mini | 3, 4, 11 |
+| openai/gpt-5 | 1, 2, 3, 4 |
+| openai/gpt-5-mini | 1, 2, 3, 4 |
+| openai/gpt-5-nano | 1, 2, 3, 4 |
+| mistral/pixtral-12b-2409 | 1, 2, 3, 4 |
+| mistral/ministral-3b-latest | 2, 3, 4, 6, 7, 8, 9, 10, 11, 12 |
 
 ---
 *Auto-generated by agent_006 benchmark*

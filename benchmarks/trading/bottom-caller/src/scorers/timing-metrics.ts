@@ -25,30 +25,19 @@ export interface TrackBMetrics {
 const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /**
- * Validate that a correct round has the expected timing fields
- * Throws if label=true but timeToPivotRatio is missing (indicates data flow bug)
+ * Validate timing fields for a round (no-op with no-new-low ground truth)
  *
- * @param round - Round score to validate
- * @param horizon - Horizon being validated
- * @throws Error if timing data is expected but missing
+ * With the no-new-low ground truth system, timing data (timeToPivotRatio) is not
+ * populated because we no longer track pivot points. Track B metrics will simply
+ * return hasTimingData: false when timing data is unavailable.
+ *
+ * @param _round - Round score (unused)
+ * @param _horizon - Horizon (unused)
  */
-function validateTimingFields(round: RoundScore, horizon: TimeframeId): void {
-  // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-  const label = round.labels?.[horizon];
-  // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-  const timeToPivotRatio = round.timeToPivotRatio?.[horizon];
-
-  // If label is true (bottom occurred), timeToPivotRatio should be defined
-  // If it's not, there's a bug in the data flow
-  if (label === true && timeToPivotRatio === undefined) {
-    throw new Error(
-      `Track B timing validation failed for ${horizon}: ` +
-      `label=true but timeToPivotRatio is undefined. ` +
-      `Round ${String(round.roundNumber)} has incomplete timing data. ` +
-      `This indicates a bug in ground truth resolution - when hasStructuralBottom=true, ` +
-      `timeToPivotRatio should always be defined.`
-    );
-  }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- function signature preserved for future use
+function validateTimingFields(_round: RoundScore, _horizon: TimeframeId): void {
+  // No-op: with no-new-low ground truth, timing data is not populated.
+  // Track B metrics will return hasTimingData: false when no timing data exists.
 }
 
 /**
