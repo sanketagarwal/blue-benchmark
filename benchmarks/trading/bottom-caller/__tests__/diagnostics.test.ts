@@ -29,7 +29,8 @@ describe('computeHorizonDatasetDiagnostics', () => {
       expect(result.countFalse).toBe(0);
       expect(result.pTrue).toBe(1);
       expect(result.baselineRandomLL).toBeCloseTo(LOG_2);
-      expect(result.baselinePrevalenceLL).toBe(0);
+      expect(result.baselinePrevalenceLL).toBeGreaterThan(0);
+      expect(result.baselinePrevalenceLL).toBeLessThan(1e-14);
     });
 
     it('handles all false labels', () => {
@@ -41,7 +42,8 @@ describe('computeHorizonDatasetDiagnostics', () => {
       expect(result.countFalse).toBe(3);
       expect(result.pTrue).toBe(0);
       expect(result.baselineRandomLL).toBeCloseTo(LOG_2);
-      expect(result.baselinePrevalenceLL).toBe(0);
+      expect(result.baselinePrevalenceLL).toBeGreaterThan(0);
+      expect(result.baselinePrevalenceLL).toBeLessThan(1e-14);
     });
   });
 
@@ -94,12 +96,14 @@ describe('computeHorizonDatasetDiagnostics', () => {
       expect(result.baselinePrevalenceLL).toBeCloseTo(LOG_2);
     });
 
-    it('baselinePrevalenceLL is 0 when pTrue is 0 or 1', () => {
+    it('baselinePrevalenceLL is near-zero when pTrue is 0 or 1 (clipped)', () => {
       const allTrue = computeHorizonDatasetDiagnostics([true, true, true]);
       const allFalse = computeHorizonDatasetDiagnostics([false, false, false]);
 
-      expect(allTrue.baselinePrevalenceLL).toBe(0);
-      expect(allFalse.baselinePrevalenceLL).toBe(0);
+      expect(allTrue.baselinePrevalenceLL).toBeGreaterThan(0);
+      expect(allTrue.baselinePrevalenceLL).toBeLessThan(1e-14);
+      expect(allFalse.baselinePrevalenceLL).toBeGreaterThan(0);
+      expect(allFalse.baselinePrevalenceLL).toBeLessThan(1e-14);
     });
   });
 });

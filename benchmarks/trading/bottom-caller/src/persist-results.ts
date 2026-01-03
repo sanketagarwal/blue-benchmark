@@ -80,6 +80,20 @@ const QUICK_RESULTS_FILE = 'BENCHMARK_RESULTS_QUICK.md';
 const LOG_LOSS_GOOD = 0.5;
 const LOG_LOSS_OK = 0.8;
 
+/**
+ * Check if all horizons have single-class labels (all true or all false)
+ * @param diagnostics - Dataset diagnostics
+ * @returns True if all horizons have pTrue = 1.0 or pTrue = 0.0
+ */
+function isSingleClass(diagnostics: DatasetDiagnostics | undefined): boolean {
+  if (diagnostics?.byHorizon === undefined) {
+    return false;
+  }
+  return Object.values(diagnostics.byHorizon).every(
+    h => h.labels.pTrue === 1 || h.labels.pTrue === 0
+  );
+}
+
 // Common section headers
 const SECTION_DATASET_DIAGNOSTICS = '## Dataset Diagnostics';
 const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
@@ -311,7 +325,7 @@ function generateMethodology(): string[] {
     '- **Brier score**: Used in Phase 0 sanity checks only (not shown in tables)',
     '',
     '### Phases & Elimination',
-    '- **Phase 0 – Sanity filter**: Disqualifies horizons where model performs worse than random baseline, shows degenerate predictions (all >0.9 or <0.1), or has high extreme error rate (>20% confidently wrong)',
+    '- **Phase 0 – Sanity filter**: Disqualifies horizons where model performs worse than random baseline, shows degenerate predictions (all mapped p ≥ 0.9 or p ≤ 0.1), or has high extreme error rate (>20% confidently wrong)',
     '- **Phase 1 – Percentile filter**: Retains models above performance threshold per horizon',
     '- **Phase 2 – Stability filter**: Evaluates consistency using rolling windows; eliminates models with no qualified horizons remaining',
     '- **Phase 3 – Final ranking**: Composite scoring of surviving models',
@@ -646,7 +660,9 @@ function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | und
     const countFalse = String(d.labels.countFalse);
     const pTrue = d.labels.pTrue.toFixed(3);
     const randomLL = d.baselines.randomLogLoss.toFixed(3);
-    const prevalenceLL = d.baselines.prevalenceLogLoss.toFixed(3);
+    const prevalenceLL = d.baselines.prevalenceLogLoss < 1e-6 && d.baselines.prevalenceLogLoss > 0
+      ? d.baselines.prevalenceLogLoss.toExponential(2)
+      : d.baselines.prevalenceLogLoss.toFixed(3);
 
     lines.push(`| ${horizon} | ${n} | ${countTrue} | ${countFalse} | ${pTrue} | ${randomLL} | ${prevalenceLL} |`);
   }
@@ -823,12 +839,21 @@ function generateFailedSection(models: ModelState[]): string[] {
 }
 
 /**
+ * Label record for a single timestamp with labels per horizon
+ */
+export interface LabelByTimestamp {
+  snapTime: Date;
+  labels: Record<TimeframeId, 0 | 1>;
+}
+
+/**
  * Diagnostics bundle for benchmark run
  */
 export interface BenchmarkDiagnostics {
   dataset?: DatasetDiagnostics;
   predictionDiversity?: ModelPredictionDiversity[];
   parseDiagnostics?: ModelParseDiagnostics[];
+  labelsByTimestamp?: LabelByTimestamp[];
 }
 
 /**
@@ -1008,60 +1033,126 @@ const LABEL_IMBALANCE_THRESHOLD = 0.05;
 const LABEL_IMBALANCE_MIN_COUNT = 5;
 
 /**
+ * Format prevalence log loss value for display
+ * @param prevalenceLogLoss - The prevalence log loss value
+ * @returns Formatted string
+ */
+function formatPrevalenceLogLoss(prevalenceLogLoss: number): string {
+  const isVerySmallPositive = prevalenceLogLoss < 1e-6 && prevalenceLogLoss > 0;
+  return isVerySmallPositive
+    ? prevalenceLogLoss.toExponential(2)
+    : prevalenceLogLoss.toFixed(3);
+}
+
+/**
+ * Check if horizon has label imbalance and return warning if so
+ * @param horizon - Horizon identifier
+ * @param labels - Label statistics
+ * @param labels.n - Total number of labels
+ * @param labels.countTrue - Count of true labels
+ * @param labels.countFalse - Count of false labels
+ * @param labels.pTrue - Proportion of true labels
+ * @returns Warning message or undefined
+ */
+function checkLabelImbalance(
+  horizon: TimeframeId,
+  labels: { n: number; countTrue: number; countFalse: number; pTrue: number }
+): string | undefined {
+  const minorityCount = Math.min(labels.countTrue, labels.countFalse);
+  const minorityPct = Math.min(labels.pTrue, 1 - labels.pTrue);
+  const minorityLabel = labels.countTrue < labels.countFalse ? 'positive' : 'negative';
+  const hasImbalance = minorityPct < LABEL_IMBALANCE_THRESHOLD || minorityCount < LABEL_IMBALANCE_MIN_COUNT;
+
+  if (labels.n > 0 && hasImbalance) {
+    return `⚠️ **Warning**: ${horizon} horizon has only ${String(minorityCount)} ${minorityLabel} examples out of ${String(labels.n)} (${(minorityPct * 100).toFixed(1)}%). Metrics are dominated by base rate.`;
+  }
+  return undefined;
+}
+
+/**
  * Generate dataset diagnostics section for quick mode report
  * @param diagnostics - Dataset diagnostics or undefined
  * @returns Array of markdown lines
  */
 function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | undefined): string[] {
-  const lines: string[] = [
-    SECTION_DATASET_DIAGNOSTICS,
-    '',
-  ];
+  const lines: string[] = [SECTION_DATASET_DIAGNOSTICS, ''];
 
   if (diagnostics === undefined) {
-    lines.push(NO_DATA_COLLECTED);
-    lines.push('');
+    lines.push(NO_DATA_COLLECTED, '');
     return lines;
   }
 
-  lines.push(DATASET_DIAGNOSTICS_TABLE_HEADER);
-  lines.push(DATASET_DIAGNOSTICS_TABLE_SEPARATOR);
-
+  lines.push(DATASET_DIAGNOSTICS_TABLE_HEADER, DATASET_DIAGNOSTICS_TABLE_SEPARATOR);
   const warnings: string[] = [];
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
     const d = diagnostics.byHorizon[horizon];
-    const n = String(d.labels.n);
-    const countTrue = String(d.labels.countTrue);
-    const countFalse = String(d.labels.countFalse);
-    const pTrue = d.labels.pTrue.toFixed(3);
-    const randomLL = d.baselines.randomLogLoss.toFixed(3);
-    const prevalenceLL = d.baselines.prevalenceLogLoss.toFixed(3);
+    const row = [
+      horizon,
+      String(d.labels.n),
+      String(d.labels.countTrue),
+      String(d.labels.countFalse),
+      d.labels.pTrue.toFixed(3),
+      d.baselines.randomLogLoss.toFixed(3),
+      formatPrevalenceLogLoss(d.baselines.prevalenceLogLoss),
+    ];
+    lines.push(`| ${row.join(' | ')} |`);
 
-    lines.push(`| ${horizon} | ${n} | ${countTrue} | ${countFalse} | ${pTrue} | ${randomLL} | ${prevalenceLL} |`);
-
-    const minorityCount = Math.min(d.labels.countTrue, d.labels.countFalse);
-    const minorityPct = Math.min(d.labels.pTrue, 1 - d.labels.pTrue);
-    const minorityLabel = d.labels.countTrue < d.labels.countFalse ? 'positive' : 'negative';
-
-    if (d.labels.n > 0 && (minorityPct < LABEL_IMBALANCE_THRESHOLD || minorityCount < LABEL_IMBALANCE_MIN_COUNT)) {
-      warnings.push(
-        `⚠️ **Warning**: ${horizon} horizon has only ${String(minorityCount)} ${minorityLabel} examples out of ${String(d.labels.n)} (${(minorityPct * 100).toFixed(1)}%). Metrics are dominated by base rate.`
-      );
+    const warning = checkLabelImbalance(horizon, d.labels);
+    if (warning !== undefined) {
+      warnings.push(warning);
     }
   }
 
-  lines.push('');
-  lines.push(`*Unique prediction timestamps: ${String(diagnostics.totalRounds)}*`);
-  lines.push('');
+  lines.push('', `*Unique prediction timestamps: ${String(diagnostics.totalRounds)}*`, '');
 
+  for (const w of warnings) {
+    lines.push(w);
+  }
   if (warnings.length > 0) {
-    for (const w of warnings) {
-      lines.push(w);
-    }
     lines.push('');
   }
+
+  return lines;
+}
+
+/**
+ * Generate Label by Timestamp section for quick mode report
+ * Shows per-timestamp label matrix for window alignment verification
+ * @param labelsByTimestamp - Array of label records per timestamp or undefined
+ * @returns Array of markdown lines
+ */
+function generateLabelByTimestampSection(
+  labelsByTimestamp: LabelByTimestamp[] | undefined
+): string[] {
+  if (labelsByTimestamp === undefined || labelsByTimestamp.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '## Label by Timestamp',
+    '',
+    '| Timestamp | 15m | 1h | 4h | 24h |',
+    '|-----------|-----|----|----|-----|',
+  ];
+
+  const sorted = [...labelsByTimestamp].sort(
+    (a, b) => b.snapTime.getTime() - a.snapTime.getTime()
+  );
+
+  for (const record of sorted) {
+    const ts = record.snapTime.toISOString();
+    const l15m = String(record.labels['15m']);
+    const l1h = String(record.labels['1h']);
+    const l4h = String(record.labels['4h']);
+    const l24h = String(record.labels['24h']);
+    lines.push(`| ${ts} | ${l15m} | ${l1h} | ${l4h} | ${l24h} |`);
+  }
+
+  lines.push('');
+  lines.push('*Labels: 1 = noNewLow (bottom held), 0 = new low made*');
+  lines.push('');
 
   return lines;
 }
@@ -1211,12 +1302,53 @@ function generateQuickResultsTable(models: Map<string, ModelState>): string[] {
   }
 
   lines.push('');
-  lines.push('**Quick-run interpretation:**');
-  lines.push('- With N=3 rounds per horizon, treat rankings as indicative only.');
-  lines.push('- When pTrue=1.0 (all labels noNewLow=true), the optimal strategy is high confidence on noNewLow=true.');
-  lines.push('- Models with LL < 0.693 beat random baseline; models with LL → 0 approach optimal.');
-  lines.push('');
   return lines;
+}
+
+/**
+ * Generate single-class warning for quick mode
+ * @param diagnostics - Dataset diagnostics
+ * @returns Array of markdown lines (empty if not single-class)
+ */
+const QUICK_RUN_INTERPRETATION_HEADER = '**Quick-run interpretation:**';
+const QUICK_RUN_ROUNDS_NOTE = '- With N=3 rounds per horizon, treat rankings as indicative only.';
+
+function generateSingleClassWarning(diagnostics: DatasetDiagnostics | undefined): string[] {
+  if (!isSingleClass(diagnostics)) {
+    return [];
+  }
+
+  if (diagnostics?.byHorizon === undefined) {
+    return [];
+  }
+
+  const firstHorizon = Object.values(diagnostics.byHorizon)[0];
+  const pTrue = firstHorizon?.labels.pTrue ?? 1;
+  const isPositive = pTrue === 1;
+  const labelValue = isPositive ? 'noNewLow=true' : 'noNewLow=false';
+
+  return [
+    `> ⚠️ **Single-class sample**: All horizons have 100% ${isPositive ? 'positive' : 'negative'} labels in this run. Model rankings reflect calibration on the dominant class only. Comparisons are not meaningful for assessing prediction skill on ${isPositive ? 'negative' : 'positive'} cases.`,
+    '',
+    QUICK_RUN_INTERPRETATION_HEADER,
+    QUICK_RUN_ROUNDS_NOTE,
+    `- **This run has all labels = ${isPositive ? '1' : '0'} (${labelValue}).** Model rankings only show calibration quality, not ability to detect ${isPositive ? 'new lows' : 'no-new-low cases'}.`,
+    '- Models with LL < 0.693 beat random; models with LL → 0 approach optimal constant predictor.',
+    '',
+  ];
+}
+
+/**
+ * Generate interpretation note for quick mode (when not single-class)
+ * @returns Array of markdown lines
+ */
+function generateQuickInterpretationNote(): string[] {
+  return [
+    QUICK_RUN_INTERPRETATION_HEADER,
+    QUICK_RUN_ROUNDS_NOTE,
+    '- Models with LL < 0.693 beat random baseline; models with LL → 0 approach optimal.',
+    '',
+  ];
 }
 
 /**
@@ -1261,7 +1393,16 @@ function generateQuickMarkdown(
   lines.push(...generateQuickModelsList(models));
   lines.push(...generateQuickResultsTable(models));
 
+  const singleClassWarning = generateSingleClassWarning(meta.diagnostics?.dataset);
+  if (singleClassWarning.length > 0) {
+    lines.push(...singleClassWarning);
+  } else {
+    lines.push(...generateQuickInterpretationNote());
+  }
+
   lines.push(...generateQuickDatasetDiagnosticsSection(meta.diagnostics?.dataset));
+
+  lines.push(...generateLabelByTimestampSection(meta.diagnostics?.labelsByTimestamp));
 
   lines.push(...generateQuickPredictionDiversitySection(meta.diagnostics?.predictionDiversity));
 

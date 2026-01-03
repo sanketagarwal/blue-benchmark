@@ -159,9 +159,12 @@ export function aggregatePhase0Scores(rounds: Phase0RoundScore[]): Phase0Aggrega
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     extremeErrorRate[horizon] = horizonErrors.filter(Boolean).length / horizonErrors.length;
 
-    // Degenerate check PER HORIZON (not cross-horizon)
-    const alwaysHigh = horizonPredictions.every(p => p > 0.9);
-    const alwaysLow = horizonPredictions.every(p => p < 0.1);
+    // Degeneracy check uses mapped p values:
+    // p = noNewLow ? confidence : (1 - confidence)
+    // degenerateHigh: all p >= 0.9 (always high confidence noNewLow=true)
+    // degenerateLow: all p <= 0.1 (always high confidence noNewLow=false)
+    const alwaysHigh = horizonPredictions.every(p => p >= 0.9);
+    const alwaysLow = horizonPredictions.every(p => p <= 0.1);
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     degenerateByHorizon[horizon] = alwaysHigh || alwaysLow;
   }

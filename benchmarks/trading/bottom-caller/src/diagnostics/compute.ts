@@ -85,13 +85,9 @@ export function computeHorizonDatasetDiagnostics(
 
   const baselineRandomLL = Math.log(2);
 
-  let baselinePrevalenceLL: number;
-  if (pTrue === 0 || pTrue === 1) {
-    baselinePrevalenceLL = 0;
-  } else {
-    const losses = labels.map((y) => binaryLogLoss(pTrue, y));
-    baselinePrevalenceLL = mean(losses);
-  }
+  const pClipped = clamp(pTrue);
+  const losses = labels.map((y) => binaryLogLoss(pClipped, y));
+  const baselinePrevalenceLL = mean(losses);
 
   return {
     n,

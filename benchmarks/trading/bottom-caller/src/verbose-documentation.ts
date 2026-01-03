@@ -220,7 +220,7 @@ export function generateScoringMethodology(): string {
   lines.push('');
   lines.push('### Disqualification Thresholds:');
   lines.push('- Worse than random: meanLL > log(2) × 1.1');
-  lines.push('- Degenerate: all predictions > 0.9 or < 0.1 for a horizon');
+  lines.push('- Degenerate: all mapped probabilities p ≥ 0.9 (always predicts noNewLow with high confidence) or p ≤ 0.1 (always predicts new low with high confidence)');
   lines.push('- Extreme error rate: > 20% confident wrong predictions (p > 0.8 when label = false)');
   lines.push('- Skill margin: meanLL >= trivialBest + 0.1 (when trivialBest >= 0.1)');
 

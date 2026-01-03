@@ -21,7 +21,7 @@ import {
 } from './diagnostics/index.js';
 import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
-import { persistResults, persistQuickResults, persistScoredDatapoints, type BenchmarkDiagnostics } from './persist-results.js';
+import { persistResults, persistQuickResults, persistScoredDatapoints, type BenchmarkDiagnostics, type LabelByTimestamp } from './persist-results.js';
 import { prefetchAllRoundData } from './prefetch-warmup.js';
 import { getForecastingCharts, getForecastingChartUrls } from './replay-lab/charts.js';
 import { getCandles } from './replay-lab/ohlcv.js';
@@ -728,6 +728,7 @@ function createModelState(modelId: string): ModelState {
  */
 interface DiagnosticsState {
   allLabelsByHorizon: Record<TimeframeId, boolean[]>;
+  labelsByTimestamp: LabelByTimestamp[];
   predictionsByModelByHorizon: Map<string, Record<TimeframeId, number[]>>;
   noNewLowByModelByHorizon: Map<string, Record<TimeframeId, boolean[]>>;
   parseDiagnosticsByModel: Map<string, ParseDiagnostics>;
@@ -740,6 +741,7 @@ interface DiagnosticsState {
 function createDiagnosticsState(): DiagnosticsState {
   return {
     allLabelsByHorizon: { '15m': [], '1h': [], '4h': [], '24h': [] },
+    labelsByTimestamp: [],
     predictionsByModelByHorizon: new Map(),
     noNewLowByModelByHorizon: new Map(),
     parseDiagnosticsByModel: new Map(),
@@ -864,9 +866,13 @@ function computeFinalDiagnostics(diagnosticsState: DiagnosticsState): RunDiagnos
 /**
  * Convert RunDiagnostics to BenchmarkDiagnostics format for persistence
  * @param runDiagnostics - RunDiagnostics from computeFinalDiagnostics
+ * @param labelsByTimestamp - Optional labels by timestamp for window alignment verification
  * @returns BenchmarkDiagnostics for persistResults/persistQuickResults
  */
-function convertToBenchmarkDiagnostics(runDiagnostics: RunDiagnostics): BenchmarkDiagnostics {
+function convertToBenchmarkDiagnostics(
+  runDiagnostics: RunDiagnostics,
+  labelsByTimestamp?: LabelByTimestamp[]
+): BenchmarkDiagnostics {
   const datasetByHorizon: Record<string, {
     horizon: TimeframeId;
     labels: { n: number; countTrue: number; countFalse: number; pTrue: number };
@@ -950,6 +956,10 @@ function convertToBenchmarkDiagnostics(runDiagnostics: RunDiagnostics): Benchmar
 
   if (parseDiagnostics.length > 0) {
     result.parseDiagnostics = parseDiagnostics;
+  }
+
+  if (labelsByTimestamp !== undefined && labelsByTimestamp.length > 0) {
+    result.labelsByTimestamp = labelsByTimestamp;
   }
 
   return result;
@@ -1958,6 +1968,150 @@ function updateLabelCounts(
 }
 
 /**
+ * Log methodology documentation once at the start of the benchmark
+ */
+function logMethodologyOnce(): void {
+  if (!methodologyPrinted) {
+    logger.logMethodology('TASK SPECIFICATION', generateTaskSpecTable());
+    logger.logPromptTemplate(generatePromptDocumentation());
+    logger.logScoringExplanation(generateScoringMethodology());
+    logger.logGroundTruthExplanation(generateGroundTruthMethodology());
+    methodologyPrinted = true;
+  }
+}
+
+/**
+ * Collect labels into diagnostics state for a round
+ * @param diagnosticsState - Diagnostics state to update
+ * @param currentTime - Current prediction time
+ * @param labels - Ground truth labels per horizon
+ */
+function collectDiagnosticsLabels(
+  diagnosticsState: DiagnosticsState,
+  currentTime: Date,
+  labels: Record<TimeframeId, boolean>
+): void {
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    diagnosticsState.allLabelsByHorizon[horizon].push(labels[horizon]);
+  }
+
+  diagnosticsState.labelsByTimestamp.push({
+    snapTime: currentTime,
+    labels: {
+      '15m': labels['15m'] ? 1 : 0,
+      '1h': labels['1h'] ? 1 : 0,
+      '4h': labels['4h'] ? 1 : 0,
+      '24h': labels['24h'] ? 1 : 0,
+    },
+  });
+}
+
+/**
+ * Run all active models in batches and collect results
+ * @param activeModels - Array of active model states
+ * @param benchmarkStartTime - Benchmark start time for session isolation
+ * @returns Array of model results with state, output, and error
+ */
+async function runAllModelsInBatches(
+  activeModels: ModelState[],
+  benchmarkStartTime: Date
+): Promise<{ state: ModelState; output: BottomCallerOutput | undefined; error: Error | undefined }[]> {
+  const modelResults: { state: ModelState; output: BottomCallerOutput | undefined; error: Error | undefined }[] = [];
+
+  for (let index = 0; index < activeModels.length; index += MAX_CONCURRENT_LLM_CALLS) {
+    const batch = activeModels.slice(index, index + MAX_CONCURRENT_LLM_CALLS);
+    const batchResults = await Promise.all(
+      batch.map(async (state) => {
+        try {
+          const output = await runModelRound(state.modelId, benchmarkStartTime);
+          return { state, output, error: undefined as Error | undefined };
+        } catch (error) {
+          return { state, output: undefined, error: error as Error };
+        }
+      })
+    );
+    modelResults.push(...batchResults);
+  }
+
+  return modelResults;
+}
+
+/**
+ * Process a successful model output: score, track diversity, collect datapoints
+ * @param state - Model state to update
+ * @param output - Model output with predictions
+ * @param labels - Ground truth labels per horizon
+ * @param timeToPivotRatios - Time to pivot ratios per horizon
+ * @param firstPivotAts - First pivot timestamps per horizon
+ * @param roundNumber - Current round number
+ * @param diagnosticsState - Diagnostics state to update
+ * @param currentTime - Current prediction time
+ * @param symbolId - Trading symbol identifier
+ * @param charts - Chart data per horizon
+ * @param charts.chartByHorizon - Chart bytes keyed by horizon
+ * @param refLowByHorizon - Reference low info per horizon
+ * @param groundTruthByHorizon - Ground truth results per horizon
+ * @param scoredDatapoints - Array to collect scored datapoints
+ * @returns Round score for this model
+ */
+function processSuccessfulModelOutput(
+  state: ModelState,
+  output: BottomCallerOutput,
+  labels: Record<TimeframeId, boolean>,
+  timeToPivotRatios: Record<TimeframeId, number | undefined>,
+  firstPivotAts: Record<TimeframeId, Date | undefined>,
+  roundNumber: number,
+  diagnosticsState: DiagnosticsState,
+  currentTime: Date,
+  symbolId: string,
+  charts: { chartByHorizon: Record<TimeframeId, Uint8Array> },
+  refLowByHorizon: Record<TimeframeId, RefLowInfo>,
+  groundTruthByHorizon: Record<TimeframeId, NoNewLowResult>,
+  scoredDatapoints: ScoredDatapointRecord[]
+): Phase0RoundScore {
+  recordParseSuccess(diagnosticsState, state.modelId);
+
+  const legacyPredictions = convertPredictionsForScorer(output.predictions);
+  const roundScore = scorePhase0Round(legacyPredictions, labels);
+  recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
+
+  const probabilityPredictions: Record<TimeframeId, number> = {
+    '15m': legacyPredictions['bottom-15m'],
+    '1h': legacyPredictions['bottom-1h'],
+    '4h': legacyPredictions['bottom-4h'],
+    '24h': legacyPredictions['bottom-24h'],
+  };
+  const noNewLowPredictions: Record<TimeframeId, boolean> = {
+    '15m': output.predictions['15m'].noNewLow,
+    '1h': output.predictions['1h'].noNewLow,
+    '4h': output.predictions['4h'].noNewLow,
+    '24h': output.predictions['24h'].noNewLow,
+  };
+  trackPredictionDiversity(diagnosticsState, state.modelId, probabilityPredictions, noNewLowPredictions);
+
+  const inputRecord = createHashFromInputs(
+    JSON.stringify({ symbolId, currentTime: currentTime.toISOString(), refLowByHorizon }),
+    charts.chartByHorizon,
+    { refLowPrice: 0, candlesBack: 0, forwardLowPrice: 0, label: false },
+    currentTime
+  );
+  collectScoredDatapoints(
+    currentTime,
+    state.modelId,
+    output,
+    probabilityPredictions,
+    roundScore,
+    groundTruthByHorizon,
+    inputRecord.promptHash,
+    inputRecord.imageHashes,
+    scoredDatapoints
+  );
+
+  return roundScore;
+}
+
+/**
  * Run a single benchmark round for all active models
  * @param models - Map of model states
  * @param roundNumber - Current round number
@@ -1982,26 +2136,17 @@ async function runBenchmarkRound(
   diagnosticsState: DiagnosticsState,
   scoredDatapoints: ScoredDatapointRecord[]
 ): Promise<void> {
-  // Output methodology documentation once at start (verbose mode only)
-  if (!methodologyPrinted) {
-    logger.logMethodology('TASK SPECIFICATION', generateTaskSpecTable());
-    logger.logPromptTemplate(generatePromptDocumentation());
-    logger.logScoringExplanation(generateScoringMethodology());
-    logger.logGroundTruthExplanation(generateGroundTruthMethodology());
-    methodologyPrinted = true;
-  }
+  logMethodologyOnce();
 
   logger.logRoundHeader(roundNumber, totalRounds, currentTime);
   logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Fetching market data...`);
 
-  // Fetch chart data, reference lows, and OHLCV for ground truth in parallel
   const [charts, refLowByHorizon, ohlcvByHorizon] = await Promise.all([
     getForecastingCharts(symbolId, currentTime),
     computeRefLowByHorizon(symbolId, currentTime),
     fetchOHLCVByHorizon(symbolId, currentTime),
   ]);
 
-  // Set context
   setBottomCallerContext({
     chartByHorizon: charts.chartByHorizon,
     currentTime: currentTime.toISOString(),
@@ -2011,48 +2156,22 @@ async function runBenchmarkRound(
 
   logger.succeedSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Market data loaded`);
 
-  // Log chart URLs in verbose mode (fetch URLs separately since charts already contains bytes)
   if (isVerboseMode) {
     const chartUrls = await getForecastingChartUrls(symbolId, currentTime);
     logger.logRoundChartUrls(chartUrls.chartByHorizon);
   }
 
-  // Get ground truth (secondaryLabels captured for future analysis)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
   const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels, groundTruthByHorizon } = resolveAllHorizonsGroundTruth(ohlcvByHorizon);
 
-  // Update label counts for base rate calculation in audit records
   updateLabelCounts(labelCounts, labels);
+  collectDiagnosticsLabels(diagnosticsState, currentTime, labels);
 
-  // Collect labels for dataset diagnostics
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    diagnosticsState.allLabelsByHorizon[horizon].push(labels[horizon]);
-  }
-
-  // Run all active models in parallel with concurrency limit
   const activeModels = [...models.values()].filter(state => !state.eliminated);
   const batchCount = Math.ceil(activeModels.length / MAX_CONCURRENT_LLM_CALLS);
   logger.startSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: Calling ${String(activeModels.length)} models (${String(batchCount)} batch${batchCount > 1 ? 'es' : ''})...`);
 
-  interface ModelResult { state: typeof activeModels[0]; output: Awaited<ReturnType<typeof runModelRound>> | undefined; error: Error | undefined }
-  const modelResults: ModelResult[] = [];
-
-  // Process in batches to avoid rate limiting
-  for (let index = 0; index < activeModels.length; index += MAX_CONCURRENT_LLM_CALLS) {
-    const batch = activeModels.slice(index, index + MAX_CONCURRENT_LLM_CALLS);
-    const batchResults = await Promise.all(
-      batch.map(async (state) => {
-        try {
-          const output = await runModelRound(state.modelId, benchmarkStartTime);
-          return { state, output, error: undefined as Error | undefined };
-        } catch (error) {
-          return { state, output: undefined, error: error as Error };
-        }
-      })
-    );
-    modelResults.push(...batchResults);
-  }
+  const modelResults = await runAllModelsInBatches(activeModels, benchmarkStartTime);
   logger.succeedSpinner(`Round ${String(roundNumber)}/${String(totalRounds)}: All ${String(activeModels.length)} models complete`);
 
   // Process results sequentially for logging and state updates
@@ -2060,8 +2179,7 @@ async function runBenchmarkRound(
     if (error !== undefined) {
       state.failedRounds.push(roundNumber);
       recordParseFailure(diagnosticsState, state.modelId, roundNumber);
-      const errorMessage = error.message;
-      logger.log(`${chalk.red('✖')} ${state.modelId}: Failed - ${errorMessage.slice(0, 100)}`);
+      logger.log(`${chalk.red('✖')} ${state.modelId}: Failed - ${error.message.slice(0, 100)}`);
       continue;
     }
 
@@ -2070,47 +2188,12 @@ async function runBenchmarkRound(
       continue;
     }
 
-    recordParseSuccess(diagnosticsState, state.modelId);
-
-    const legacyPredictions = convertPredictionsForScorer(output.predictions);
-    const roundScore = scorePhase0Round(legacyPredictions, labels);
-    recordModelScore(state, roundScore, labels, timeToPivotRatios, firstPivotAts, roundNumber);
-
-    // Track prediction diversity
-    const probabilityPredictions: Record<TimeframeId, number> = {
-      '15m': legacyPredictions['bottom-15m'],
-      '1h': legacyPredictions['bottom-1h'],
-      '4h': legacyPredictions['bottom-4h'],
-      '24h': legacyPredictions['bottom-24h'],
-    };
-    const noNewLowPredictions: Record<TimeframeId, boolean> = {
-      '15m': output.predictions['15m'].noNewLow,
-      '1h': output.predictions['1h'].noNewLow,
-      '4h': output.predictions['4h'].noNewLow,
-      '24h': output.predictions['24h'].noNewLow,
-    };
-    trackPredictionDiversity(diagnosticsState, state.modelId, probabilityPredictions, noNewLowPredictions);
-
-    // Collect scored datapoints for exact re-scoring
-    const inputRecord = createHashFromInputs(
-      JSON.stringify({ symbolId, currentTime: currentTime.toISOString(), refLowByHorizon }),
-      charts.chartByHorizon,
-      { refLowPrice: 0, candlesBack: 0, forwardLowPrice: 0, label: false },
-      currentTime
-    );
-    collectScoredDatapoints(
-      currentTime,
-      state.modelId,
-      output,
-      probabilityPredictions,
-      roundScore,
-      groundTruthByHorizon,
-      inputRecord.promptHash,
-      inputRecord.imageHashes,
-      scoredDatapoints
+    const roundScore = processSuccessfulModelOutput(
+      state, output, labels, timeToPivotRatios, firstPivotAts, roundNumber,
+      diagnosticsState, currentTime, symbolId, charts, refLowByHorizon,
+      groundTruthByHorizon, scoredDatapoints
     );
 
-    // Compute baselines from accumulated labels for this model
     const baselinesByHorizon: Record<TimeframeId, BaselineLogLoss> = {
       '15m': computeBaselineLogLoss(state.labelsByHorizon['15m']),
       '1h': computeBaselineLogLoss(state.labelsByHorizon['1h']),
@@ -2536,7 +2619,7 @@ async function main(): Promise<void> {
 
     // Compute diagnostics for quick mode report
     const quickDiagnostics = computeFinalDiagnostics(diagnosticsState);
-    const benchmarkDiagnostics = convertToBenchmarkDiagnostics(quickDiagnostics);
+    const benchmarkDiagnostics = convertToBenchmarkDiagnostics(quickDiagnostics, diagnosticsState.labelsByTimestamp);
 
     // Write quick mode report with full methodology documentation
     persistQuickResults(models, {
@@ -2599,7 +2682,7 @@ async function main(): Promise<void> {
   printDiagnosticsSummary(finalDiagnostics);
 
   // Final persistence with diagnostics
-  const fullRunDiagnostics = convertToBenchmarkDiagnostics(finalDiagnostics);
+  const fullRunDiagnostics = convertToBenchmarkDiagnostics(finalDiagnostics, diagnosticsState.labelsByTimestamp);
   persistResults(models, {
     startTime,
     symbolId: SYMBOL_ID,
