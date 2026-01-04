@@ -6,6 +6,7 @@ import {
   TIMEFRAME_IDS,
   getTimeframeConfig,
   getLookbackBars,
+  getHorizonBars,
 } from './timeframe-config.js';
 
 import type { DatasetDiagnostics } from './diagnostics/dataset-diagnostics.js';
@@ -350,6 +351,40 @@ function generateHeader(meta: RunMetadata): string[] {
     `**Last Updated:** ${new Date().toISOString()}`,
     '',
   ];
+}
+
+/**
+ * Generate run configuration section
+ * @param meta - Run metadata
+ * @param modelCount - Number of models being tested
+ * @returns Array of markdown lines
+ */
+function generateRunConfigSection(meta: RunMetadata, modelCount: number): string[] {
+  const lines: string[] = [
+    '## Run Configuration',
+    '',
+    '| Setting | Value |',
+    '|---------|-------|',
+    '| Tolerance | 0% strict undercut |',
+    `| Unique snapTimes | ${String(meta.totalRounds)} |`,
+    `| Models tested | ${String(modelCount)} |`,
+    '',
+    '**Per-Horizon Configuration:**',
+    '',
+    '| Horizon | Bar Size | Lookback Bars | Horizon Bars |',
+    '|---------|----------|---------------|--------------|',
+  ];
+
+  for (const id of TIMEFRAME_IDS) {
+    const config = getTimeframeConfig(id);
+    const barSize = config.chart.barTimeframe;
+    const lookback = getLookbackBars(id);
+    const horizon = getHorizonBars(id);
+    lines.push(`| ${id} | ${barSize} | ${String(lookback)} | ${String(horizon)} |`);
+  }
+
+  lines.push('');
+  return lines;
 }
 
 /**
@@ -895,6 +930,7 @@ function generateMarkdown(
 
   const lines: string[] = [
     ...generateHeader(meta),
+    ...generateRunConfigSection(meta, models.size),
     ...generateBenchmarkOverview(),
     ...generateMethodology(),
     ...generateDatasetDiagnosticsSection(diagnostics?.dataset),
