@@ -515,7 +515,7 @@ export function generateMethodology(): string[] {
     '- **Brier score**: Used in Phase 0 sanity checks only (not shown in tables)',
     '',
     '### Phases & Elimination',
-    '- **Phase 0 – Sanity filter**: Disqualifies horizons where model performs worse than random baseline, shows degenerate predictions (all mapped p ≥ 0.9 or p ≤ 0.1), or has high extreme error rate (>20% confidently wrong)',
+    '- **Phase 0 – Sanity filter**: Disqualifies horizons where model log loss > random baseline × 1.1 (≈0.762), shows degenerate predictions (all mapped p ≥ 0.9 or p ≤ 0.1), or has high extreme error rate (>20% confident wrong predictions where p > 0.8 but actual = false)',
     '- **Phase 1 – Percentile filter**: Retains models above performance threshold per horizon',
     '- **Phase 2 – Stability filter**: Evaluates consistency using rolling windows; eliminates models with no qualified horizons remaining',
     '- **Phase 3 – Final ranking**: Composite scoring of surviving models',
