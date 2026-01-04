@@ -32,6 +32,8 @@ export interface PredictionDiversityDiagnostics {
   pMin: number;
   /** Maximum probability predicted */
   pMax: number;
+  /** Mean probability */
+  pMean: number;
   /** Standard deviation of probabilities */
   pStdDev: number;
   /** Standard deviation of confidence values */

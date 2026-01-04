@@ -37,6 +37,7 @@ describe('computeHorizonPredictionDiversity', () => {
       uniquePCount: 0,
       pMin: 0,
       pMax: 0,
+      pMean: 0,
       pStdDev: 0,
       confidenceStdDev: 0,
       noNewLowTrueRate: 0,

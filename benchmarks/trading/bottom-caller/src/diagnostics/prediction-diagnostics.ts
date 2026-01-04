@@ -17,6 +17,8 @@ export interface HorizonPredictionDiversity {
   pMin: number;
   /** Maximum probability */
   pMax: number;
+  /** Mean probability */
+  pMean: number;
   /** Standard deviation of probabilities */
   pStdDev: number;
   /** Standard deviation of confidence values */
@@ -80,6 +82,7 @@ export function computeHorizonPredictionDiversity(
       uniquePCount: 0,
       pMin: 0,
       pMax: 0,
+      pMean: 0,
       pStdDev: 0,
       confidenceStdDev: 0,
       noNewLowTrueRate: 0,
@@ -93,11 +96,15 @@ export function computeHorizonPredictionDiversity(
   // Count unique probabilities (round to 6 decimal places for comparison)
   const uniquePs = new Set(probabilities.map((p) => p.toFixed(6)));
 
+  // Compute mean probability
+  const pMean = probabilities.reduce((a, b) => a + b, 0) / n;
+
   return {
     n,
     uniquePCount: uniquePs.size,
     pMin: Math.min(...probabilities),
     pMax: Math.max(...probabilities),
+    pMean,
     pStdDev: computeStandardDeviation(probabilities),
     confidenceStdDev: computeStandardDeviation(confidences),
     noNewLowTrueRate: noNewLowTrueCount / n,

@@ -844,8 +844,8 @@ function formatHorizonDiversityRow(
   const warningMark = constant ? ' ⚠️' : '';
   return (
     `| ${horizon}${warningMark} | ${String(d.n)} | ${String(d.uniquePCount)} | ` +
-    `${d.pMin.toFixed(3)} | ${d.pMax.toFixed(3)} | ${d.pStdDev.toFixed(3)} | ` +
-    `${d.noNewLowTrueRate.toFixed(2)} |`
+    `${d.pMean.toFixed(3)} | ${d.pMin.toFixed(3)} | ${d.pMax.toFixed(3)} | ` +
+    `${d.pStdDev.toFixed(3)} | ${d.noNewLowTrueRate.toFixed(2)} |`
   );
 }
 
@@ -853,17 +853,19 @@ function formatHorizonDiversityRow(
  * Generate diversity table for a single model
  * @param model - Model prediction diversity metrics
  * @param warnings - Array to collect constant predictor warnings
+ * @param parseDiagnostic - Optional parse diagnostics for failure summary
  * @returns Array of markdown lines
  */
 function generateModelDiversityTable(
   model: ModelPredictionDiversity,
-  warnings: string[]
+  warnings: string[],
+  parseDiagnostic: ModelParseDiagnostics | undefined
 ): string[] {
   const lines: string[] = [
     `### ${model.modelId}`,
     '',
-    '| Horizon | N | Unique P | pMin | pMax | pStdDev | NoNewLow Rate |',
-    '|---------|---|----------|------|------|---------|---------------|',
+    '| Horizon | N | Unique P | pMean | pMin | pMax | pStdDev | NoNewLow Rate |',
+    '|---------|---|----------|-------|------|------|---------|---------------|',
   ];
 
   for (const horizon of HORIZONS) {
@@ -878,6 +880,24 @@ function generateModelDiversityTable(
     lines.push(formatHorizonDiversityRow(horizon, d, constant));
   }
 
+  if (parseDiagnostic !== undefined) {
+    const totalN = parseDiagnostic.parseSuccessCount +
+      parseDiagnostic.parseFailCount +
+      parseDiagnostic.schemaFailCount;
+    const effectiveN = parseDiagnostic.parseSuccessCount;
+    const hasFailures = parseDiagnostic.parseFailCount > 0 ||
+      parseDiagnostic.schemaFailCount > 0;
+
+    if (hasFailures) {
+      lines.push(
+        `**Failures:** ${String(parseDiagnostic.parseFailCount)} parse, ` +
+        `${String(parseDiagnostic.schemaFailCount)} schema ` +
+        `(effectiveN: ${String(effectiveN)}/${String(totalN)})`
+      );
+      lines.push('');
+    }
+  }
+
   lines.push('');
   return lines;
 }
@@ -885,11 +905,22 @@ function generateModelDiversityTable(
 /**
  * Generate prediction diversity section for all models
  * @param diversities - Array of model prediction diversity metrics
+ * @param parseDiagnostics - Array of model parse diagnostics for failure info
  * @returns Array of markdown lines
  */
-function generatePredictionDiversitySection(diversities: ModelPredictionDiversity[] | undefined): string[] {
+function generatePredictionDiversitySection(
+  diversities: ModelPredictionDiversity[] | undefined,
+  parseDiagnostics: ModelParseDiagnostics[] | undefined
+): string[] {
   if (diversities === undefined || diversities.length === 0) {
     return [];
+  }
+
+  const parseMap = new Map<string, ModelParseDiagnostics>();
+  if (parseDiagnostics !== undefined) {
+    for (const pd of parseDiagnostics) {
+      parseMap.set(pd.modelId, pd);
+    }
   }
 
   const lines: string[] = [
@@ -902,7 +933,8 @@ function generatePredictionDiversitySection(diversities: ModelPredictionDiversit
   const warnings: string[] = [];
 
   for (const model of diversities) {
-    lines.push(...generateModelDiversityTable(model, warnings));
+    const parseDiag = parseMap.get(model.modelId);
+    lines.push(...generateModelDiversityTable(model, warnings, parseDiag));
   }
 
   if (warnings.length > 0) {
@@ -1054,7 +1086,7 @@ function generateMarkdown(
     ...generateBenchmarkOverview(),
     ...generateMethodology(),
     ...generateDatasetDiagnosticsSection(diagnostics),
-    ...generatePredictionDiversitySection(diagnostics?.predictionDiversity),
+    ...generatePredictionDiversitySection(diagnostics?.predictionDiversity, diagnostics?.parseDiagnostics),
     ...generateParseDiagnosticsSection(diagnostics?.parseDiagnostics),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateArenaResultsByHorizon(perHorizonRankings),

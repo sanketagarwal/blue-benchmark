@@ -114,6 +114,7 @@ export function computePredictionDiversity(
       uniquePCount: 0,
       pMin: 0,
       pMax: 0,
+      pMean: 0,
       pStdDev: 0,
       confidenceStdDev: 0,
       noNewLowTrueRate: 0,
@@ -122,6 +123,7 @@ export function computePredictionDiversity(
 
   const uniquePs = new Set(predictions);
   const confidences = predictions.map((p) => Math.abs(p - 0.5));
+  const pMean = predictions.reduce((a, b) => a + b, 0) / predictions.length;
 
   let noNewLowTrueRate = 0;
   if (noNewLowPredictions !== undefined && noNewLowPredictions.length > 0) {
@@ -133,6 +135,7 @@ export function computePredictionDiversity(
     uniquePCount: uniquePs.size,
     pMin: Math.min(...predictions),
     pMax: Math.max(...predictions),
+    pMean,
     pStdDev: standardDeviation(predictions),
     confidenceStdDev: standardDeviation(confidences),
     noNewLowTrueRate,

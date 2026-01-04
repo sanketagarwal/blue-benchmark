@@ -944,6 +944,7 @@ function convertToBenchmarkDiagnostics(
       uniquePCount: number;
       pMin: number;
       pMax: number;
+      pMean: number;
       pStdDev: number;
       confidenceStdDev: number;
       noNewLowTrueRate: number;
@@ -957,6 +958,7 @@ function convertToBenchmarkDiagnostics(
         uniquePCount: d.uniquePCount,
         pMin: d.pMin,
         pMax: d.pMax,
+        pMean: d.pMean,
         pStdDev: d.pStdDev,
         confidenceStdDev: d.confidenceStdDev,
         noNewLowTrueRate: d.noNewLowTrueRate,
