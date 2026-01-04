@@ -96,8 +96,8 @@ export const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
 export const NO_DATA_COLLECTED = '*No data collected.*';
 
 // Dataset diagnostics table headers (exported for quick-mode-report)
-export const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL |';
-export const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|';
+export const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL | AlwaysTrue LL | AlwaysFalse LL | trivialBest LL |';
+export const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|---------------|----------------|----------------|';
 
 /**
  * Format a number to fixed decimal places
@@ -664,14 +664,138 @@ function generateEliminatedSection(models: ModelState[]): string[] {
 }
 
 /**
- * Generate dataset diagnostics section
- * @param diagnostics - Dataset diagnostics for all horizons
+ * Format log loss value for display
+ * @param ll - Log loss value
+ * @returns Formatted string
+ */
+function formatLogLoss(ll: number): string {
+  return ll > 1e3 ? ll.toExponential(2) : ll.toFixed(3);
+}
+
+/**
+ * Compute median of a sorted array of numbers
+ * @param sorted - Sorted array
+ * @returns Median value
+ */
+function computeMedian(sorted: number[]): number {
+  if (sorted.length === 0) {
+    return 0;
+  }
+  const midIndex = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    const leftMid = sorted[midIndex - 1] ?? 0;
+    // eslint-disable-next-line security/detect-object-injection -- midIndex computed from Math.floor
+    const rightMid = sorted[midIndex] ?? 0;
+    return (leftMid + rightMid) / 2;
+  }
+  // eslint-disable-next-line security/detect-object-injection -- midIndex computed from Math.floor
+  return sorted[midIndex] ?? 0;
+}
+
+const MINUS_LOG_EPSILON = -Math.log(1e-15);
+
+/**
+ * Check if horizon has unbalanced labels and return warning if so
+ * @param horizon - Horizon name
+ * @param countTrue - Count of true labels
+ * @param countFalse - Count of false labels
+ * @param n - Total count
+ * @returns Warning string or undefined
+ */
+function checkUnbalancedHorizon(
+  horizon: TimeframeId,
+  countTrue: number,
+  countFalse: number,
+  n: number
+): string | undefined {
+  const minorityCount = Math.min(countTrue, countFalse);
+  const minorityPct = n > 0 ? (minorityCount / n) * 100 : 0;
+  if (minorityCount < 5 || minorityPct < 5) {
+    const minorityLabel = countTrue < countFalse ? 'positive' : 'negative';
+    return `⚠️ **${horizon} horizon**: Only ${String(minorityCount)} ${minorityLabel} examples (${minorityPct.toFixed(1)}%). Results are **not rankable** for this horizon.`;
+  }
+  return undefined;
+}
+
+/**
+ * Generate dataset diagnostics table rows with baseline columns
+ * @param dataset - Dataset diagnostics
+ * @returns Object with lines and unbalanced horizon warnings
+ */
+function generateDiagnosticsTableRows(dataset: DatasetDiagnostics): {
+  rows: string[];
+  warnings: string[];
+} {
+  const rows: string[] = [];
+  const warnings: string[] = [];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const d = dataset.byHorizon[horizon];
+    const { n, countTrue, countFalse, pTrue } = d.labels;
+
+    const alwaysTrueLL = n > 0 ? (countFalse * MINUS_LOG_EPSILON) / n : 0;
+    const alwaysFalseLL = n > 0 ? (countTrue * MINUS_LOG_EPSILON) / n : 0;
+    const trivialBestLL = Math.min(alwaysTrueLL, alwaysFalseLL);
+
+    const prevalenceLL = d.baselines.prevalenceLogLoss;
+    const prevalenceLLFormatted = (prevalenceLL < 1e-6 && prevalenceLL > 0)
+      ? prevalenceLL.toExponential(2)
+      : prevalenceLL.toFixed(3);
+
+    rows.push(
+      `| ${horizon} | ${String(n)} | ${String(countTrue)} | ${String(countFalse)} | ${pTrue.toFixed(3)} | ` +
+      `${d.baselines.randomLogLoss.toFixed(3)} | ${prevalenceLLFormatted} | ` +
+      `${formatLogLoss(alwaysTrueLL)} | ${formatLogLoss(alwaysFalseLL)} | ${formatLogLoss(trivialBestLL)} |`
+    );
+
+    const warning = checkUnbalancedHorizon(horizon, countTrue, countFalse, n);
+    if (warning !== undefined) {
+      warnings.push(warning);
+    }
+  }
+
+  return { rows, warnings };
+}
+
+/**
+ * Generate per-round label distribution table
+ * @param labelsByTimestamp - Label records by timestamp
  * @returns Array of markdown lines
  */
-function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | undefined): string[] {
-  if (diagnostics === undefined) {
+function generatePerRoundLabelTable(labelsByTimestamp: LabelByTimestamp[]): string[] {
+  const lines: string[] = [
+    '**Per-round label distribution:**',
+    '',
+    '| Horizon | Min | Median | Max |',
+    '|---------|-----|--------|-----|',
+  ];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const labelsPerRound = labelsByTimestamp.map(lbt => lbt.labels[horizon]);
+    const sorted = [...labelsPerRound].sort((a, b) => a - b);
+    const min = sorted[0] ?? 0;
+    const max = sorted.at(-1) ?? 0;
+    const median = computeMedian(sorted);
+    lines.push(`| ${horizon} | ${String(min)} | ${String(median)} | ${String(max)} |`);
+  }
+  lines.push('');
+
+  return lines;
+}
+
+/**
+ * Generate dataset diagnostics section
+ * @param diagnostics - Benchmark diagnostics (includes dataset and labelsByTimestamp)
+ * @returns Array of markdown lines
+ */
+function generateDatasetDiagnosticsSection(diagnostics: BenchmarkDiagnostics | undefined): string[] {
+  if (diagnostics?.dataset === undefined) {
     return [];
   }
+
+  const { rows, warnings } = generateDiagnosticsTableRows(diagnostics.dataset);
 
   const lines: string[] = [
     SECTION_DATASET_DIAGNOSTICS,
@@ -680,31 +804,27 @@ function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | und
     '',
     DATASET_DIAGNOSTICS_TABLE_HEADER,
     DATASET_DIAGNOSTICS_TABLE_SEPARATOR,
+    ...rows,
+    '',
+    '*Clipping: ε = 1e-15 (probabilities clipped to [ε, 1-ε] to avoid log(0))*',
+    '',
+    '**Interpretation:**',
+    '- *pTrue*: Label prevalence. If extremely skewed (>0.9 or <0.1), models may achieve good log loss without skill.',
+    '- *Random LL*: Baseline log loss for p=0.5 predictor (always 0.693).',
+    '- *Prevalence LL*: Baseline log loss for optimal constant predictor. Models must beat this to show skill.',
+    '- *AlwaysTrue LL*: Log loss for always predicting p=1-ε. Low when most labels are true.',
+    '- *AlwaysFalse LL*: Log loss for always predicting p=ε. Low when most labels are false.',
+    '- *trivialBest LL*: min(AlwaysTrue LL, AlwaysFalse LL). Approaches 0 for single-class datasets.',
+    '',
   ];
 
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-    const d = diagnostics.byHorizon[horizon];
-    const n = String(d.labels.n);
-    const countTrue = String(d.labels.countTrue);
-    const countFalse = String(d.labels.countFalse);
-    const pTrue = d.labels.pTrue.toFixed(3);
-    const randomLL = d.baselines.randomLogLoss.toFixed(3);
-    const prevalenceLL = d.baselines.prevalenceLogLoss < 1e-6 && d.baselines.prevalenceLogLoss > 0
-      ? d.baselines.prevalenceLogLoss.toExponential(2)
-      : d.baselines.prevalenceLogLoss.toFixed(3);
-
-    lines.push(`| ${horizon} | ${n} | ${countTrue} | ${countFalse} | ${pTrue} | ${randomLL} | ${prevalenceLL} |`);
+  if (diagnostics.labelsByTimestamp !== undefined && diagnostics.labelsByTimestamp.length > 0) {
+    lines.push(...generatePerRoundLabelTable(diagnostics.labelsByTimestamp));
   }
 
-  lines.push('');
-  lines.push('*Clipping: ε = 1e-15 (probabilities clipped to [ε, 1-ε] to avoid log(0))*');
-  lines.push('');
-  lines.push('**Interpretation:**');
-  lines.push('- *pTrue*: Label prevalence. If extremely skewed (>0.9 or <0.1), models may achieve good log loss without skill.');
-  lines.push('- *Random LL*: Baseline log loss for p=0.5 predictor (always 0.693).');
-  lines.push('- *Prevalence LL*: Baseline log loss for optimal constant predictor. Models must beat this to show skill.');
-  lines.push('');
+  if (warnings.length > 0) {
+    lines.push(...warnings, '');
+  }
 
   return lines;
 }
@@ -933,7 +1053,7 @@ function generateMarkdown(
     ...generateRunConfigSection(meta, models.size),
     ...generateBenchmarkOverview(),
     ...generateMethodology(),
-    ...generateDatasetDiagnosticsSection(diagnostics?.dataset),
+    ...generateDatasetDiagnosticsSection(diagnostics),
     ...generatePredictionDiversitySection(diagnostics?.predictionDiversity),
     ...generateParseDiagnosticsSection(diagnostics?.parseDiagnostics),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
