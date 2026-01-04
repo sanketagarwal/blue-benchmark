@@ -54,6 +54,17 @@ export interface ParseDiagnostics {
   missingHorizonCount: number;
   /** Round numbers that failed */
   failedRounds: number[];
+  /** Breakdown by failure type */
+  failuresByType: {
+    /** Network/provider error */
+    transport: number;
+    /** Request timed out */
+    timeout: number;
+    /** JSON parse failed */
+    parse: number;
+    /** Schema validation failed */
+    schema: number;
+  };
 }
 
 /**

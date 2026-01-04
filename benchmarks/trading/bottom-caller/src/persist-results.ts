@@ -663,6 +663,8 @@ function generateDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | und
   }
 
   lines.push('');
+  lines.push('*Clipping: ε = 1e-15 (probabilities clipped to [ε, 1-ε] to avoid log(0))*');
+  lines.push('');
   lines.push('**Interpretation:**');
   lines.push('- *pTrue*: Label prevalence. If extremely skewed (>0.9 or <0.1), models may achieve good log loss without skill.');
   lines.push('- *Random LL*: Baseline log loss for p=0.5 predictor (always 0.693).');

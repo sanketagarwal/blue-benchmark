@@ -761,6 +761,12 @@ function createParseDiagnostics(): ParseDiagnostics {
     schemaFailCount: 0,
     missingHorizonCount: 0,
     failedRounds: [],
+    failuresByType: {
+      transport: 0,
+      timeout: 0,
+      parse: 0,
+      schema: 0,
+    },
   };
 }
 
@@ -796,15 +802,39 @@ function trackPredictionDiversity(
 }
 
 /**
+ * Categorize error message into failure type
+ * @param errorMessage - Error message string or undefined
+ * @returns Failure type category
+ */
+function categorizeFailure(errorMessage: string | undefined): 'transport' | 'timeout' | 'parse' | 'schema' {
+  if (errorMessage === undefined) {
+    return 'parse';
+  }
+  const lowerMessage = errorMessage.toLowerCase();
+  if (lowerMessage.includes('timeout')) {
+    return 'timeout';
+  }
+  if (lowerMessage.includes('network') || lowerMessage.includes('fetch') || /status\s*code|status:\s*\d{3}/i.test(errorMessage)) {
+    return 'transport';
+  }
+  if (lowerMessage.includes('schema') || lowerMessage.includes('validation')) {
+    return 'schema';
+  }
+  return 'parse';
+}
+
+/**
  * Record parse failure for a model
  * @param diagnosticsState - Diagnostics state to update
  * @param modelId - Model identifier
  * @param roundNumber - Round number where failure occurred
+ * @param errorMessage - Optional error message for categorization
  */
 function recordParseFailure(
   diagnosticsState: DiagnosticsState,
   modelId: string,
-  roundNumber: number
+  roundNumber: number,
+  errorMessage?: string
 ): void {
   let parseDiag = diagnosticsState.parseDiagnosticsByModel.get(modelId);
   if (parseDiag === undefined) {
@@ -813,6 +843,10 @@ function recordParseFailure(
   }
   parseDiag.parseFailCount++;
   parseDiag.failedRounds.push(roundNumber);
+
+  const failureType = categorizeFailure(errorMessage);
+  // eslint-disable-next-line security/detect-object-injection -- failureType is from categorizeFailure which returns a known union type
+  parseDiag.failuresByType[failureType]++;
 }
 
 /**
@@ -2206,13 +2240,13 @@ async function runBenchmarkRound(
   for (const { state, output, error } of modelResults) {
     if (error !== undefined) {
       state.failedRounds.push(roundNumber);
-      recordParseFailure(diagnosticsState, state.modelId, roundNumber);
+      recordParseFailure(diagnosticsState, state.modelId, roundNumber, error.message);
       logger.log(`${chalk.red('✖')} ${state.modelId}: Failed - ${error.message.slice(0, 100)}`);
       continue;
     }
 
     if (output === undefined) {
-      recordParseFailure(diagnosticsState, state.modelId, roundNumber);
+      recordParseFailure(diagnosticsState, state.modelId, roundNumber, 'No output returned');
       continue;
     }
 

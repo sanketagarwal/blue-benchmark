@@ -26,6 +26,7 @@ import {
 } from './verbose-documentation.js';
 
 import type { DatasetDiagnostics } from './diagnostics/dataset-diagnostics.js';
+import type { ModelParseDiagnostics } from './diagnostics/parse-diagnostics.js';
 import type { ModelPredictionDiversity } from './diagnostics/prediction-diagnostics.js';
 
 const QUICK_RESULTS_FILE = 'BENCHMARK_RESULTS_QUICK.md';
@@ -134,7 +135,8 @@ export function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagn
     }
   }
 
-  lines.push('', `*Unique prediction timestamps: ${String(diagnostics.totalRounds)}*`, '');
+  lines.push('', `*Unique prediction timestamps: ${String(diagnostics.totalRounds)}*`);
+  lines.push('*Clipping: ε = 1e-15 (probabilities clipped to [ε, 1-ε] to avoid log(0))*', '');
 
   for (const w of warnings) {
     lines.push(w);
@@ -144,6 +146,29 @@ export function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagn
   }
 
   return lines;
+}
+
+/**
+ * Generate label balance gate summary
+ * @param diagnostics - Benchmark diagnostics or undefined
+ * @returns Array of markdown lines
+ */
+export function generateLabelBalanceGate(diagnostics: BenchmarkDiagnostics | undefined): string[] {
+  if (diagnostics?.dataset?.byHorizon === undefined) {
+    return [];
+  }
+
+  const unbalanced = HORIZONS.filter(h => {
+    // eslint-disable-next-line security/detect-object-injection -- h from typed constant array
+    const d = diagnostics.dataset?.byHorizon[h];
+    return d !== undefined && (d.labels.countTrue === 0 || d.labels.countFalse === 0);
+  });
+
+  if (unbalanced.length === 0) {
+    return ['**Label Balance Gate:** ✅ PASSED — All horizons have ≥1 example of each class.', ''];
+  }
+
+  return [`**Label Balance Gate:** ⚠️ INFORMATIONAL ONLY — ${unbalanced.join(', ')} have < 1 negative example each.`, ''];
 }
 
 /**
@@ -307,15 +332,72 @@ export function generateQuickInterpretationNote(): string[] {
   ];
 }
 
+interface FailuresByType {
+  transport: number;
+  timeout: number;
+  parse: number;
+  schema: number;
+}
+
+function extractFailuresByType(parseDiag: ModelParseDiagnostics): FailuresByType | undefined {
+  if (!('failuresByType' in parseDiag)) {
+    return undefined;
+  }
+  return (parseDiag as unknown as { failuresByType: FailuresByType }).failuresByType;
+}
+
+function buildFailureTypeParts(byType: FailuresByType): string[] {
+  const parts: string[] = [];
+  if (byType.transport > 0) {
+    parts.push(`transport: ${String(byType.transport)}`);
+  }
+  if (byType.timeout > 0) {
+    parts.push(`timeout: ${String(byType.timeout)}`);
+  }
+  if (byType.parse > 0) {
+    parts.push(`parse: ${String(byType.parse)}`);
+  }
+  if (byType.schema > 0) {
+    parts.push(`schema: ${String(byType.schema)}`);
+  }
+  return parts;
+}
+
+/**
+ * Format failure type breakdown for display
+ * @param parseDiag - Parse diagnostics for a model or undefined
+ * @returns Formatted string like "(parse: 2, schema: 1)" or empty string
+ */
+function formatFailureTypeBreakdown(parseDiag: ModelParseDiagnostics | undefined): string {
+  if (parseDiag === undefined) {
+    return '';
+  }
+
+  const hasFailures = parseDiag.parseFailCount > 0 || parseDiag.schemaFailCount > 0;
+  if (!hasFailures) {
+    return '';
+  }
+
+  const byType = extractFailuresByType(parseDiag);
+  if (byType === undefined) {
+    return '';
+  }
+
+  const parts = buildFailureTypeParts(byType);
+  return parts.length > 0 ? ` (${parts.join(', ')})` : '';
+}
+
 /**
  * Generate results summary table for quick report
  * @param models - Map of model states
  * @param totalRounds - Total rounds in benchmark
+ * @param diagnostics - Optional benchmark diagnostics for failure type breakdown
  * @returns Array of markdown lines
  */
 export function generateQuickResultsTable(
   models: Map<string, ModelState>,
-  totalRounds: number
+  totalRounds: number,
+  diagnostics?: BenchmarkDiagnostics
 ): string[] {
   const allModels = [...models.values()];
   const metrics = allModels
@@ -330,6 +412,13 @@ export function generateQuickResultsTable(
       return a.meanLogLoss - b.meanLogLoss;
     });
 
+  const parseDiagByModel = new Map<string, ModelParseDiagnostics>();
+  if (diagnostics?.parseDiagnostics !== undefined) {
+    for (const d of diagnostics.parseDiagnostics) {
+      parseDiagByModel.set(d.modelId, d);
+    }
+  }
+
   const lines: string[] = [
     '## Results Summary',
     '',
@@ -339,9 +428,11 @@ export function generateQuickResultsTable(
   ];
 
   for (const m of metrics) {
+    const parseDiag = parseDiagByModel.get(m.modelId);
+    const failureBreakdown = formatFailureTypeBreakdown(parseDiag);
     const allRoundsFailed = m.failedRounds === m.totalRounds;
     const row = allRoundsFailed
-      ? [m.modelId, '-', '-', '-', '-', '-', `${String(m.failedRounds)}/${String(m.totalRounds)} failed`]
+      ? [m.modelId, '-', '-', '-', '-', '-', `${String(m.failedRounds)}/${String(m.totalRounds)} failed${failureBreakdown}`]
       : [
           m.modelId,
           formatLogLossCell(m.logLoss15m),
@@ -349,7 +440,7 @@ export function generateQuickResultsTable(
           formatLogLossCell(m.logLoss4h),
           formatLogLossCell(m.logLoss24h),
           formatLogLossCell(m.meanLogLoss),
-          String(m.failedRounds),
+          m.failedRounds > 0 ? `${String(m.failedRounds)}${failureBreakdown}` : String(m.failedRounds),
         ];
     lines.push(`| ${row.join(' | ')} |`);
   }
@@ -400,7 +491,7 @@ export function generateQuickMarkdown(
   lines.push('');
 
   lines.push(...generateQuickModelsList(models));
-  lines.push(...generateQuickResultsTable(models, meta.totalRounds));
+  lines.push(...generateQuickResultsTable(models, meta.totalRounds, meta.diagnostics));
 
   const singleClassWarning = generateSingleClassWarning(meta.diagnostics?.dataset);
   if (singleClassWarning.length > 0) {
@@ -410,6 +501,8 @@ export function generateQuickMarkdown(
   }
 
   lines.push(...generateQuickDatasetDiagnosticsSection(meta.diagnostics?.dataset));
+
+  lines.push(...generateLabelBalanceGate(meta.diagnostics));
 
   lines.push(...generateLabelByTimestampSection(meta.diagnostics?.labelsByTimestamp));
 
