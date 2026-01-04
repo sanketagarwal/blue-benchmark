@@ -691,21 +691,72 @@ function generateSurvivorsLeaderboard(metrics: ModelMetrics[]): string[] {
   return lines;
 }
 
+/**
+ * Header for insufficient coverage table (no Rank column)
+ */
+const INSUFFICIENT_COVERAGE_HEADER =
+  '| Model | Status | Rnds | Cov | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |';
+const INSUFFICIENT_COVERAGE_SEPARATOR =
+  '|-------|--------|------|-----|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|';
+
+/**
+ * Format a leaderboard row without rank column (for insufficient coverage models)
+ * @param m - Model metrics
+ * @returns Formatted markdown table row
+ */
+function formatLeaderboardRowNoRank(m: ModelMetrics): string {
+  const ll15m = formatLogLossCell(m.logLoss15m);
+  const ll1h = formatLogLossCell(m.logLoss1h);
+  const ll4h = formatLogLossCell(m.logLoss4h);
+  const ll24h = formatLogLossCell(m.logLoss24h);
+  const llMean = formatLogLossCell(m.meanLogLoss);
+  const pctRank = formatNumber(m.avgPercentileRank, 1);
+  const bestWin = formatNumber(m.avgBestWindow, 3);
+  const stability = formatNumber(m.avgStability, 3);
+  const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
+  const score = formatNumber(m.compositeScore, 4);
+  const cov = formatCoverageCell(m);
+  return `| ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${cov} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | ${score} |`;
+}
+
 function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
+  const adequateCoverage = metrics.filter(m => !m.hasLowCoverage);
+  const insufficientCoverage = metrics.filter(m => m.hasLowCoverage);
+
   const lines: string[] = [
     '## All Models (Research Reference)',
     '',
-    '*Includes eliminated models for comparative analysis. Rankings are by raw composite score, not tournament outcome.*',
+    '*Rankings are by composite score among models with adequate coverage (≥80%).*',
     '',
-    LEADERBOARD_HEADER,
-    LEADERBOARD_SEPARATOR,
   ];
 
-  for (const [index, m] of metrics.entries()) {
-    lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
+  if (adequateCoverage.length > 0) {
+    lines.push(LEADERBOARD_HEADER);
+    lines.push(LEADERBOARD_SEPARATOR);
+
+    for (const [index, m] of adequateCoverage.entries()) {
+      lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
+    }
+    lines.push('');
+  } else {
+    lines.push('*No models have adequate coverage (≥80%).*');
+    lines.push('');
   }
 
-  lines.push('');
+  if (insufficientCoverage.length > 0) {
+    lines.push('### Insufficient Coverage (Not Ranked)');
+    lines.push('');
+    lines.push('*These models had <80% coverage and are shown for reference only, not as competitive rankings.*');
+    lines.push('');
+    lines.push(INSUFFICIENT_COVERAGE_HEADER);
+    lines.push(INSUFFICIENT_COVERAGE_SEPARATOR);
+
+    for (const m of insufficientCoverage) {
+      lines.push(formatLeaderboardRowNoRank(m));
+    }
+    lines.push('');
+  }
+
   lines.push('**Legend:**');
   lines.push('');
   lines.push('*Log loss color coding:*');
