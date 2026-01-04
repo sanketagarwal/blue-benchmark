@@ -803,7 +803,9 @@ function generateArenaResultsByHorizon(
   const lines: string[] = [
     '## Arena Results by Horizon',
     '',
-    '*Models with <10 scored rounds on a given horizon are excluded from that arena.*',
+    '*Eligibility: Models must have ≥10 scored rounds on this horizon AND be qualified for this horizon (not disqualified in Phase 0/1/2 for that specific horizon).*',
+    '',
+    '*Note: A model may show log loss in Final Standings but not appear here if it was disqualified at this horizon during Phase 0/1/2.*',
     '',
   ];
 
@@ -1040,7 +1042,7 @@ function generateHorizonBreakdown(
   const lines: string[] = [
     SECTION_PER_HORIZON_TOP_10,
     '',
-    '*Same data as Arena Winners, showing top 10 per horizon. Models with <10 scored rounds excluded.*',
+    '*Same data as Arena Winners, showing top 10 per horizon. Eligibility: ≥10 scored rounds AND not disqualified at this horizon in Phase 0/1/2.*',
     '',
   ];
 
