@@ -31,6 +31,35 @@ export interface HorizonDisqualification {
 }
 
 /**
+ * Horizon rankability status
+ */
+export interface HorizonRankability {
+  horizon: TimeframeId;
+  isRankable: boolean;
+  reason?: string;
+}
+
+/**
+ * Check if a horizon has sufficient label diversity to be rankable
+ * @param trueCount - Number of true labels
+ * @param falseCount - Number of false labels
+ * @param minClassCount - Minimum required count for minority class (default 5)
+ * @param minClassRatio - Minimum required ratio for minority class (default 0.10)
+ * @returns True if horizon is rankable
+ */
+export function isHorizonRankable(
+  trueCount: number,
+  falseCount: number,
+  minClassCount = 5,
+  minClassRatio = 0.1
+): boolean {
+  const minorityCount = Math.min(trueCount, falseCount);
+  const total = trueCount + falseCount;
+  const minorityRatio = total > 0 ? minorityCount / total : 0;
+  return minorityCount >= minClassCount && minorityRatio >= minClassRatio;
+}
+
+/**
  * Model state for persistence
  */
 export interface ModelState {
@@ -88,6 +117,59 @@ interface ModelMetrics {
 
 export const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
+
+/**
+ * Build non-rankable reason message for a horizon
+ * @param countTrue - Number of true labels
+ * @param countFalse - Number of false labels
+ * @param n - Total number of labels
+ * @returns Human-readable reason message
+ */
+function buildNonRankableReason(
+  countTrue: number,
+  countFalse: number,
+  n: number
+): string {
+  const minorityCount = Math.min(countTrue, countFalse);
+  const minorityLabel = countTrue < countFalse ? 'positive' : 'negative';
+  const minorityPct = n > 0 ? ((minorityCount / n) * 100).toFixed(1) : '0';
+  return `only ${String(minorityCount)} ${minorityLabel} examples (${minorityPct}%)`;
+}
+
+/**
+ * Compute rankability for all horizons from dataset diagnostics
+ * @param dataset - Dataset diagnostics
+ * @returns Map of horizon to rankability status
+ */
+export function computeHorizonRankability(
+  dataset: DatasetDiagnostics | undefined
+): Map<TimeframeId, HorizonRankability> {
+  const rankabilityMap = new Map<TimeframeId, HorizonRankability>();
+
+  for (const horizon of HORIZONS) {
+    if (dataset?.byHorizon === undefined) {
+      rankabilityMap.set(horizon, { horizon, isRankable: true });
+      continue;
+    }
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const d = dataset.byHorizon[horizon];
+    const { countTrue, countFalse, n } = d.labels;
+    const rankable = isHorizonRankable(countTrue, countFalse);
+
+    if (rankable) {
+      rankabilityMap.set(horizon, { horizon, isRankable: true });
+    } else {
+      rankabilityMap.set(horizon, {
+        horizon,
+        isRankable: false,
+        reason: buildNonRankableReason(countTrue, countFalse, n),
+      });
+    }
+  }
+
+  return rankabilityMap;
+}
 
 // Quality thresholds for log loss (lower is better)
 const LOG_LOSS_GOOD = 0.5;
@@ -242,11 +324,13 @@ function getStatusString(eliminated: boolean, phase: number | undefined): string
  * Calculate all metrics for a model
  * @param model - Model state
  * @param allMeanLogLosses - All models' mean log losses for percentile ranking
+ * @param rankabilityMap - Map of horizon to rankability status (optional)
  * @returns Model metrics
  */
 function calculateModelMetrics(
   model: ModelState,
-  allMeanLogLosses: number[]
+  allMeanLogLosses: number[],
+  rankabilityMap?: Map<TimeframeId, HorizonRankability>
 ): ModelMetrics {
   // Per-horizon log loss averages
   const logLoss15m = calculateMean(model.logLossByHorizon['15m']);
@@ -254,7 +338,13 @@ function calculateModelMetrics(
   const logLoss4h = calculateMean(model.logLossByHorizon['4h']);
   const logLoss24h = calculateMean(model.logLossByHorizon['24h']);
 
-  // Overall mean log loss
+  // Filter to only rankable horizons for composite score calculation
+  const rankableHorizons = HORIZONS.filter(h => {
+    const rankability = rankabilityMap?.get(h);
+    return rankability === undefined || rankability.isRankable;
+  });
+
+  // Overall mean log loss (uses all horizons for display)
   const allLosses: number[] = [];
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
@@ -262,18 +352,26 @@ function calculateModelMetrics(
   }
   const meanLogLoss = calculateMean(allLosses);
 
+  // For composite score, only use rankable horizons
+  const rankableLosses: number[] = [];
+  for (const horizon of rankableHorizons) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
+    rankableLosses.push(...model.logLossByHorizon[horizon]);
+  }
+  const rankableMeanLogLoss = rankableLosses.length > 0 ? calculateMean(rankableLosses) : meanLogLoss;
+
   // Percentile rank (higher is better, lower log loss = higher rank)
-  const avgPercentileRank = calculatePercentileRank(meanLogLoss, allMeanLogLosses);
+  const avgPercentileRank = calculatePercentileRank(rankableMeanLogLoss, allMeanLogLosses);
 
-  // Best window (lower is better)
-  const avgBestWindow = calculateBestWindow(allLosses);
+  // Best window (lower is better) - only on rankable horizons
+  const avgBestWindow = rankableLosses.length > 0 ? calculateBestWindow(rankableLosses) : calculateBestWindow(allLosses);
 
-  // Stability (lower std dev is better)
-  const avgStability = calculateStandardDeviation(allLosses);
+  // Stability (lower std dev is better) - only on rankable horizons
+  const avgStability = rankableLosses.length > 0 ? calculateStandardDeviation(rankableLosses) : calculateStandardDeviation(allLosses);
 
   // Time to pivot ratio (lower is better = earlier pivot detection)
   const allRatios: number[] = [];
-  for (const horizon of HORIZONS) {
+  for (const horizon of rankableHorizons) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
     allRatios.push(...model.timeToPivotRatios[horizon]);
   }
@@ -571,7 +669,62 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
   lines.push('- `BestWin`: Best rolling-window average log loss (lower = better)');
   lines.push('- `Stabil`: Standard deviation of per-round log loss (lower = better)');
   lines.push('- `TtP`: Time-to-pivot ratio (lower = better). *Note: With the current no-new-low ground truth system, timing data is not available; all models show TtP = 0.50.*');
-  lines.push('- `Score`: Composite metric combining rank, best window, stability, and timing (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹)');
+  lines.push('- `Score`: Composite metric combining rank, best window, stability, and timing (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹). *Non-rankable horizons (insufficient label diversity) are excluded from composite score calculation.*');
+  lines.push('');
+
+  return lines;
+}
+
+/**
+ * Format a single arena ranking row
+ * @param ranking - The horizon ranking to format
+ * @param rank - The numeric rank (1-based)
+ * @returns Formatted markdown table row
+ */
+function formatArenaRankingRow(ranking: HorizonRanking, rank: number): string {
+  const medalOptions = ['🥇', '🥈', '🥉'];
+  const medal = rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
+  const score = formatNumber(ranking.score, 2);
+  const logLoss = `${getLogLossEmoji(ranking.logLoss)}${formatNumber(ranking.logLoss, 2)}`;
+  const bestWindow = formatNumber(ranking.bestWindow, 2);
+  const stability = formatNumber(ranking.stability, 3);
+  return `| ${medal} | ${ranking.modelId} | ${score} | ${logLoss} | ${bestWindow} | ${stability} |`;
+}
+
+/**
+ * Generate arena table for a single rankable horizon
+ * @param horizonRankings - Rankings for this horizon
+ * @param horizon - The horizon timeframe ID
+ * @param metricsMap - Map of model ID to metrics for filtering
+ * @returns Array of markdown lines
+ */
+function generateHorizonArenaTable(
+  horizonRankings: HorizonRanking[],
+  horizon: TimeframeId,
+  metricsMap: Map<string, ModelMetrics>
+): string[] {
+  const filteredRankings = horizonRankings.filter(r => {
+    const metrics = metricsMap.get(r.modelId);
+    if (metrics === undefined) {
+      return true;
+    }
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const effectiveRounds = metrics.effectiveRoundsByHorizon[horizon];
+    return effectiveRounds >= MIN_EFFECTIVE_ROUNDS;
+  });
+
+  if (filteredRankings.length === 0) {
+    return ['*No models qualified for this arena*', ''];
+  }
+
+  const lines = [
+    '| Rank | Model | Score | Log Loss | Best Window | Stability |',
+    '|------|-------|-------|----------|-------------|-----------|',
+  ];
+
+  for (const [index, ranking] of filteredRankings.entries()) {
+    lines.push(formatArenaRankingRow(ranking, index + 1));
+  }
   lines.push('');
 
   return lines;
@@ -581,13 +734,16 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
  * Generate arena results by horizon section
  * Shows the top 8 arena competitors for each horizon with full metrics
  * Excludes models with insufficient coverage on that horizon
+ * Skips non-rankable horizons with an explanation
  * @param rankings - Per-horizon rankings from phase-3-scorer
  * @param metricsMap - Map of modelId to ModelMetrics for coverage filtering
+ * @param rankabilityMap - Map of horizon to rankability status
  * @returns Array of markdown lines
  */
 function generateArenaResultsByHorizon(
   rankings: PerHorizonRankings | undefined,
-  metricsMap: Map<string, ModelMetrics>
+  metricsMap: Map<string, ModelMetrics>,
+  rankabilityMap: Map<TimeframeId, HorizonRankability>
 ): string[] {
   if (rankings === undefined) {
     return [];
@@ -609,47 +765,21 @@ function generateArenaResultsByHorizon(
 
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-    const horizonRankings: HorizonRanking[] = rankings[horizon];
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
     const label = horizonLabels[horizon];
-
-    const filteredRankings = horizonRankings.filter(r => {
-      const metrics = metricsMap.get(r.modelId);
-      if (metrics === undefined) {
-        return true;
-      }
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-      const effectiveRounds = metrics.effectiveRoundsByHorizon[horizon];
-      return effectiveRounds >= MIN_EFFECTIVE_ROUNDS;
-    });
-
     lines.push(`### ${label}`);
     lines.push('');
 
-    if (filteredRankings.length === 0) {
-      lines.push('*No models qualified for this arena*');
+    const rankability = rankabilityMap.get(horizon);
+    if (rankability !== undefined && !rankability.isRankable) {
+      const reason = rankability.reason ?? 'insufficient label diversity';
+      lines.push(`*This horizon is not rankable: ${reason}. Rankings would not be statistically meaningful.*`);
       lines.push('');
       continue;
     }
 
-    lines.push('| Rank | Model | Score | Log Loss | Best Window | Stability |');
-    lines.push('|------|-------|-------|----------|-------------|-----------|');
-
-    for (const [index, ranking] of filteredRankings.entries()) {
-      const rank = index + 1;
-      const medalOptions = ['🥇', '🥈', '🥉'];
-      const medal = rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
-
-      const score = formatNumber(ranking.score, 2);
-      const logLoss = `${getLogLossEmoji(ranking.logLoss)}${formatNumber(ranking.logLoss, 2)}`;
-      const bestWindow = formatNumber(ranking.bestWindow, 2);
-      const stability = formatNumber(ranking.stability, 3);
-
-      lines.push(
-        `| ${medal} | ${ranking.modelId} | ${score} | ${logLoss} | ${bestWindow} | ${stability} |`
-      );
-    }
-    lines.push('');
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const horizonRankings: HorizonRanking[] = rankings[horizon];
+    lines.push(...generateHorizonArenaTable(horizonRankings, horizon, metricsMap));
   }
 
   return lines;
@@ -1362,10 +1492,13 @@ function generateMarkdown(
       return calculateMean(losses);
     });
 
-  // Calculate metrics for all models with data
+  // Compute horizon rankability from dataset diagnostics
+  const rankabilityMap = computeHorizonRankability(diagnostics?.dataset);
+
+  // Calculate metrics for all models with data (pass rankability to exclude non-rankable from composite)
   const modelMetrics = allModels
     .filter(m => m.roundScores.length > 0)
-    .map(m => calculateModelMetrics(m, allMeanLogLosses))
+    .map(m => calculateModelMetrics(m, allMeanLogLosses, rankabilityMap))
     .sort((a, b) => b.compositeScore - a.compositeScore);
 
   // Build metrics map for coverage filtering in arena results
@@ -1384,7 +1517,7 @@ function generateMarkdown(
     ...generateFailureAuditSection(diagnostics?.parseDiagnostics, meta.totalRounds, allModels.length),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateMassTieWarning(modelMetrics),
-    ...generateArenaResultsByHorizon(perHorizonRankings, metricsMap),
+    ...generateArenaResultsByHorizon(perHorizonRankings, metricsMap, rankabilityMap),
     ...generateCrossHorizonStrength(perHorizonRankings),
     ...generateSurvivorsLeaderboard(modelMetrics),
     ...generateAllModelsLeaderboard(modelMetrics),
