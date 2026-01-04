@@ -191,6 +191,9 @@ const SECTION_PER_HORIZON_TOP_10 = '## Per-Horizon Rankings (Top 10)';
 // Section header for cross-horizon strength
 const SECTION_CROSS_HORIZON_STRENGTH = '## Cross-Horizon Strength';
 
+// Message for horizons with no qualifying models
+const NO_MODELS_QUALIFIED_MESSAGE = '*No models qualified for this horizon.*';
+
 /**
  * Check if a model has insufficient coverage to qualify for ranking
  * @param effectiveRounds - Number of scored rounds
@@ -954,7 +957,7 @@ function generateHorizonBreakdownTable(
   const top10 = filteredRankings.slice(0, 10);
 
   if (top10.length === 0) {
-    return ['*No models qualified for this horizon.*', ''];
+    return [NO_MODELS_QUALIFIED_MESSAGE, ''];
   }
 
   const lines = [
@@ -974,8 +977,52 @@ function generateHorizonBreakdownTable(
 }
 
 /**
+ * Generate diagnostic view table for non-rankable horizons (no rank numbers)
+ * @param rankings - Rankings for the horizon
+ * @param horizon - Horizon identifier
+ * @param metricsMap - Map of modelId to ModelMetrics for coverage info
+ * @returns Array of markdown lines
+ */
+function generateDiagnosticTable(
+  rankings: HorizonRanking[],
+  horizon: TimeframeId,
+  metricsMap: Map<string, ModelMetrics>
+): string[] {
+  const filteredRankings = rankings.filter(r => {
+    const metrics = metricsMap.get(r.modelId);
+    if (metrics === undefined) {
+      return true;
+    }
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const effectiveRounds = metrics.effectiveRoundsByHorizon[horizon];
+    return effectiveRounds >= MIN_EFFECTIVE_ROUNDS;
+  });
+
+  if (filteredRankings.length === 0) {
+    return [NO_MODELS_QUALIFIED_MESSAGE, ''];
+  }
+
+  const lines = [
+    '| Model | Log Loss | Status |',
+    '|-------|----------|--------|',
+  ];
+
+  for (const r of filteredRankings) {
+    const logLossFormatted = isValidMean(r.logLoss)
+      ? formatNumber(r.logLoss, 4)
+      : 'N/A';
+    const status = '✅ Active';
+    lines.push(`| ${r.modelId} | ${logLossFormatted} | ${status} |`);
+  }
+  lines.push('');
+
+  return lines;
+}
+
+/**
  * Generate per-horizon breakdown table showing top 10 from arena rankings
  * Uses the same data source as Arena Winners for consistency
+ * For non-rankable horizons, shows diagnostic view without rank numbers
  * @param rankings - Per-horizon rankings from phase-3-scorer (same as Arena Winners)
  * @param metricsMap - Map of modelId to ModelMetrics for coverage info
  * @param rankabilityMap - Map of horizon to rankability status
@@ -998,20 +1045,28 @@ function generateHorizonBreakdown(
   ];
 
   for (const horizon of HORIZONS) {
-    lines.push(`### ${horizon} Horizon (Top 10)`);
-    lines.push('');
-
     const rankability = rankabilityMap.get(horizon);
-    if (rankability !== undefined && !rankability.isRankable) {
-      const reason = rankability.reason ?? DEFAULT_NON_RANKABLE_REASON;
-      lines.push(`*This horizon is not rankable: ${reason}.*`);
-      lines.push('');
-      continue;
-    }
+    const isRankable = rankability === undefined || rankability.isRankable;
 
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-    const horizonRankings: HorizonRanking[] = rankings[horizon];
-    lines.push(...generateHorizonBreakdownTable(horizonRankings, horizon, metricsMap));
+    if (isRankable) {
+      lines.push(`### ${horizon} Horizon (Top 10)`);
+      lines.push('');
+
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+      const horizonRankings: HorizonRanking[] = rankings[horizon];
+      lines.push(...generateHorizonBreakdownTable(horizonRankings, horizon, metricsMap));
+    } else {
+      lines.push(`### ${horizon} Horizon (Diagnostic Only)`);
+      lines.push('');
+
+      const reason = rankability.reason ?? DEFAULT_NON_RANKABLE_REASON;
+      lines.push(`*This horizon is not rankable: ${reason}. Data shown for reference only, not as competitive rankings.*`);
+      lines.push('');
+
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+      const horizonRankings: HorizonRanking[] = rankings[horizon];
+      lines.push(...generateDiagnosticTable(horizonRankings, horizon, metricsMap));
+    }
   }
 
   return lines;
