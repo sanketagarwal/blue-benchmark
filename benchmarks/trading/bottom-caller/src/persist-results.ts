@@ -1421,6 +1421,39 @@ function formatHorizonDiversityRow(
   );
 }
 
+interface FailuresByTypeRecord {
+  transport: number;
+  timeout: number;
+  parse: number;
+  schema: number;
+  other: number;
+}
+
+/**
+ * Format failures by type into a human-readable string
+ * @param byType - Failures broken down by type
+ * @returns Array of formatted failure strings (e.g., ["3 schema", "1 parse"])
+ */
+function formatFailuresByTypeParts(byType: FailuresByTypeRecord): string[] {
+  const parts: string[] = [];
+  if (byType.transport > 0) {
+    parts.push(`${String(byType.transport)} transport`);
+  }
+  if (byType.timeout > 0) {
+    parts.push(`${String(byType.timeout)} timeout`);
+  }
+  if (byType.parse > 0) {
+    parts.push(`${String(byType.parse)} parse`);
+  }
+  if (byType.schema > 0) {
+    parts.push(`${String(byType.schema)} schema`);
+  }
+  if (byType.other > 0) {
+    parts.push(`${String(byType.other)} other`);
+  }
+  return parts;
+}
+
 /**
  * Generate diversity table for a single model
  * @param model - Model prediction diversity metrics
@@ -1452,18 +1485,16 @@ function generateModelDiversityTable(
     lines.push(formatHorizonDiversityRow(horizon, d, constant));
   }
 
-  if (parseDiagnostic !== undefined) {
+  if (parseDiagnostic?.failuresByType !== undefined) {
     const totalN = parseDiagnostic.parseSuccessCount +
       parseDiagnostic.parseFailCount +
       parseDiagnostic.schemaFailCount;
     const effectiveN = parseDiagnostic.parseSuccessCount;
-    const hasFailures = parseDiagnostic.parseFailCount > 0 ||
-      parseDiagnostic.schemaFailCount > 0;
+    const parts = formatFailuresByTypeParts(parseDiagnostic.failuresByType);
 
-    if (hasFailures) {
+    if (parts.length > 0) {
       lines.push(
-        `**Failures:** ${String(parseDiagnostic.parseFailCount)} parse, ` +
-        `${String(parseDiagnostic.schemaFailCount)} schema ` +
+        `**Failures:** ${parts.join(', ')} ` +
         `(effectiveN: ${String(effectiveN)}/${String(totalN)})`
       );
       lines.push('');
