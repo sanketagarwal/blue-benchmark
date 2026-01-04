@@ -188,6 +188,9 @@ const DEFAULT_NON_RANKABLE_REASON = 'insufficient label diversity';
 // Section header for per-horizon rankings
 const SECTION_PER_HORIZON_TOP_10 = '## Per-Horizon Rankings (Top 10)';
 
+// Section header for cross-horizon strength
+const SECTION_CROSS_HORIZON_STRENGTH = '## Cross-Horizon Strength';
+
 /**
  * Check if a model has insufficient coverage to qualify for ranking
  * @param effectiveRounds - Number of scored rounds
@@ -830,19 +833,38 @@ function generateArenaResultsByHorizon(
 /**
  * Generate cross-horizon strength analysis
  * Shows models that appear in multiple horizon arenas
+ * Only counts appearances in rankable horizons
  * @param rankings - Per-horizon rankings from phase-3-scorer
+ * @param rankabilityMap - Map of horizon to rankability status
  * @returns Array of markdown lines
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Complex multi-horizon aggregation logic
-function generateCrossHorizonStrength(rankings: PerHorizonRankings | undefined): string[] {
+function generateCrossHorizonStrength(
+  rankings: PerHorizonRankings | undefined,
+  rankabilityMap: Map<TimeframeId, HorizonRankability>
+): string[] {
   if (rankings === undefined) {
     return [];
   }
 
-  // Count appearances per model across all horizons
+  const rankableHorizons = HORIZONS.filter(h => {
+    const rankability = rankabilityMap.get(h);
+    return rankability?.isRankable ?? false;
+  });
+
+  if (rankableHorizons.length < 2) {
+    return [
+      SECTION_CROSS_HORIZON_STRENGTH,
+      '',
+      `*Cross-horizon analysis requires at least 2 rankable horizons. This run has only ${String(rankableHorizons.length)}.*`,
+      '',
+    ];
+  }
+
+  // Count appearances per model across rankable horizons only
   const modelAppearances = new Map<string, { horizons: TimeframeId[]; avgRank: number }>();
 
-  for (const horizon of HORIZONS) {
+  for (const horizon of rankableHorizons) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
     const horizonRankings: HorizonRanking[] = rankings[horizon];
 
@@ -876,8 +898,10 @@ function generateCrossHorizonStrength(rankings: PerHorizonRankings | undefined):
     return [];
   }
 
+  const totalRankableArenas = rankableHorizons.length;
+
   const lines: string[] = [
-    '## Cross-Horizon Strength',
+    SECTION_CROSS_HORIZON_STRENGTH,
     '',
     '*Models appearing in multiple horizon arenas demonstrate consistent performance.*',
     '',
@@ -890,14 +914,13 @@ function generateCrossHorizonStrength(rankings: PerHorizonRankings | undefined):
     const horizonsList = data.horizons.join(', ');
     const avgRank = formatNumber(data.avgRank, 1);
 
-    // Add indicator for models in all 4 arenas
-    const strengthIndicator = data.horizons.length === 4 ? '⭐ ' : '';
+    const strengthIndicator = data.horizons.length === totalRankableArenas ? '⭐ ' : '';
 
-    lines.push(`| ${strengthIndicator}${modelId} | ${arenaCount}/4 | ${horizonsList} | ${avgRank} |`);
+    lines.push(`| ${strengthIndicator}${modelId} | ${arenaCount}/${String(totalRankableArenas)} | ${horizonsList} | ${avgRank} |`);
   }
 
   lines.push('');
-  lines.push('**Legend:** ⭐ = Top performer across all horizons');
+  lines.push('**Legend:** ⭐ = Top performer across all rankable horizons');
   lines.push('');
 
   return lines;
@@ -1627,7 +1650,7 @@ function generateMarkdown(
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateMassTieWarning(modelMetrics),
     ...generateArenaResultsByHorizon(perHorizonRankings, metricsMap, rankabilityMap),
-    ...generateCrossHorizonStrength(perHorizonRankings),
+    ...generateCrossHorizonStrength(perHorizonRankings, rankabilityMap),
     ...generateSurvivorsLeaderboard(modelMetrics),
     ...generateAllModelsLeaderboard(modelMetrics),
     ...generateHorizonBreakdown(perHorizonRankings, metricsMap, rankabilityMap),
