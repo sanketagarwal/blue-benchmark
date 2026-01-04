@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Report generation requires many section generators; refactor to modules when extending further */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -42,6 +43,8 @@ export interface ModelState {
   timeToPivotRatios: Record<TimeframeId, number[]>;
   failedRounds?: number[];
   disqualifiedHorizons?: Map<TimeframeId, HorizonDisqualification>;
+  intendedRounds?: number;
+  effectiveRoundsByHorizon?: Record<TimeframeId, number>;
 }
 
 /**
@@ -76,6 +79,11 @@ interface ModelMetrics {
   avgTimeToPivotRatio: number;
   // Final composite score
   compositeScore: number;
+  // Coverage info
+  intendedRounds: number;
+  effectiveRoundsByHorizon: Record<TimeframeId, number>;
+  coverageRatio: number;
+  hasLowCoverage: boolean;
 }
 
 export const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
@@ -87,6 +95,24 @@ const LOG_LOSS_OK = 0.8;
 
 // Mass tie detection threshold - warn if more than this many models share identical LL tuples
 const MASS_TIE_THRESHOLD = 3;
+
+// Coverage thresholds - models must have sufficient data to qualify for ranking
+const MIN_COVERAGE_RATIO = 0.8;
+const MIN_EFFECTIVE_ROUNDS = 10;
+
+/**
+ * Check if a model has insufficient coverage to qualify for ranking
+ * @param effectiveRounds - Number of scored rounds
+ * @param intendedRounds - Total rounds the model should have participated in
+ * @returns True if coverage is insufficient
+ */
+export function hasInsufficientCoverage(
+  effectiveRounds: number,
+  intendedRounds: number
+): boolean {
+  const coverage = intendedRounds > 0 ? effectiveRounds / intendedRounds : 0;
+  return effectiveRounds < MIN_EFFECTIVE_ROUNDS || coverage < MIN_COVERAGE_RATIO;
+}
 
 /**
  * Check if all horizons have single-class labels (all true or all false)
@@ -269,6 +295,24 @@ function calculateModelMetrics(
     0.2 * stabilityScore +
     0.1 * pivotScore;
 
+  const intendedRounds = model.intendedRounds ?? model.roundScores.length;
+  const effectiveRoundsByHorizon: Record<TimeframeId, number> = model.effectiveRoundsByHorizon ?? {
+    '15m': model.logLossByHorizon['15m'].length,
+    '1h': model.logLossByHorizon['1h'].length,
+    '4h': model.logLossByHorizon['4h'].length,
+    '24h': model.logLossByHorizon['24h'].length,
+  };
+
+  const totalEffective = Object.values(effectiveRoundsByHorizon).reduce((a, b) => a + b, 0);
+  const totalIntended = intendedRounds * HORIZONS.length;
+  const coverageRatio = totalIntended > 0 ? totalEffective / totalIntended : 0;
+
+  const hasLowCoverage = HORIZONS.some(h => {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
+    const effective = effectiveRoundsByHorizon[h];
+    return hasInsufficientCoverage(effective, intendedRounds);
+  });
+
   return {
     modelId: model.modelId,
     status: getStatusString(model.eliminated, model.eliminatedInPhase),
@@ -284,6 +328,10 @@ function calculateModelMetrics(
     avgStability,
     avgTimeToPivotRatio,
     compositeScore,
+    intendedRounds,
+    effectiveRoundsByHorizon,
+    coverageRatio,
+    hasLowCoverage,
   };
 }
 
@@ -418,10 +466,16 @@ function generateSummary(activeCount: number, eliminatedCount: number, failedCou
 }
 
 const LEADERBOARD_HEADER =
-  '| Rank | Model | Status | Rnds | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |';
+  '| Rank | Model | Status | Rnds | Cov | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |';
 const LEADERBOARD_SEPARATOR =
-  '|------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|';
+  '|------|-------|--------|------|-----|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|';
 const SURVIVORS_TITLE = '## Final Standings (Survivors)';
+
+function formatCoverageCell(m: ModelMetrics): string {
+  const covPct = Math.round(m.coverageRatio * 100);
+  const warning = m.hasLowCoverage ? '⚠️' : '';
+  return `${String(covPct)}%${warning}`;
+}
 
 function formatLeaderboardRow(m: ModelMetrics, medal: string): string {
   const ll15m = `${getLogLossEmoji(m.logLoss15m)}${formatNumber(m.logLoss15m, 3)}`;
@@ -434,7 +488,8 @@ function formatLeaderboardRow(m: ModelMetrics, medal: string): string {
   const stability = formatNumber(m.avgStability, 3);
   const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
   const score = formatNumber(m.compositeScore, 4);
-  return `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`;
+  const cov = formatCoverageCell(m);
+  return `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${cov} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`;
 }
 
 function getMedal(rank: number): string {
@@ -443,18 +498,41 @@ function getMedal(rank: number): string {
 }
 
 /**
+ * Check if all horizons have insufficient coverage
+ * @param m - Model metrics
+ * @returns True if all horizons have low coverage
+ */
+function hasAllHorizonsLowCoverage(m: ModelMetrics): boolean {
+  return HORIZONS.every(h => {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array constant
+    const effective = m.effectiveRoundsByHorizon[h];
+    return hasInsufficientCoverage(effective, m.intendedRounds);
+  });
+}
+
+/**
  * Generate the survivors leaderboard (active models only)
+ * Excludes models with insufficient coverage on all horizons
  * @param metrics - Array of model metrics sorted by composite score
  * @returns Array of markdown lines
  */
 function generateSurvivorsLeaderboard(metrics: ModelMetrics[]): string[] {
-  const survivors = metrics.filter(m => m.status.startsWith('✅'));
+  const survivors = metrics
+    .filter(m => m.status.startsWith('✅'))
+    .filter(m => !hasAllHorizonsLowCoverage(m));
 
   if (survivors.length === 0) {
-    return [SURVIVORS_TITLE, '', '*No models survived all elimination phases.*', ''];
+    return [SURVIVORS_TITLE, '', '*No models survived all elimination phases with adequate coverage.*', ''];
   }
 
-  const lines: string[] = [SURVIVORS_TITLE, '', LEADERBOARD_HEADER, LEADERBOARD_SEPARATOR];
+  const lines: string[] = [
+    SURVIVORS_TITLE,
+    '',
+    '*Models with <80% coverage or <10 effective rounds on all horizons are excluded.*',
+    '',
+    LEADERBOARD_HEADER,
+    LEADERBOARD_SEPARATOR,
+  ];
 
   for (const [index, m] of survivors.entries()) {
     lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
@@ -485,6 +563,8 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
   lines.push('- 🟢 Good (≤ 0.5) | 🟡 OK (≤ 0.8) | 🔴 Poor (> 0.8)');
   lines.push('');
   lines.push('*Column definitions:*');
+  lines.push('- `Rnds`: Number of successful rounds (failed rounds are excluded from metrics)');
+  lines.push('- `Cov`: Coverage percentage (effective rounds / intended rounds). ⚠️ indicates <80% coverage or <10 effective rounds on any horizon');
   lines.push('- `15m, 1h, 4h, 24h`: Mean log loss for that horizon across all valid rounds');
   lines.push('- `Mean`: Arithmetic mean of the four horizon log losses');
   lines.push('- `%Rank`: Percentile rank among all models by composite Score (higher = better)');
@@ -492,7 +572,6 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
   lines.push('- `Stabil`: Standard deviation of per-round log loss (lower = better)');
   lines.push('- `TtP`: Time-to-pivot ratio (lower = better). *Note: With the current no-new-low ground truth system, timing data is not available; all models show TtP = 0.50.*');
   lines.push('- `Score`: Composite metric combining rank, best window, stability, and timing (40% rank + 30% bestWin⁻¹ + 20% stabil⁻¹ + 10% TtP⁻¹)');
-  lines.push('- `Rnds`: Number of successful rounds (failed rounds are excluded from metrics)');
   lines.push('');
 
   return lines;
@@ -501,15 +580,25 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
 /**
  * Generate arena results by horizon section
  * Shows the top 8 arena competitors for each horizon with full metrics
+ * Excludes models with insufficient coverage on that horizon
  * @param rankings - Per-horizon rankings from phase-3-scorer
+ * @param metricsMap - Map of modelId to ModelMetrics for coverage filtering
  * @returns Array of markdown lines
  */
-function generateArenaResultsByHorizon(rankings: PerHorizonRankings | undefined): string[] {
+function generateArenaResultsByHorizon(
+  rankings: PerHorizonRankings | undefined,
+  metricsMap: Map<string, ModelMetrics>
+): string[] {
   if (rankings === undefined) {
     return [];
   }
 
-  const lines: string[] = ['## Arena Results by Horizon', ''];
+  const lines: string[] = [
+    '## Arena Results by Horizon',
+    '',
+    '*Models with <10 scored rounds on a given horizon are excluded from that arena.*',
+    '',
+  ];
 
   const horizonLabels: Record<TimeframeId, string> = {
     '15m': '15m Arena Winners',
@@ -524,10 +613,20 @@ function generateArenaResultsByHorizon(rankings: PerHorizonRankings | undefined)
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
     const label = horizonLabels[horizon];
 
+    const filteredRankings = horizonRankings.filter(r => {
+      const metrics = metricsMap.get(r.modelId);
+      if (metrics === undefined) {
+        return true;
+      }
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+      const effectiveRounds = metrics.effectiveRoundsByHorizon[horizon];
+      return effectiveRounds >= MIN_EFFECTIVE_ROUNDS;
+    });
+
     lines.push(`### ${label}`);
     lines.push('');
 
-    if (horizonRankings.length === 0) {
+    if (filteredRankings.length === 0) {
       lines.push('*No models qualified for this arena*');
       lines.push('');
       continue;
@@ -536,7 +635,7 @@ function generateArenaResultsByHorizon(rankings: PerHorizonRankings | undefined)
     lines.push('| Rank | Model | Score | Log Loss | Best Window | Stability |');
     lines.push('|------|-------|-------|----------|-------------|-----------|');
 
-    for (const [index, ranking] of horizonRankings.entries()) {
+    for (const [index, ranking] of filteredRankings.entries()) {
       const rank = index + 1;
       const medalOptions = ['🥇', '🥈', '🥉'];
       const medal = rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
@@ -1231,6 +1330,12 @@ function generateMarkdown(
     .map(m => calculateModelMetrics(m, allMeanLogLosses))
     .sort((a, b) => b.compositeScore - a.compositeScore);
 
+  // Build metrics map for coverage filtering in arena results
+  const metricsMap = new Map<string, ModelMetrics>();
+  for (const m of modelMetrics) {
+    metricsMap.set(m.modelId, m);
+  }
+
   const lines: string[] = [
     ...generateHeader(meta),
     ...generateRunConfigSection(meta, models.size),
@@ -1241,7 +1346,7 @@ function generateMarkdown(
     ...generateFailureAuditSection(diagnostics?.parseDiagnostics, meta.totalRounds, allModels.length),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateMassTieWarning(modelMetrics),
-    ...generateArenaResultsByHorizon(perHorizonRankings),
+    ...generateArenaResultsByHorizon(perHorizonRankings, metricsMap),
     ...generateCrossHorizonStrength(perHorizonRankings),
     ...generateSurvivorsLeaderboard(modelMetrics),
     ...generateAllModelsLeaderboard(modelMetrics),
@@ -1468,3 +1573,4 @@ export function persistScoredDatapoints(
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants or user-provided
   writeFileSync(outputPath, json, 'utf8');
 }
+/* eslint-enable max-lines -- Re-enable after file scope disable */
