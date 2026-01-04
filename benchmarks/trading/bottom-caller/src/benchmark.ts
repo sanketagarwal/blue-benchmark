@@ -732,6 +732,7 @@ interface DiagnosticsState {
   predictionsByModelByHorizon: Map<string, Record<TimeframeId, number[]>>;
   noNewLowByModelByHorizon: Map<string, Record<TimeframeId, boolean[]>>;
   parseDiagnosticsByModel: Map<string, ParseDiagnostics>;
+  missingForwardDataCount: Record<TimeframeId, number>;
 }
 
 /**
@@ -745,6 +746,7 @@ function createDiagnosticsState(): DiagnosticsState {
     predictionsByModelByHorizon: new Map(),
     noNewLowByModelByHorizon: new Map(),
     parseDiagnosticsByModel: new Map(),
+    missingForwardDataCount: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
   };
 }
 
@@ -860,6 +862,7 @@ function computeFinalDiagnostics(diagnosticsState: DiagnosticsState): RunDiagnos
     diversityByModel,
     parseByModel: diagnosticsState.parseDiagnosticsByModel,
     inputRecords: [],
+    missingForwardDataCount: diagnosticsState.missingForwardDataCount,
   };
 }
 
@@ -1032,6 +1035,20 @@ function printDiagnosticsSummary(diagnostics: RunDiagnostics): void {
   printDatasetDiagnostics(diagnostics.datasetByHorizon);
   printParseDiagnostics(diagnostics.parseByModel);
   printPredictionDiversityDiagnostics(diagnostics.diversityByModel);
+
+  // eslint-disable-next-line security/detect-object-injection -- h is controlled loop variable from HORIZONS array
+  const totalMissing = HORIZONS.reduce((sum, h) => sum + diagnostics.missingForwardDataCount[h], 0);
+  if (totalMissing > 0) {
+    logger.newline();
+    logger.log(chalk.yellow('=== Missing Forward Data Warnings ==='));
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from HORIZONS array
+      const count = diagnostics.missingForwardDataCount[horizon];
+      if (count > 0) {
+        logger.log(chalk.yellow(`  ${horizon}: ${String(count)} labels with missing forward candles`));
+      }
+    }
+  }
 }
 
 /**
@@ -1105,10 +1122,14 @@ function recordModelScore(
 /**
  * Resolve ground truth for all horizons using the no-new-low labeler
  * @param ohlcvByHorizon - OHLCV data with lookback and forward candles per horizon
+ * @param snapTime - Prediction time for logging
+ * @param missingForwardDataCount - Counter to increment when forward data is missing
  * @returns Labels, time-to-pivot ratios, first pivot timestamps, and full ground truth results for all horizons
  */
 function resolveAllHorizonsGroundTruth(
-  ohlcvByHorizon: OHLCVByHorizon
+  ohlcvByHorizon: OHLCVByHorizon,
+  snapTime: Date,
+  missingForwardDataCount: Record<TimeframeId, number>
 ): {
   labels: Record<TimeframeId, boolean>;
   timeToPivotRatios: Record<TimeframeId, number | undefined>;
@@ -1126,6 +1147,13 @@ function resolveAllHorizonsGroundTruth(
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     const { lookback, forward } = ohlcvByHorizon[horizon];
     const result = resolveNoNewLowGroundTruth(lookback, forward);
+
+    if (result.forwardCandlesMissing === true) {
+      logger.log(`[${horizon}] Forward candles missing at ${snapTime.toISOString()} - label may be unreliable`);
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      missingForwardDataCount[horizon]++;
+    }
+
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     labels[horizon] = result.labelNoNewLow === 1;
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
@@ -2162,7 +2190,7 @@ async function runBenchmarkRound(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- secondaryLabels captured for future analysis use
-  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels, groundTruthByHorizon } = resolveAllHorizonsGroundTruth(ohlcvByHorizon);
+  const { labels, timeToPivotRatios, firstPivotAts, secondaryLabels: _secondaryLabels, groundTruthByHorizon } = resolveAllHorizonsGroundTruth(ohlcvByHorizon, currentTime, diagnosticsState.missingForwardDataCount);
 
   updateLabelCounts(labelCounts, labels);
   collectDiagnosticsLabels(diagnosticsState, currentTime, labels);
@@ -2523,6 +2551,15 @@ async function main(): Promise<void> {
   let clockState = initializeClock();
   const benchmarkStartTime = new Date(); // Real wall-clock time for session isolation
   const startTime = clockState.currentTime.toISOString();
+
+  // Validate SIMULATION_START_TIME allows for forward data
+  const MAX_FORWARD_MINUTES = 1440; // 24h horizon needs 24h of forward data
+  const minRequiredTime = Date.now() - MAX_FORWARD_MINUTES * 60 * 1000;
+  if (clockState.currentTime.getTime() > minRequiredTime) {
+    console.error('SIMULATION_START_TIME is too recent - forward data may not be available');
+    console.error(`Simulation time: ${clockState.currentTime.toISOString()}`);
+    console.error(`Minimum required: ${new Date(minRequiredTime).toISOString()}`);
+  }
 
   logger.newline();
   logger.log(`Symbol: ${SYMBOL_ID}`);

@@ -7,10 +7,6 @@ import {
   getTimeframeConfig,
   getLookbackBars,
 } from './timeframe-config.js';
-import {
-  generateScoringMethodology,
-  generateGroundTruthMethodology,
-} from './verbose-documentation.js';
 
 import type { DatasetDiagnostics } from './diagnostics/dataset-diagnostics.js';
 import type { ScoredDatapointRecord } from './diagnostics/index.js';
@@ -27,7 +23,7 @@ import type { BenchmarkLogger } from '@nullagent/cli-utils';
 /**
  * Model state for persistence
  */
-interface ModelState {
+export interface ModelState {
   modelId: string;
   eliminated: boolean;
   eliminatedInPhase?: number;
@@ -72,9 +68,8 @@ interface ModelMetrics {
   compositeScore: number;
 }
 
-const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
+export const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
-const QUICK_RESULTS_FILE = 'BENCHMARK_RESULTS_QUICK.md';
 
 // Quality thresholds for log loss (lower is better)
 const LOG_LOSS_GOOD = 0.5;
@@ -85,7 +80,7 @@ const LOG_LOSS_OK = 0.8;
  * @param diagnostics - Dataset diagnostics
  * @returns True if all horizons have pTrue = 1.0 or pTrue = 0.0
  */
-function isSingleClass(diagnostics: DatasetDiagnostics | undefined): boolean {
+export function isSingleClass(diagnostics: DatasetDiagnostics | undefined): boolean {
   if (diagnostics?.byHorizon === undefined) {
     return false;
   }
@@ -94,14 +89,14 @@ function isSingleClass(diagnostics: DatasetDiagnostics | undefined): boolean {
   );
 }
 
-// Common section headers
-const SECTION_DATASET_DIAGNOSTICS = '## Dataset Diagnostics';
-const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
-const NO_DATA_COLLECTED = '*No data collected.*';
+// Common section headers (exported for quick-mode-report)
+export const SECTION_DATASET_DIAGNOSTICS = '## Dataset Diagnostics';
+export const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
+export const NO_DATA_COLLECTED = '*No data collected.*';
 
-// Dataset diagnostics table headers
-const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL |';
-const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|';
+// Dataset diagnostics table headers (exported for quick-mode-report)
+export const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL |';
+export const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|';
 
 /**
  * Format a number to fixed decimal places
@@ -109,7 +104,7 @@ const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-----
  * @param decimals - Decimal places (default 4)
  * @returns Formatted string
  */
-function formatNumber(value: number, decimals = 4): string {
+export function formatNumber(value: number, decimals = 4): string {
   return value.toFixed(decimals);
 }
 
@@ -118,7 +113,7 @@ function formatNumber(value: number, decimals = 4): string {
  * @param values - Array of numbers
  * @returns Mean value or 0 if empty
  */
-function calculateMean(values: number[]): number {
+export function calculateMean(values: number[]): number {
   if (values.length === 0) {
     return 0;
   }
@@ -284,7 +279,7 @@ function calculateModelMetrics(
  * Explains the prediction task for data scientists
  * @returns Array of markdown lines
  */
-function generateBenchmarkOverview(): string[] {
+export function generateBenchmarkOverview(): string[] {
   return [
     '## Benchmark Overview',
     '',
@@ -306,7 +301,7 @@ function generateBenchmarkOverview(): string[] {
  * Documents ground truth, scoring, and phase definitions
  * @returns Array of markdown lines
  */
-function generateMethodology(): string[] {
+export function generateMethodology(): string[] {
   return [
     '## Methodology',
     '',
@@ -1000,7 +995,7 @@ function formatBarSize(minutes: number): string {
  * Generate task specification table for quick report
  * @returns Array of markdown lines
  */
-function generateTaskSpecSection(): string[] {
+export function generateTaskSpecSection(): string[] {
   const lines: string[] = [
     '## Task Specification',
     '',
@@ -1037,7 +1032,7 @@ const LABEL_IMBALANCE_MIN_COUNT = 5;
  * @param prevalenceLogLoss - The prevalence log loss value
  * @returns Formatted string
  */
-function formatPrevalenceLogLoss(prevalenceLogLoss: number): string {
+export function formatPrevalenceLogLoss(prevalenceLogLoss: number): string {
   const isVerySmallPositive = prevalenceLogLoss < 1e-6 && prevalenceLogLoss > 0;
   return isVerySmallPositive
     ? prevalenceLogLoss.toExponential(2)
@@ -1054,7 +1049,7 @@ function formatPrevalenceLogLoss(prevalenceLogLoss: number): string {
  * @param labels.pTrue - Proportion of true labels
  * @returns Warning message or undefined
  */
-function checkLabelImbalance(
+export function checkLabelImbalance(
   horizon: TimeframeId,
   labels: { n: number; countTrue: number; countFalse: number; pTrue: number }
 ): string | undefined {
@@ -1069,363 +1064,9 @@ function checkLabelImbalance(
   return undefined;
 }
 
-/**
- * Generate dataset diagnostics section for quick mode report
- * @param diagnostics - Dataset diagnostics or undefined
- * @returns Array of markdown lines
- */
-function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagnostics | undefined): string[] {
-  const lines: string[] = [SECTION_DATASET_DIAGNOSTICS, ''];
-
-  if (diagnostics === undefined) {
-    lines.push(NO_DATA_COLLECTED, '');
-    return lines;
-  }
-
-  lines.push(DATASET_DIAGNOSTICS_TABLE_HEADER, DATASET_DIAGNOSTICS_TABLE_SEPARATOR);
-  const warnings: string[] = [];
-
-  for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-    const d = diagnostics.byHorizon[horizon];
-    const row = [
-      horizon,
-      String(d.labels.n),
-      String(d.labels.countTrue),
-      String(d.labels.countFalse),
-      d.labels.pTrue.toFixed(3),
-      d.baselines.randomLogLoss.toFixed(3),
-      formatPrevalenceLogLoss(d.baselines.prevalenceLogLoss),
-    ];
-    lines.push(`| ${row.join(' | ')} |`);
-
-    const warning = checkLabelImbalance(horizon, d.labels);
-    if (warning !== undefined) {
-      warnings.push(warning);
-    }
-  }
-
-  lines.push('', `*Unique prediction timestamps: ${String(diagnostics.totalRounds)}*`, '');
-
-  for (const w of warnings) {
-    lines.push(w);
-  }
-  if (warnings.length > 0) {
-    lines.push('');
-  }
-
-  return lines;
-}
-
-/**
- * Generate Label by Timestamp section for quick mode report
- * Shows per-timestamp label matrix for window alignment verification
- * @param labelsByTimestamp - Array of label records per timestamp or undefined
- * @returns Array of markdown lines
- */
-function generateLabelByTimestampSection(
-  labelsByTimestamp: LabelByTimestamp[] | undefined
-): string[] {
-  if (labelsByTimestamp === undefined || labelsByTimestamp.length === 0) {
-    return [];
-  }
-
-  const lines: string[] = [
-    '## Label by Timestamp',
-    '',
-    '| Timestamp | 15m | 1h | 4h | 24h |',
-    '|-----------|-----|----|----|-----|',
-  ];
-
-  const sorted = [...labelsByTimestamp].sort(
-    (a, b) => b.snapTime.getTime() - a.snapTime.getTime()
-  );
-
-  for (const record of sorted) {
-    const ts = record.snapTime.toISOString();
-    const l15m = String(record.labels['15m']);
-    const l1h = String(record.labels['1h']);
-    const l4h = String(record.labels['4h']);
-    const l24h = String(record.labels['24h']);
-    lines.push(`| ${ts} | ${l15m} | ${l1h} | ${l4h} | ${l24h} |`);
-  }
-
-  lines.push('');
-  lines.push('*Labels: 1 = noNewLow (bottom held), 0 = new low made*');
-  lines.push('');
-
-  return lines;
-}
-
-/**
- * Generate prediction diversity section for quick mode report
- * @param diversities - Array of model prediction diversity metrics or undefined
- * @returns Array of markdown lines
- */
-function generateQuickPredictionDiversitySection(diversities: ModelPredictionDiversity[] | undefined): string[] {
-  const lines: string[] = [
-    SECTION_PREDICTION_DIVERSITY,
-    '',
-  ];
-
-  if (diversities === undefined || diversities.length === 0) {
-    lines.push(NO_DATA_COLLECTED);
-    lines.push('');
-    return lines;
-  }
-
-  for (const model of diversities) {
-    lines.push(`### ${model.modelId}`);
-    lines.push('');
-    lines.push('| Horizon | Unique P | Min | Max | Std Dev |');
-    lines.push('|---------|----------|-----|-----|---------|');
-
-    for (const horizon of HORIZONS) {
-      // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-      const d = model.byHorizon[horizon];
-      lines.push(`| ${horizon} | ${String(d.uniquePCount)} | ${d.pMin.toFixed(3)} | ${d.pMax.toFixed(3)} | ${d.pStdDev.toFixed(3)} |`);
-    }
-
-    lines.push('');
-  }
-
-  return lines;
-}
-
-/**
- * Quick mode metadata for quick report
- */
-interface QuickRunMetadata {
-  startTime: string;
-  symbolId: string;
-  totalRounds: number;
-  modelCount: number;
-  diagnostics?: BenchmarkDiagnostics;
-}
-
-/**
- * Quick mode model metrics for results table
- */
-interface QuickModelMetrics {
-  modelId: string;
-  logLoss15m: number;
-  logLoss1h: number;
-  logLoss4h: number;
-  logLoss24h: number;
-  meanLogLoss: number;
-  parseFails: number;
-}
-
-/**
- * Calculate quick mode metrics for a model
- * @param model - Model state
- * @returns Quick model metrics
- */
-function calculateQuickModelMetrics(model: ModelState): QuickModelMetrics {
-  const logLoss15m = calculateMean(model.logLossByHorizon['15m']);
-  const logLoss1h = calculateMean(model.logLossByHorizon['1h']);
-  const logLoss4h = calculateMean(model.logLossByHorizon['4h']);
-  const logLoss24h = calculateMean(model.logLossByHorizon['24h']);
-
-  const horizonMeans = [logLoss15m, logLoss1h, logLoss4h, logLoss24h].filter(v => v > 0);
-  const meanLogLoss = horizonMeans.length > 0 ? calculateMean(horizonMeans) : 0;
-
-  return {
-    modelId: model.modelId,
-    logLoss15m,
-    logLoss1h,
-    logLoss4h,
-    logLoss24h,
-    meanLogLoss,
-    parseFails: model.failedRounds?.length ?? 0,
-  };
-}
-
-/**
- * Generate models tested section for quick report
- * @param models - Map of model states
- * @returns Array of markdown lines
- */
-function generateQuickModelsList(models: Map<string, ModelState>): string[] {
-  const modelIds = [...models.keys()].sort();
-  const lines: string[] = [
-    '## Models Tested',
-    '',
-  ];
-
-  for (const modelId of modelIds) {
-    lines.push(`- ${modelId}`);
-  }
-
-  lines.push('');
-  return lines;
-}
-
-/**
- * Format log loss value for table display
- * @param value - Log loss value
- * @returns Formatted string or '-' if no data
- */
-function formatLogLossCell(value: number): string {
-  return value > 0 ? formatNumber(value, 3) : '-';
-}
-
-/**
- * Generate results summary table for quick report
- * @param models - Map of model states
- * @returns Array of markdown lines
- */
-function generateQuickResultsTable(models: Map<string, ModelState>): string[] {
-  const allModels = [...models.values()];
-  const metrics = allModels
-    .map(m => calculateQuickModelMetrics(m))
-    .sort((a, b) => a.meanLogLoss - b.meanLogLoss);
-
-  const lines: string[] = [
-    '## Results Summary',
-    '',
-    '| Model | 15m LL | 1h LL | 4h LL | 24h LL | Mean LL | Parse Fails |',
-    '|-------|--------|-------|-------|--------|---------|-------------|',
-  ];
-
-  for (const m of metrics) {
-    const row = [
-      m.modelId,
-      formatLogLossCell(m.logLoss15m),
-      formatLogLossCell(m.logLoss1h),
-      formatLogLossCell(m.logLoss4h),
-      formatLogLossCell(m.logLoss24h),
-      formatLogLossCell(m.meanLogLoss),
-      String(m.parseFails),
-    ];
-    lines.push(`| ${row.join(' | ')} |`);
-  }
-
-  lines.push('');
-  return lines;
-}
-
-/**
- * Generate single-class warning for quick mode
- * @param diagnostics - Dataset diagnostics
- * @returns Array of markdown lines (empty if not single-class)
- */
-const QUICK_RUN_INTERPRETATION_HEADER = '**Quick-run interpretation:**';
-const QUICK_RUN_ROUNDS_NOTE = '- With N=3 rounds per horizon, treat rankings as indicative only.';
-
-function generateSingleClassWarning(diagnostics: DatasetDiagnostics | undefined): string[] {
-  if (!isSingleClass(diagnostics)) {
-    return [];
-  }
-
-  if (diagnostics?.byHorizon === undefined) {
-    return [];
-  }
-
-  const firstHorizon = Object.values(diagnostics.byHorizon)[0];
-  const pTrue = firstHorizon?.labels.pTrue ?? 1;
-  const isPositive = pTrue === 1;
-  const labelValue = isPositive ? 'noNewLow=true' : 'noNewLow=false';
-
-  return [
-    `> ⚠️ **Single-class sample**: All horizons have 100% ${isPositive ? 'positive' : 'negative'} labels in this run. Model rankings reflect calibration on the dominant class only. Comparisons are not meaningful for assessing prediction skill on ${isPositive ? 'negative' : 'positive'} cases.`,
-    '',
-    QUICK_RUN_INTERPRETATION_HEADER,
-    QUICK_RUN_ROUNDS_NOTE,
-    `- **This run has all labels = ${isPositive ? '1' : '0'} (${labelValue}).** Model rankings only show calibration quality, not ability to detect ${isPositive ? 'new lows' : 'no-new-low cases'}.`,
-    '- Models with LL < 0.693 beat random; models with LL → 0 approach optimal constant predictor.',
-    '',
-  ];
-}
-
-/**
- * Generate interpretation note for quick mode (when not single-class)
- * @returns Array of markdown lines
- */
-function generateQuickInterpretationNote(): string[] {
-  return [
-    QUICK_RUN_INTERPRETATION_HEADER,
-    QUICK_RUN_ROUNDS_NOTE,
-    '- Models with LL < 0.693 beat random baseline; models with LL → 0 approach optimal.',
-    '',
-  ];
-}
-
-/**
- * Generate markdown content for quick mode verification report
- * Includes full methodology documentation with actual model data
- * @param models - Map of model states
- * @param meta - Quick mode run metadata
- * @returns Markdown string
- */
-function generateQuickMarkdown(
-  models: Map<string, ModelState>,
-  meta: QuickRunMetadata
-): string {
-  const lines: string[] = [
-    '# agent_006 Benchmark Results (QUICK MODE)',
-    '',
-    '> **This is a quick mode verification run - not a full benchmark.**',
-    '',
-    `**Symbol:** ${meta.symbolId}`,
-    `**Generated:** ${new Date().toISOString()}`,
-    `**Rounds:** ${String(meta.totalRounds)}`,
-    `**Models Tested:** ${String(meta.modelCount)}`,
-    '',
-    '---',
-    '',
-  ];
-
-  lines.push(...generateBenchmarkOverview());
-  lines.push(...generateMethodology());
-  lines.push(...generateTaskSpecSection());
-
-  lines.push('## Scoring Methodology');
-  lines.push('');
-  lines.push(generateScoringMethodology());
-  lines.push('');
-
-  lines.push('## Ground Truth Methodology');
-  lines.push('');
-  lines.push(generateGroundTruthMethodology());
-  lines.push('');
-
-  lines.push(...generateQuickModelsList(models));
-  lines.push(...generateQuickResultsTable(models));
-
-  const singleClassWarning = generateSingleClassWarning(meta.diagnostics?.dataset);
-  if (singleClassWarning.length > 0) {
-    lines.push(...singleClassWarning);
-  } else {
-    lines.push(...generateQuickInterpretationNote());
-  }
-
-  lines.push(...generateQuickDatasetDiagnosticsSection(meta.diagnostics?.dataset));
-
-  lines.push(...generateLabelByTimestampSection(meta.diagnostics?.labelsByTimestamp));
-
-  lines.push(...generateQuickPredictionDiversitySection(meta.diagnostics?.predictionDiversity));
-
-  lines.push('---');
-  lines.push('*Quick mode verification - auto-generated by agent_006 benchmark*');
-
-  return lines.join('\n');
-}
-
-/**
- * Persist quick mode verification results to markdown file
- * @param models - Map of model states
- * @param meta - Quick mode run metadata
- */
-export function persistQuickResults(
-  models: Map<string, ModelState>,
-  meta: QuickRunMetadata
-): void {
-  const markdown = generateQuickMarkdown(models, meta);
-  const filePath = join(process.cwd(), QUICK_RESULTS_FILE);
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
-  writeFileSync(filePath, markdown, 'utf8');
-}
+// Re-export quick mode functions from dedicated module
+export { persistQuickResults } from './quick-mode-report.js';
+export type { QuickRunMetadata } from './quick-mode-report.js';
 
 const SCORED_DATAPOINTS_FILE = 'BENCHMARK_SCORED_DATAPOINTS.json';
 

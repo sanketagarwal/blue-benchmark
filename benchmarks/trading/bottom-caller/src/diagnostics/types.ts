@@ -92,6 +92,8 @@ export interface RunDiagnostics {
   parseByModel: Map<string, ParseDiagnostics>;
   /** Input uniqueness for each scored example */
   inputRecords: InputUniquenessRecord[];
+  /** Count of labels with missing forward data per horizon */
+  missingForwardDataCount: Record<TimeframeId, number>;
 }
 
 /**

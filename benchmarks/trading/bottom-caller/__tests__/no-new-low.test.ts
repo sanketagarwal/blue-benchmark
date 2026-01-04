@@ -136,12 +136,13 @@ describe('resolveNoNewLowGroundTruth', () => {
     expect(result.labelNoNewLow).toBe(1);
   });
 
-  it('handles empty forward (Infinity, no new low ever made)', () => {
+  it('handles empty forward (NaN, missing data flagged)', () => {
     const lookback = [makeCandle(100, 0)];
     const result = resolveNoNewLowGroundTruth(lookback, []);
-    expect(result.forwardLow).toBe(Infinity);
+    expect(result.forwardLow).toBeNaN();
     expect(result.refLowCandlesBack).toBe(0);
     expect(result.labelNoNewLow).toBe(1);
+    expect(result.forwardCandlesMissing).toBe(true);
   });
 
   it('returns correct refLowCandlesBack for reference low in middle of lookback', () => {

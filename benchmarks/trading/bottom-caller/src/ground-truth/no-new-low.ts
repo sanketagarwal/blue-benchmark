@@ -25,6 +25,8 @@ export interface NoNewLowResult {
   refLowCandlesBack: number;
   forwardLow: number;
   labelNoNewLow: 0 | 1;
+  /** True if forward candles were empty (no data available) */
+  forwardCandlesMissing?: boolean;
 }
 
 /**
@@ -99,6 +101,17 @@ export function resolveNoNewLowGroundTruth(
   forwardCandles: Candle[]
 ): NoNewLowResult {
   const refLow = computeReferenceLow(lookbackCandles);
+
+  if (forwardCandles.length === 0) {
+    return {
+      refLowPrice: refLow.price,
+      refLowCandlesBack: refLow.candlesBack,
+      forwardLow: Number.NaN,
+      labelNoNewLow: 1,
+      forwardCandlesMissing: true,
+    };
+  }
+
   const forwardWindow = computeForwardWindow(forwardCandles);
 
   return {
