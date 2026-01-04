@@ -425,7 +425,8 @@ function calculateModelMetrics(
     0.2 * stabilityScore +
     0.1 * pivotScore;
 
-  const intendedRounds = model.intendedRounds ?? model.roundScores.length;
+  const failedCount = model.failedRounds?.length ?? 0;
+  const intendedRounds = model.intendedRounds ?? (model.roundScores.length + failedCount);
   const effectiveRoundsByHorizon: Record<TimeframeId, number> = model.effectiveRoundsByHorizon ?? {
     '15m': model.logLossByHorizon['15m'].length,
     '1h': model.logLossByHorizon['1h'].length,
@@ -602,9 +603,11 @@ const LEADERBOARD_SEPARATOR =
 const SURVIVORS_TITLE = '## Final Standings (Survivors)';
 
 function formatCoverageCell(m: ModelMetrics): string {
+  const totalEffective = Object.values(m.effectiveRoundsByHorizon).reduce((a, b) => a + b, 0);
+  const totalIntended = m.intendedRounds * HORIZONS.length;
   const covPct = Math.round(m.coverageRatio * 100);
   const warning = m.hasLowCoverage ? '⚠️' : '';
-  return `${String(covPct)}%${warning}`;
+  return `${String(totalEffective)}/${String(totalIntended)} (${String(covPct)}%)${warning}`;
 }
 
 /**
@@ -707,7 +710,7 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
   lines.push('');
   lines.push('*Column definitions:*');
   lines.push('- `Rnds`: Number of successful rounds (failed rounds are excluded from metrics)');
-  lines.push('- `Cov`: Coverage percentage (effective rounds / intended rounds). ⚠️ indicates <80% coverage or <10 effective rounds on any horizon');
+  lines.push('- `Cov`: Coverage as effective/intended (percent). ⚠️ indicates <80% coverage or <10 effective rounds on any horizon');
   lines.push('- `15m, 1h, 4h, 24h`: Mean log loss for that horizon across all valid rounds');
   lines.push('- `Mean`: Arithmetic mean of the four horizon log losses');
   lines.push('- `%Rank`: Percentile rank among all models by composite Score (higher = better)');
