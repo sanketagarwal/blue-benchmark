@@ -766,6 +766,7 @@ function createParseDiagnostics(): ParseDiagnostics {
       timeout: 0,
       parse: 0,
       schema: 0,
+      other: 0,
     },
   };
 }
@@ -806,9 +807,9 @@ function trackPredictionDiversity(
  * @param errorMessage - Error message string or undefined
  * @returns Failure type category
  */
-function categorizeFailure(errorMessage: string | undefined): 'transport' | 'timeout' | 'parse' | 'schema' {
+function categorizeFailure(errorMessage: string | undefined): 'transport' | 'timeout' | 'parse' | 'schema' | 'other' {
   if (errorMessage === undefined) {
-    return 'parse';
+    return 'other';
   }
   const lowerMessage = errorMessage.toLowerCase();
   if (lowerMessage.includes('timeout')) {
@@ -820,7 +821,10 @@ function categorizeFailure(errorMessage: string | undefined): 'transport' | 'tim
   if (lowerMessage.includes('schema') || lowerMessage.includes('validation')) {
     return 'schema';
   }
-  return 'parse';
+  if (lowerMessage.includes('json') || lowerMessage.includes('parse') || lowerMessage.includes('no json found')) {
+    return 'parse';
+  }
+  return 'other';
 }
 
 /**
@@ -979,6 +983,7 @@ function convertToBenchmarkDiagnostics(
       schemaFailCount: diag.schemaFailCount,
       missingHorizonCount: diag.missingHorizonCount,
       missingByHorizon: { '15m': 0, '1h': 0, '4h': 0, '24h': 0 },
+      failuresByType: { ...diag.failuresByType },
     });
   }
 

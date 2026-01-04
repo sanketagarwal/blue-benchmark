@@ -337,13 +337,11 @@ interface FailuresByType {
   timeout: number;
   parse: number;
   schema: number;
+  other: number;
 }
 
 function extractFailuresByType(parseDiag: ModelParseDiagnostics): FailuresByType | undefined {
-  if (!('failuresByType' in parseDiag)) {
-    return undefined;
-  }
-  return (parseDiag as unknown as { failuresByType: FailuresByType }).failuresByType;
+  return parseDiag.failuresByType;
 }
 
 function buildFailureTypeParts(byType: FailuresByType): string[] {
@@ -359,6 +357,9 @@ function buildFailureTypeParts(byType: FailuresByType): string[] {
   }
   if (byType.schema > 0) {
     parts.push(`schema: ${String(byType.schema)}`);
+  }
+  if (byType.other > 0) {
+    parts.push(`other: ${String(byType.other)}`);
   }
   return parts;
 }

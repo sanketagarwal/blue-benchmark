@@ -1157,16 +1157,67 @@ interface FailuresByType {
   timeout: number;
   parse: number;
   schema: number;
+  other: number;
 }
 
 function extractFailuresByType(parseDiag: ModelParseDiagnostics): FailuresByType | undefined {
-  if (!('failuresByType' in parseDiag)) {
-    return undefined;
-  }
-  return (parseDiag as unknown as { failuresByType: FailuresByType }).failuresByType;
+  return parseDiag.failuresByType;
 }
 
 const HORIZONS_PER_ROUND = 4;
+
+interface FailureAuditAggregates {
+  failedModelCalls: number;
+  failedHorizonPredictions: number;
+}
+
+function computeFailureAggregates(parseDiagnostics: ModelParseDiagnostics[]): FailureAuditAggregates {
+  let failedModelCalls = 0;
+  let failedHorizonPredictions = 0;
+
+  for (const d of parseDiagnostics) {
+    const modelFailedCalls = d.parseFailCount + d.schemaFailCount;
+    failedModelCalls += modelFailedCalls;
+    failedHorizonPredictions += modelFailedCalls * HORIZONS_PER_ROUND + d.missingHorizonCount;
+  }
+
+  return { failedModelCalls, failedHorizonPredictions };
+}
+
+interface ModelFailureRow {
+  modelId: string;
+  modelFailedCalls: number;
+  modelFailedHorizons: number;
+  transport: number;
+  timeout: number;
+  parse: number;
+  schema: number;
+  other: number;
+  integrityWarning: string | undefined;
+}
+
+function buildModelFailureRow(d: ModelParseDiagnostics): ModelFailureRow {
+  const modelFailedCalls = d.parseFailCount + d.schemaFailCount;
+  const modelFailedHorizons = modelFailedCalls * HORIZONS_PER_ROUND + d.missingHorizonCount;
+  const byType = extractFailuresByType(d);
+  const transport = byType?.transport ?? 0;
+  const timeout = byType?.timeout ?? 0;
+  const parse = byType?.parse ?? 0;
+  const schema = byType?.schema ?? 0;
+  const other = byType?.other ?? 0;
+
+  const totalTyped = transport + timeout + parse + schema + other;
+  const integrityWarning = totalTyped !== modelFailedCalls && modelFailedCalls > 0
+    ? `**${d.modelId}**: Failure type sum (${String(totalTyped)}) != calls failed (${String(modelFailedCalls)})`
+    : undefined;
+
+  return { modelId: d.modelId, modelFailedCalls, modelFailedHorizons, transport, timeout, parse, schema, other, integrityWarning };
+}
+
+function formatFailureRow(row: ModelFailureRow, totalRounds: number): string {
+  return `| ${row.modelId} | ${String(row.modelFailedCalls)}/${String(totalRounds)} | ${String(row.modelFailedHorizons)} | ` +
+    `${String(row.transport)} | ${String(row.timeout)} | ${String(row.parse)} | ${String(row.schema)} | ${String(row.other)} |`;
+}
 
 /**
  * Generate failure audit section for all models
@@ -1186,21 +1237,13 @@ function generateFailureAuditSection(
 
   const totalModelCalls = modelCount * totalRounds;
   const totalHorizonPredictions = totalModelCalls * HORIZONS_PER_ROUND;
-
-  let failedModelCalls = 0;
-  let failedHorizonPredictions = 0;
-
-  for (const d of parseDiagnostics) {
-    const modelFailedCalls = d.parseFailCount + d.schemaFailCount;
-    failedModelCalls += modelFailedCalls;
-    failedHorizonPredictions += modelFailedCalls * HORIZONS_PER_ROUND + d.missingHorizonCount;
-  }
+  const aggregates = computeFailureAggregates(parseDiagnostics);
 
   const modelCallFailRate = totalModelCalls > 0
-    ? ((failedModelCalls / totalModelCalls) * 100).toFixed(1)
+    ? ((aggregates.failedModelCalls / totalModelCalls) * 100).toFixed(1)
     : '0.0';
   const horizonFailRate = totalHorizonPredictions > 0
-    ? ((failedHorizonPredictions / totalHorizonPredictions) * 100).toFixed(1)
+    ? ((aggregates.failedHorizonPredictions / totalHorizonPredictions) * 100).toFixed(1)
     : '0.0';
 
   const lines: string[] = [
@@ -1210,32 +1253,32 @@ function generateFailureAuditSection(
     '',
     '**Aggregate:**',
     `- Total model calls: ${String(totalModelCalls)} (${String(modelCount)} models × ${String(totalRounds)} rounds)`,
-    `- Failed model calls: ${String(failedModelCalls)} (${modelCallFailRate}%)`,
+    `- Failed model calls: ${String(aggregates.failedModelCalls)} (${modelCallFailRate}%)`,
     `- Total horizon predictions: ${String(totalHorizonPredictions)} (${String(modelCount)} models × ${String(totalRounds)} rounds × ${String(HORIZONS_PER_ROUND)} horizons)`,
-    `- Failed horizon predictions: ${String(failedHorizonPredictions)} (${horizonFailRate}%)`,
+    `- Failed horizon predictions: ${String(aggregates.failedHorizonPredictions)} (${horizonFailRate}%)`,
     '',
     '**Per-Model Breakdown:**',
     '',
-    '| Model | Calls Failed/Total | Horizons Failed | Transport | Timeout | Parse | Schema |',
-    '|-------|--------------------|--------------------|-----------|---------|-------|--------|',
+    '| Model | Calls Failed/Total | Horizons Failed | Transport | Timeout | Parse | Schema | Other |',
+    '|-------|--------------------|--------------------|-----------|---------|-------|--------|-------|',
   ];
 
-  for (const d of parseDiagnostics) {
-    const modelFailedCalls = d.parseFailCount + d.schemaFailCount;
-    const modelFailedHorizons = modelFailedCalls * HORIZONS_PER_ROUND + d.missingHorizonCount;
-    const byType = extractFailuresByType(d);
-    const transport = byType?.transport ?? 0;
-    const timeout = byType?.timeout ?? 0;
-    const parse = byType?.parse ?? 0;
-    const schema = byType?.schema ?? 0;
+  const rows = parseDiagnostics.map(d => buildModelFailureRow(d));
+  const integrityWarnings = rows.map(r => r.integrityWarning).filter((w): w is string => w !== undefined);
 
-    lines.push(
-      `| ${d.modelId} | ${String(modelFailedCalls)}/${String(totalRounds)} | ${String(modelFailedHorizons)} | ` +
-      `${String(transport)} | ${String(timeout)} | ${String(parse)} | ${String(schema)} |`
-    );
+  for (const row of rows) {
+    lines.push(formatFailureRow(row, totalRounds));
   }
 
   lines.push('');
+
+  if (integrityWarnings.length > 0) {
+    lines.push('> ⚠️ **Audit Integrity Warning**:');
+    for (const warning of integrityWarnings) {
+      lines.push(`> - ${warning}`);
+    }
+    lines.push('');
+  }
 
   return lines;
 }

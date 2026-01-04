@@ -36,6 +36,14 @@ export interface ModelParseDiagnostics {
   missingHorizonCount: number;
   /** Per-horizon missing counts */
   missingByHorizon: Record<TimeframeId, number>;
+  /** Breakdown by failure type */
+  failuresByType?: {
+    transport: number;
+    timeout: number;
+    parse: number;
+    schema: number;
+    other: number;
+  };
 }
 
 const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];

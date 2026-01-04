@@ -66,6 +66,8 @@ export interface ParseDiagnostics {
     parse: number;
     /** Schema validation failed */
     schema: number;
+    /** Uncategorized failures */
+    other: number;
   };
 }
 
