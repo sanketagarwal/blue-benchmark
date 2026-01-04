@@ -818,7 +818,10 @@ function categorizeFailure(errorMessage: string | undefined): 'transport' | 'tim
   if (lowerMessage.includes('network') || lowerMessage.includes('fetch') || /status\s*code|status:\s*\d{3}/i.test(errorMessage)) {
     return 'transport';
   }
-  if (lowerMessage.includes('schema') || lowerMessage.includes('validation')) {
+  if (errorMessage.includes('AI_JSONParseError') || lowerMessage.includes('json parsing failed') || lowerMessage.includes('syntaxerror')) {
+    return 'parse';
+  }
+  if (errorMessage.includes('AI_TypeValidationError') || lowerMessage.includes('typevalidation') || lowerMessage.includes('schema') || lowerMessage.includes('validation')) {
     return 'schema';
   }
   if (lowerMessage.includes('json') || lowerMessage.includes('parse') || lowerMessage.includes('no json found')) {
