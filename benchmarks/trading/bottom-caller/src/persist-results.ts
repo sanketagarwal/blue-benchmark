@@ -182,6 +182,12 @@ const MASS_TIE_THRESHOLD = 3;
 const MIN_COVERAGE_RATIO = 0.8;
 const MIN_EFFECTIVE_ROUNDS = 10;
 
+// Default reason for non-rankable horizons
+const DEFAULT_NON_RANKABLE_REASON = 'insufficient label diversity';
+
+// Section header for per-horizon rankings
+const SECTION_PER_HORIZON_TOP_10 = '## Per-Horizon Rankings (Top 10)';
+
 /**
  * Check if a model has insufficient coverage to qualify for ranking
  * @param effectiveRounds - Number of scored rounds
@@ -807,7 +813,7 @@ function generateArenaResultsByHorizon(
 
     const rankability = rankabilityMap.get(horizon);
     if (rankability !== undefined && !rankability.isRankable) {
-      const reason = rankability.reason ?? 'insufficient label diversity';
+      const reason = rankability.reason ?? DEFAULT_NON_RANKABLE_REASON;
       lines.push(`*This horizon is not rankable: ${reason}. Rankings would not be statistically meaningful.*`);
       lines.push('');
       continue;
@@ -898,43 +904,88 @@ function generateCrossHorizonStrength(rankings: PerHorizonRankings | undefined):
 }
 
 /**
- * Generate per-horizon breakdown table (legacy format for backward compatibility)
- * @param metrics - Array of model metrics
+ * Generate table rows for a single horizon in the breakdown
+ * @param rankings - Rankings for this horizon
+ * @param horizon - Horizon identifier
+ * @param metricsMap - Map of modelId to ModelMetrics
  * @returns Array of markdown lines
  */
-function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
-  const lines: string[] = ['## Per-Horizon Rankings (All Models)', ''];
+function generateHorizonBreakdownTable(
+  rankings: HorizonRanking[],
+  horizon: TimeframeId,
+  metricsMap: Map<string, ModelMetrics>
+): string[] {
+  const filteredRankings = rankings.filter(r => {
+    const metrics = metricsMap.get(r.modelId);
+    if (metrics === undefined) {
+      return true;
+    }
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const effectiveRounds = metrics.effectiveRoundsByHorizon[horizon];
+    return effectiveRounds >= MIN_EFFECTIVE_ROUNDS;
+  });
 
-  // Sort by each horizon and show top 10
-  const keyMap: Record<TimeframeId, keyof ModelMetrics> = {
-    '15m': 'logLoss15m',
-    '1h': 'logLoss1h',
-    '4h': 'logLoss4h',
-    '24h': 'logLoss24h',
-  };
+  const top10 = filteredRankings.slice(0, 10);
+
+  if (top10.length === 0) {
+    return ['*No models qualified for this horizon.*', ''];
+  }
+
+  const lines = [
+    '| Rank | Model | Score | Log Loss |',
+    '|------|-------|-------|----------|',
+  ];
+
+  for (const [rankIndex, r] of top10.entries()) {
+    const logLossFormatted = isValidMean(r.logLoss)
+      ? `${getLogLossEmoji(r.logLoss)}${formatNumber(r.logLoss, 4)}`
+      : 'N/A';
+    lines.push(`| ${String(rankIndex + 1)} | ${r.modelId} | ${formatNumber(r.score, 4)} | ${logLossFormatted} |`);
+  }
+  lines.push('');
+
+  return lines;
+}
+
+/**
+ * Generate per-horizon breakdown table showing top 10 from arena rankings
+ * Uses the same data source as Arena Winners for consistency
+ * @param rankings - Per-horizon rankings from phase-3-scorer (same as Arena Winners)
+ * @param metricsMap - Map of modelId to ModelMetrics for coverage info
+ * @param rankabilityMap - Map of horizon to rankability status
+ * @returns Array of markdown lines
+ */
+function generateHorizonBreakdown(
+  rankings: PerHorizonRankings | undefined,
+  metricsMap: Map<string, ModelMetrics>,
+  rankabilityMap: Map<TimeframeId, HorizonRankability>
+): string[] {
+  if (rankings === undefined) {
+    return [SECTION_PER_HORIZON_TOP_10, '', '*No ranking data available.*', ''];
+  }
+
+  const lines: string[] = [
+    SECTION_PER_HORIZON_TOP_10,
+    '',
+    '*Same data as Arena Winners, showing top 10 per horizon. Models with <10 scored rounds excluded.*',
+    '',
+  ];
 
   for (const horizon of HORIZONS) {
-    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
-    const key = keyMap[horizon];
-
-    // eslint-disable-next-line security/detect-object-injection -- key from typed constant mapping
-    const sorted = [...metrics].sort((a, b) => (a[key] as number) - (b[key] as number));
-    const top10 = sorted.slice(0, 10);
-
     lines.push(`### ${horizon} Horizon (Top 10)`);
     lines.push('');
-    lines.push('| Rank | Model | Log Loss | Status |');
-    lines.push('|------|-------|----------|--------|');
 
-    for (const [rankIndex, m] of top10.entries()) {
-      // eslint-disable-next-line security/detect-object-injection -- key from typed constant mapping
-      const value = m[key] as number;
-      const formattedValue = isValidMean(value)
-        ? `${getLogLossEmoji(value)}${formatNumber(value, 4)}`
-        : 'N/A';
-      lines.push(`| ${String(rankIndex + 1)} | ${m.modelId} | ${formattedValue} | ${m.status} |`);
+    const rankability = rankabilityMap.get(horizon);
+    if (rankability !== undefined && !rankability.isRankable) {
+      const reason = rankability.reason ?? DEFAULT_NON_RANKABLE_REASON;
+      lines.push(`*This horizon is not rankable: ${reason}.*`);
+      lines.push('');
+      continue;
     }
-    lines.push('');
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const horizonRankings: HorizonRanking[] = rankings[horizon];
+    lines.push(...generateHorizonBreakdownTable(horizonRankings, horizon, metricsMap));
   }
 
   return lines;
@@ -1579,7 +1630,7 @@ function generateMarkdown(
     ...generateCrossHorizonStrength(perHorizonRankings),
     ...generateSurvivorsLeaderboard(modelMetrics),
     ...generateAllModelsLeaderboard(modelMetrics),
-    ...generateHorizonBreakdown(modelMetrics),
+    ...generateHorizonBreakdown(perHorizonRankings, metricsMap, rankabilityMap),
     ...generateEliminationAuditSection(allModels),
     ...generateFailedSection(allModels),
     '---',
