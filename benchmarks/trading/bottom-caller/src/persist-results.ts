@@ -414,41 +414,65 @@ function generateSummary(activeCount: number, eliminatedCount: number, failedCou
   ];
 }
 
+const LEADERBOARD_HEADER =
+  '| Rank | Model | Status | Rnds | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |';
+const LEADERBOARD_SEPARATOR =
+  '|------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|';
+const SURVIVORS_TITLE = '## Final Standings (Survivors)';
+
+function formatLeaderboardRow(m: ModelMetrics, medal: string): string {
+  const ll15m = `${getLogLossEmoji(m.logLoss15m)}${formatNumber(m.logLoss15m, 3)}`;
+  const ll1h = `${getLogLossEmoji(m.logLoss1h)}${formatNumber(m.logLoss1h, 3)}`;
+  const ll4h = `${getLogLossEmoji(m.logLoss4h)}${formatNumber(m.logLoss4h, 3)}`;
+  const ll24h = `${getLogLossEmoji(m.logLoss24h)}${formatNumber(m.logLoss24h, 3)}`;
+  const llMean = `${getLogLossEmoji(m.meanLogLoss)}${formatNumber(m.meanLogLoss, 3)}`;
+  const pctRank = formatNumber(m.avgPercentileRank, 1);
+  const bestWin = formatNumber(m.avgBestWindow, 3);
+  const stability = formatNumber(m.avgStability, 3);
+  const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
+  const score = formatNumber(m.compositeScore, 4);
+  return `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`;
+}
+
+function getMedal(rank: number): string {
+  const medalOptions = ['🥇', '🥈', '🥉'];
+  return rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
+}
+
 /**
- * Generate the comprehensive results table
+ * Generate the survivors leaderboard (active models only)
  * @param metrics - Array of model metrics sorted by composite score
  * @returns Array of markdown lines
  */
-function generateComprehensiveTable(metrics: ModelMetrics[]): string[] {
+function generateSurvivorsLeaderboard(metrics: ModelMetrics[]): string[] {
+  const survivors = metrics.filter(m => m.status.startsWith('✅'));
+
+  if (survivors.length === 0) {
+    return [SURVIVORS_TITLE, '', '*No models survived all elimination phases.*', ''];
+  }
+
+  const lines: string[] = [SURVIVORS_TITLE, '', LEADERBOARD_HEADER, LEADERBOARD_SEPARATOR];
+
+  for (const [index, m] of survivors.entries()) {
+    lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
+  }
+
+  lines.push('');
+  return lines;
+}
+
+function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
   const lines: string[] = [
-    '## Full Results (All Models)',
+    '## All Models (Research Reference)',
     '',
-    '| Rank | Model | Status | Rnds | 15m | 1h | 4h | 24h | Mean | %Rank | BestWin | Stabil | TtP | Score |',
-    '|------|-------|--------|------|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|',
+    '*Includes eliminated models for comparative analysis. Rankings are by raw composite score, not tournament outcome.*',
+    '',
+    LEADERBOARD_HEADER,
+    LEADERBOARD_SEPARATOR,
   ];
 
   for (const [index, m] of metrics.entries()) {
-    const rank = index + 1;
-    const medalOptions = ['🥇', '🥈', '🥉'];
-    const medal = rank <= 3 ? (medalOptions[rank - 1] ?? String(rank)) : String(rank);
-
-    // Format with quality indicators
-    const ll15m = `${getLogLossEmoji(m.logLoss15m)}${formatNumber(m.logLoss15m, 3)}`;
-    const ll1h = `${getLogLossEmoji(m.logLoss1h)}${formatNumber(m.logLoss1h, 3)}`;
-    const ll4h = `${getLogLossEmoji(m.logLoss4h)}${formatNumber(m.logLoss4h, 3)}`;
-    const ll24h = `${getLogLossEmoji(m.logLoss24h)}${formatNumber(m.logLoss24h, 3)}`;
-    const llMean = `${getLogLossEmoji(m.meanLogLoss)}${formatNumber(m.meanLogLoss, 3)}`;
-
-    // Format composite components
-    const pctRank = formatNumber(m.avgPercentileRank, 1);
-    const bestWin = formatNumber(m.avgBestWindow, 3);
-    const stability = formatNumber(m.avgStability, 3);
-    const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
-    const score = formatNumber(m.compositeScore, 4);
-
-    lines.push(
-      `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`
-    );
+    lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
   }
 
   lines.push('');
@@ -1168,7 +1192,8 @@ function generateMarkdown(
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateArenaResultsByHorizon(perHorizonRankings),
     ...generateCrossHorizonStrength(perHorizonRankings),
-    ...generateComprehensiveTable(modelMetrics),
+    ...generateSurvivorsLeaderboard(modelMetrics),
+    ...generateAllModelsLeaderboard(modelMetrics),
     ...generateHorizonBreakdown(modelMetrics),
     ...generateEliminationAuditSection(allModels),
     ...generateFailedSection(allModels),
