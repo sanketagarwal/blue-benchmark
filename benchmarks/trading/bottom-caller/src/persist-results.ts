@@ -948,40 +948,86 @@ function generatePredictionDiversitySection(
   return lines;
 }
 
+interface FailuresByType {
+  transport: number;
+  timeout: number;
+  parse: number;
+  schema: number;
+}
+
+function extractFailuresByType(parseDiag: ModelParseDiagnostics): FailuresByType | undefined {
+  if (!('failuresByType' in parseDiag)) {
+    return undefined;
+  }
+  return (parseDiag as unknown as { failuresByType: FailuresByType }).failuresByType;
+}
+
+const HORIZONS_PER_ROUND = 4;
+
 /**
- * Generate parse diagnostics section for all models
+ * Generate failure audit section for all models
  * @param parseDiagnostics - Array of model parse diagnostics
+ * @param totalRounds - Total rounds in the benchmark
+ * @param modelCount - Total number of models
  * @returns Array of markdown lines
  */
-function generateParseDiagnosticsSection(parseDiagnostics: ModelParseDiagnostics[] | undefined): string[] {
+function generateFailureAuditSection(
+  parseDiagnostics: ModelParseDiagnostics[] | undefined,
+  totalRounds: number,
+  modelCount: number
+): string[] {
   if (parseDiagnostics === undefined || parseDiagnostics.length === 0) {
     return [];
   }
 
-  const hasIssues = parseDiagnostics.some(
-    d => d.parseFailCount > 0 || d.schemaFailCount > 0 || d.missingHorizonCount > 0
-  );
+  const totalModelCalls = modelCount * totalRounds;
+  const totalHorizonPredictions = totalModelCalls * HORIZONS_PER_ROUND;
 
-  if (!hasIssues) {
-    return [];
+  let failedModelCalls = 0;
+  let failedHorizonPredictions = 0;
+
+  for (const d of parseDiagnostics) {
+    const modelFailedCalls = d.parseFailCount + d.schemaFailCount;
+    failedModelCalls += modelFailedCalls;
+    failedHorizonPredictions += modelFailedCalls * HORIZONS_PER_ROUND + d.missingHorizonCount;
   }
 
+  const modelCallFailRate = totalModelCalls > 0
+    ? ((failedModelCalls / totalModelCalls) * 100).toFixed(1)
+    : '0.0';
+  const horizonFailRate = totalHorizonPredictions > 0
+    ? ((failedHorizonPredictions / totalHorizonPredictions) * 100).toFixed(1)
+    : '0.0';
+
   const lines: string[] = [
-    '## Parse Diagnostics',
+    '## Failure Audit',
     '',
-    '*Parsing and validation issues encountered during the run.*',
+    '*Failed rounds are excluded from scoring.*',
     '',
-    '| Model | Success | Parse Fail | Schema Fail | Missing Horizons |',
-    '|-------|---------|------------|-------------|------------------|',
+    '**Aggregate:**',
+    `- Total model calls: ${String(totalModelCalls)} (${String(modelCount)} models × ${String(totalRounds)} rounds)`,
+    `- Failed model calls: ${String(failedModelCalls)} (${modelCallFailRate}%)`,
+    `- Total horizon predictions: ${String(totalHorizonPredictions)} (${String(modelCount)} models × ${String(totalRounds)} rounds × ${String(HORIZONS_PER_ROUND)} horizons)`,
+    `- Failed horizon predictions: ${String(failedHorizonPredictions)} (${horizonFailRate}%)`,
+    '',
+    '**Per-Model Breakdown:**',
+    '',
+    '| Model | Calls Failed/Total | Horizons Failed | Transport | Timeout | Parse | Schema |',
+    '|-------|--------------------|--------------------|-----------|---------|-------|--------|',
   ];
 
   for (const d of parseDiagnostics) {
-    if (d.parseFailCount === 0 && d.schemaFailCount === 0 && d.missingHorizonCount === 0) {
-      continue;
-    }
+    const modelFailedCalls = d.parseFailCount + d.schemaFailCount;
+    const modelFailedHorizons = modelFailedCalls * HORIZONS_PER_ROUND + d.missingHorizonCount;
+    const byType = extractFailuresByType(d);
+    const transport = byType?.transport ?? 0;
+    const timeout = byType?.timeout ?? 0;
+    const parse = byType?.parse ?? 0;
+    const schema = byType?.schema ?? 0;
+
     lines.push(
-      `| ${d.modelId} | ${String(d.parseSuccessCount)} | ${String(d.parseFailCount)} | ` +
-      `${String(d.schemaFailCount)} | ${String(d.missingHorizonCount)} |`
+      `| ${d.modelId} | ${String(modelFailedCalls)}/${String(totalRounds)} | ${String(modelFailedHorizons)} | ` +
+      `${String(transport)} | ${String(timeout)} | ${String(parse)} | ${String(schema)} |`
     );
   }
 
@@ -1087,7 +1133,7 @@ function generateMarkdown(
     ...generateMethodology(),
     ...generateDatasetDiagnosticsSection(diagnostics),
     ...generatePredictionDiversitySection(diagnostics?.predictionDiversity, diagnostics?.parseDiagnostics),
-    ...generateParseDiagnosticsSection(diagnostics?.parseDiagnostics),
+    ...generateFailureAuditSection(diagnostics?.parseDiagnostics, meta.totalRounds, allModels.length),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
     ...generateArenaResultsByHorizon(perHorizonRankings),
     ...generateCrossHorizonStrength(perHorizonRankings),
