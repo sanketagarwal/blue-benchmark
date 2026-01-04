@@ -872,6 +872,8 @@ function generateArenaResultsByHorizon(
     const label = horizonLabels[horizon];
     lines.push(`### ${label}`);
     lines.push('');
+    lines.push('*Ranked by Arena Score (50% log loss + 30% best window + 20% stability)*');
+    lines.push('');
 
     const rankability = rankabilityMap.get(horizon);
     if (rankability !== undefined && !rankability.isRankable) {
@@ -1093,7 +1095,7 @@ function generateHorizonBreakdown(
   const lines: string[] = [
     SECTION_PER_HORIZON_TOP_10,
     '',
-    '*Same data as Arena Winners, showing top 10 per horizon. Eligibility: ≥10 scored rounds AND not disqualified at this horizon in Phase 0/1/2.*',
+    '*Same data as Arena Winners, showing top 10 per horizon. Ranked by Arena Score (50% log loss + 30% best window + 20% stability). Eligibility: ≥10 scored rounds AND not disqualified at this horizon in Phase 0/1/2.*',
     '',
   ];
 
