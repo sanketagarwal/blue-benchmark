@@ -85,6 +85,9 @@ const RESULTS_FILE = 'BENCHMARK_RESULTS.md';
 const LOG_LOSS_GOOD = 0.5;
 const LOG_LOSS_OK = 0.8;
 
+// Mass tie detection threshold - warn if more than this many models share identical LL tuples
+const MASS_TIE_THRESHOLD = 3;
+
 /**
  * Check if all horizons have single-class labels (all true or all false)
  * @param diagnostics - Dataset diagnostics
@@ -750,6 +753,53 @@ function computeMedian(sorted: number[]): number {
 const MINUS_LOG_EPSILON = -Math.log(1e-15);
 
 /**
+ * Generate mass tie warning section when too many models share identical LL tuples.
+ * This catches suspicious patterns like shared cached outputs, fallback predictions,
+ * routing mis-attribution, or single-class datasets with constant predictors.
+ * @param metrics - Array of model metrics
+ * @returns Array of markdown lines for the warning section (empty if no ties detected)
+ */
+function generateMassTieWarning(metrics: ModelMetrics[]): string[] {
+  const tupleGroups = new Map<string, string[]>();
+
+  for (const m of metrics) {
+    const tuple = `(${m.logLoss15m.toFixed(3)}, ${m.logLoss1h.toFixed(3)}, ${m.logLoss4h.toFixed(3)}, ${m.logLoss24h.toFixed(3)})`;
+    const existing = tupleGroups.get(tuple);
+    if (existing === undefined) {
+      tupleGroups.set(tuple, [m.modelId]);
+    } else {
+      existing.push(m.modelId);
+    }
+  }
+
+  const tiedGroups = [...tupleGroups.entries()]
+    .filter(([, models]) => models.length > MASS_TIE_THRESHOLD)
+    .sort((a, b) => b[1].length - a[1].length);
+
+  if (tiedGroups.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '',
+    '## ⚠️ Mass Tie Warning',
+    '',
+    '*High tie rate detected. Check prediction diversity, parse fallback, or caching issues.*',
+    '',
+  ];
+
+  for (const [tuple, models] of tiedGroups) {
+    lines.push(`**${String(models.length)} models share identical LL tuple ${tuple}:**`);
+    for (const modelId of models) {
+      lines.push(`- ${modelId}`);
+    }
+    lines.push('');
+  }
+
+  return lines;
+}
+
+/**
  * Check if horizon has unbalanced labels and return warning if so
  * @param horizon - Horizon name
  * @param countTrue - Count of true labels
@@ -1190,6 +1240,7 @@ function generateMarkdown(
     ...generatePredictionDiversitySection(diagnostics?.predictionDiversity, diagnostics?.parseDiagnostics),
     ...generateFailureAuditSection(diagnostics?.parseDiagnostics, meta.totalRounds, allModels.length),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
+    ...generateMassTieWarning(modelMetrics),
     ...generateArenaResultsByHorizon(perHorizonRankings),
     ...generateCrossHorizonStrength(perHorizonRankings),
     ...generateSurvivorsLeaderboard(modelMetrics),
