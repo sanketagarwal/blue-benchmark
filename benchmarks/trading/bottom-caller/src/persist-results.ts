@@ -134,8 +134,8 @@ export const SECTION_PREDICTION_DIVERSITY = '## Prediction Diversity Analysis';
 export const NO_DATA_COLLECTED = '*No data collected.*';
 
 // Dataset diagnostics table headers (exported for quick-mode-report)
-export const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL | AlwaysTrue LL | AlwaysFalse LL | trivialBest LL |';
-export const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|---------------|----------------|----------------|';
+export const DATASET_DIAGNOSTICS_TABLE_HEADER = '| Horizon | N | True | False | pTrue | Random LL | Prevalence LL | Extreme True LL | Extreme False LL |';
+export const DATASET_DIAGNOSTICS_TABLE_SEPARATOR = '|---------|---|------|-------|-------|-----------|---------------|-----------------|------------------|';
 
 /**
  * Format a number to fixed decimal places
@@ -938,9 +938,8 @@ function generateDiagnosticsTableRows(dataset: DatasetDiagnostics): {
     const d = dataset.byHorizon[horizon];
     const { n, countTrue, countFalse, pTrue } = d.labels;
 
-    const alwaysTrueLL = n > 0 ? (countFalse * MINUS_LOG_EPSILON) / n : 0;
-    const alwaysFalseLL = n > 0 ? (countTrue * MINUS_LOG_EPSILON) / n : 0;
-    const trivialBestLL = Math.min(alwaysTrueLL, alwaysFalseLL);
+    const extremeTrueLL = n > 0 ? (countFalse * MINUS_LOG_EPSILON) / n : 0;
+    const extremeFalseLL = n > 0 ? (countTrue * MINUS_LOG_EPSILON) / n : 0;
 
     const prevalenceLL = d.baselines.prevalenceLogLoss;
     const prevalenceLLFormatted = (prevalenceLL < 1e-6 && prevalenceLL > 0)
@@ -950,7 +949,7 @@ function generateDiagnosticsTableRows(dataset: DatasetDiagnostics): {
     rows.push(
       `| ${horizon} | ${String(n)} | ${String(countTrue)} | ${String(countFalse)} | ${pTrue.toFixed(3)} | ` +
       `${d.baselines.randomLogLoss.toFixed(3)} | ${prevalenceLLFormatted} | ` +
-      `${formatLogLoss(alwaysTrueLL)} | ${formatLogLoss(alwaysFalseLL)} | ${formatLogLoss(trivialBestLL)} |`
+      `${formatLogLoss(extremeTrueLL)} | ${formatLogLoss(extremeFalseLL)} |`
     );
 
     const warning = checkUnbalancedHorizon(horizon, countTrue, countFalse, n);
@@ -1013,12 +1012,8 @@ function generateDatasetDiagnosticsSection(diagnostics: BenchmarkDiagnostics | u
     '*Clipping: ε = 1e-15 (probabilities clipped to [ε, 1-ε] to avoid log(0))*',
     '',
     '**Interpretation:**',
-    '- *pTrue*: Label prevalence. If extremely skewed (>0.9 or <0.1), models may achieve good log loss without skill.',
-    '- *Random LL*: Baseline log loss for p=0.5 predictor (always 0.693).',
-    '- *Prevalence LL*: Baseline log loss for optimal constant predictor. Models must beat this to show skill.',
-    '- *AlwaysTrue LL*: Log loss for always predicting p=1-ε. Low when most labels are true.',
-    '- *AlwaysFalse LL*: Log loss for always predicting p=ε. Low when most labels are false.',
-    '- *trivialBest LL*: min(AlwaysTrue LL, AlwaysFalse LL). Approaches 0 for single-class datasets.',
+    '- *Prevalence LL*: Best possible constant predictor. Models must beat this to show skill.',
+    '- *Extreme True/False LL*: Diagnostic baselines for p≈1 or p≈0 predictions. High values indicate label imbalance makes extreme predictions catastrophic.',
     '',
   ];
 

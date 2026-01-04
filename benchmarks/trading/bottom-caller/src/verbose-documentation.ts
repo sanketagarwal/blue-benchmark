@@ -211,18 +211,18 @@ export function generateScoringMethodology(): string {
 
   lines.push('### Baselines (from phase-0-scorer.ts)');
   lines.push('');
-  lines.push('| Baseline      | Strategy                              | Log Loss       |');
-  lines.push('| ------------- | ------------------------------------- | -------------- |');
-  lines.push('| random        | Always predict 0.5                    | log(2) ≈ 0.693 |');
-  lines.push('| alwaysFalse   | Always predict ε (near 0)             | Depends on labels |');
-  lines.push('| alwaysTrue    | Always predict 1-ε (near 1)           | Depends on labels |');
-  lines.push('| trivialBest   | min(alwaysFalse, alwaysTrue)          | Best constant  |');
+  lines.push('| Baseline       | Strategy                              | Log Loss          |');
+  lines.push('| -------------- | ------------------------------------- | ----------------- |');
+  lines.push('| random         | Always predict 0.5                    | log(2) ≈ 0.693    |');
+  lines.push('| prevalence     | Always predict pTrue                  | Best constant     |');
+  lines.push('| extremeFalse   | Always predict ε (near 0)             | Diagnostic only   |');
+  lines.push('| extremeTrue    | Always predict 1-ε (near 1)           | Diagnostic only   |');
   lines.push('');
   lines.push('### Disqualification Thresholds:');
   lines.push('- Worse than random: meanLL > log(2) × 1.1');
-  lines.push('- Degenerate: all mapped probabilities p ≥ 0.9 (always predicts noNewLow with high confidence) or p ≤ 0.1 (always predicts new low with high confidence)');
+  lines.push('- Degenerate: all mapped probabilities p ≥ 0.9 or p ≤ 0.1');
   lines.push('- Extreme error rate: > 20% confident wrong predictions (p > 0.8 when label = false)');
-  lines.push('- Skill margin: meanLL >= trivialBest + 0.1 (when trivialBest >= 0.1)');
+  lines.push('- Skill check: model must beat prevalence baseline to show skill');
 
   return lines.join('\n');
 }

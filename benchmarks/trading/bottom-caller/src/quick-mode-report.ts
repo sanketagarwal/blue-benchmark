@@ -118,14 +118,22 @@ export function generateQuickDatasetDiagnosticsSection(diagnostics: DatasetDiagn
   for (const horizon of HORIZONS) {
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
     const d = diagnostics.byHorizon[horizon];
+    const { n, countTrue, countFalse, pTrue } = d.labels;
+
+    const MINUS_LOG_EPSILON = 34.5388;
+    const extremeTrueLL = n > 0 ? (countFalse * MINUS_LOG_EPSILON) / n : 0;
+    const extremeFalseLL = n > 0 ? (countTrue * MINUS_LOG_EPSILON) / n : 0;
+
     const row = [
       horizon,
-      String(d.labels.n),
-      String(d.labels.countTrue),
-      String(d.labels.countFalse),
-      d.labels.pTrue.toFixed(3),
+      String(n),
+      String(countTrue),
+      String(countFalse),
+      pTrue.toFixed(3),
       d.baselines.randomLogLoss.toFixed(3),
       formatPrevalenceLogLoss(d.baselines.prevalenceLogLoss),
+      extremeTrueLL.toFixed(3),
+      extremeFalseLL.toFixed(3),
     ];
     lines.push(`| ${row.join(' | ')} |`);
 
