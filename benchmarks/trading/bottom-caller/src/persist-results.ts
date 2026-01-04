@@ -232,13 +232,36 @@ export function formatNumber(value: number, decimals = 4): string {
 /**
  * Calculate mean of an array of numbers
  * @param values - Array of numbers
- * @returns Mean value or 0 if empty
+ * @returns Mean value or NaN if empty
  */
 export function calculateMean(values: number[]): number {
   if (values.length === 0) {
-    return 0;
+    return Number.NaN;
   }
   return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+/**
+ * Format log loss with N/A handling for empty arrays
+ * @param values - Array of log loss values
+ * @param decimals - Decimal places (default 3)
+ * @returns Formatted string or 'N/A' if empty
+ */
+export function formatLogLossOrNA(values: number[], decimals = 3): string {
+  if (values.length === 0) {
+    return 'N/A';
+  }
+  const mean = calculateMean(values);
+  return formatNumber(mean, decimals);
+}
+
+/**
+ * Check if a mean value is valid (not NaN)
+ * @param value - Mean value to check
+ * @returns True if valid (not NaN)
+ */
+function isValidMean(value: number): boolean {
+  return !Number.isNaN(value);
 }
 
 /**
@@ -575,12 +598,25 @@ function formatCoverageCell(m: ModelMetrics): string {
   return `${String(covPct)}%${warning}`;
 }
 
+/**
+ * Format a log loss value for leaderboard display
+ * Shows N/A for NaN values (no data)
+ * @param ll - Log loss value
+ * @returns Formatted string with emoji prefix
+ */
+function formatLogLossCell(ll: number): string {
+  if (!isValidMean(ll)) {
+    return 'N/A';
+  }
+  return `${getLogLossEmoji(ll)}${formatNumber(ll, 3)}`;
+}
+
 function formatLeaderboardRow(m: ModelMetrics, medal: string): string {
-  const ll15m = `${getLogLossEmoji(m.logLoss15m)}${formatNumber(m.logLoss15m, 3)}`;
-  const ll1h = `${getLogLossEmoji(m.logLoss1h)}${formatNumber(m.logLoss1h, 3)}`;
-  const ll4h = `${getLogLossEmoji(m.logLoss4h)}${formatNumber(m.logLoss4h, 3)}`;
-  const ll24h = `${getLogLossEmoji(m.logLoss24h)}${formatNumber(m.logLoss24h, 3)}`;
-  const llMean = `${getLogLossEmoji(m.meanLogLoss)}${formatNumber(m.meanLogLoss, 3)}`;
+  const ll15m = formatLogLossCell(m.logLoss15m);
+  const ll1h = formatLogLossCell(m.logLoss1h);
+  const ll4h = formatLogLossCell(m.logLoss4h);
+  const ll24h = formatLogLossCell(m.logLoss24h);
+  const llMean = formatLogLossCell(m.meanLogLoss);
   const pctRank = formatNumber(m.avgPercentileRank, 1);
   const bestWin = formatNumber(m.avgBestWindow, 3);
   const stability = formatNumber(m.avgStability, 3);
@@ -893,7 +929,10 @@ function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
     for (const [rankIndex, m] of top10.entries()) {
       // eslint-disable-next-line security/detect-object-injection -- key from typed constant mapping
       const value = m[key] as number;
-      lines.push(`| ${String(rankIndex + 1)} | ${m.modelId} | ${getLogLossEmoji(value)}${formatNumber(value, 4)} | ${m.status} |`);
+      const formattedValue = isValidMean(value)
+        ? `${getLogLossEmoji(value)}${formatNumber(value, 4)}`
+        : 'N/A';
+      lines.push(`| ${String(rankIndex + 1)} | ${m.modelId} | ${formattedValue} | ${m.status} |`);
     }
     lines.push('');
   }
@@ -904,10 +943,32 @@ function generateHorizonBreakdown(metrics: ModelMetrics[]): string[] {
 /**
  * Format log loss value for display
  * @param ll - Log loss value
- * @returns Formatted string
+ * @returns Formatted string, or 'N/A' if NaN
  */
 function formatLogLoss(ll: number): string {
+  if (!isValidMean(ll)) {
+    return 'N/A';
+  }
   return ll > 1e3 ? ll.toExponential(2) : ll.toFixed(3);
+}
+
+/**
+ * Determine the reason for a horizon with no scored rounds
+ * @param horizonLosses - Array of log losses for this horizon
+ * @param disqInfo - Disqualification info if any
+ * @returns Appropriate reason string
+ */
+function getHorizonReason(
+  horizonLosses: number[],
+  disqInfo: HorizonDisqualification | undefined
+): { phase: string; reason: string } {
+  if (horizonLosses.length === 0) {
+    return { phase: '-', reason: 'No scored rounds' };
+  }
+  if (disqInfo === undefined) {
+    return { phase: '-', reason: 'Qualified' };
+  }
+  return { phase: String(disqInfo.phase), reason: disqInfo.reason };
 }
 
 /**
@@ -945,12 +1006,9 @@ function generateEliminationAuditSection(models: ModelState[]): string[] {
       const formattedLL = formatLogLoss(meanLL);
 
       const disqInfo = m.disqualifiedHorizons?.get(horizon);
+      const { phase: horizonPhase, reason } = getHorizonReason(horizonLosses, disqInfo);
 
-      if (disqInfo === undefined) {
-        lines.push(`| ${horizon} | - | Qualified | ${formattedLL} |`);
-      } else {
-        lines.push(`| ${horizon} | ${String(disqInfo.phase)} | ${disqInfo.reason} | ${formattedLL} |`);
-      }
+      lines.push(`| ${horizon} | ${horizonPhase} | ${reason} | ${formattedLL} |`);
     }
 
     lines.push('');
