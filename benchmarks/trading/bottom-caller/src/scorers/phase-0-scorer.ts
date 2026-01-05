@@ -6,6 +6,170 @@ import type { TimeframeId } from '../timeframe-config.js';
 
 export const RANDOM_BASELINE = Math.log(2);
 
+const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
+
+/**
+ * Skill sanity level for a horizon
+ * - pass: meanLL <= softFailThreshold
+ * - soft_fail: softFailThreshold < meanLL <= hardFailThreshold (weak but keep for more data)
+ * - hard_fail: meanLL > hardFailThreshold (definitely broken, disqualify immediately)
+ */
+export type SkillSanityLevel = 'pass' | 'soft_fail' | 'hard_fail';
+
+/**
+ * Configuration for skill sanity thresholds
+ */
+export interface SkillSanityConfig {
+  /** Soft fail threshold. Default: 0.762 (random * 1.1) */
+  softFailThreshold: number;
+  /** Hard fail threshold. Default: 0.90 */
+  hardFailThreshold: number;
+}
+
+/**
+ * Skill sanity result for a single horizon
+ */
+export interface HorizonSkillSanity {
+  horizon: TimeframeId;
+  meanLL: number;
+  level: SkillSanityLevel;
+  /** Which threshold was crossed (softFailThreshold or hardFailThreshold) */
+  threshold: number;
+}
+
+/**
+ * Skill sanity result for an entire model
+ */
+export interface ModelSkillSanity {
+  modelId: string;
+  byHorizon: Record<TimeframeId, HorizonSkillSanity>;
+  /** True if ANY horizon hard failed */
+  hasHardFail: boolean;
+  /** Horizons that soft failed */
+  weakHorizons: TimeframeId[];
+}
+
+/**
+ * Get default skill sanity configuration
+ * @returns Default config with softFailThreshold=0.762 (random*1.1), hardFailThreshold=0.90
+ */
+export function getDefaultSkillSanityConfig(): SkillSanityConfig {
+  return {
+    softFailThreshold: RANDOM_BASELINE * 1.1, // ~0.762
+    hardFailThreshold: 0.9,
+  };
+}
+
+/**
+ * Check skill sanity for each horizon based on mean log loss
+ * @param meanLogLossByHorizon - Mean log loss by horizon
+ * @param config - Skill sanity thresholds
+ * @returns Skill sanity result for each horizon
+ */
+export function checkSkillSanity(
+  meanLogLossByHorizon: Record<TimeframeId, number>,
+  config: SkillSanityConfig
+): Record<TimeframeId, HorizonSkillSanity> {
+  const result: Record<string, HorizonSkillSanity> = {};
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const meanLL = meanLogLossByHorizon[horizon];
+
+    let level: SkillSanityLevel;
+    let threshold: number;
+
+    if (meanLL > config.hardFailThreshold) {
+      level = 'hard_fail';
+      threshold = config.hardFailThreshold;
+    } else if (meanLL > config.softFailThreshold) {
+      level = 'soft_fail';
+      threshold = config.softFailThreshold;
+    } else {
+      level = 'pass';
+      threshold = config.softFailThreshold;
+    }
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    result[horizon] = { horizon, meanLL, level, threshold };
+  }
+
+  return result as Record<TimeframeId, HorizonSkillSanity>;
+}
+
+/**
+ * Build full model skill sanity assessment
+ * @param modelId - Model identifier
+ * @param meanLogLossByHorizon - Mean log loss by horizon
+ * @param config - Skill sanity thresholds (uses defaults if not provided)
+ * @returns Complete model skill sanity result
+ */
+export function getModelSkillSanity(
+  modelId: string,
+  meanLogLossByHorizon: Record<TimeframeId, number>,
+  config?: SkillSanityConfig
+): ModelSkillSanity {
+  const effectiveConfig = config ?? getDefaultSkillSanityConfig();
+  const byHorizon = checkSkillSanity(meanLogLossByHorizon, effectiveConfig);
+
+  const weakHorizons: TimeframeId[] = [];
+  let hasHardFail = false;
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const sanity = byHorizon[horizon];
+    if (sanity.level === 'hard_fail') {
+      hasHardFail = true;
+    } else if (sanity.level === 'soft_fail') {
+      weakHorizons.push(horizon);
+    }
+  }
+
+  return { modelId, byHorizon, hasHardFail, weakHorizons };
+}
+
+/**
+ * Get horizons that should be disqualified using soft/hard thresholds
+ * Hard fail horizons are always disqualified.
+ * Soft fail horizons are optionally included based on includeSoftFails flag.
+ *
+ * @param aggregateScore - Aggregate Phase 0 score
+ * @param config - Skill sanity thresholds (uses defaults if not provided)
+ * @param includeSoftFails - Whether to disqualify soft fails (default: false)
+ * @returns Set of horizons to disqualify
+ */
+export function getPhase0DisqualifiedHorizonsWithSanity(
+  aggregateScore: Phase0AggregateScore,
+  config?: SkillSanityConfig,
+  includeSoftFails = false
+): Set<TimeframeId> {
+  const effectiveConfig = config ?? getDefaultSkillSanityConfig();
+  const sanityByHorizon = checkSkillSanity(aggregateScore.meanLogLoss, effectiveConfig);
+  const disqualified = new Set<TimeframeId>();
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const sanity = sanityByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const degenerate = aggregateScore.degenerateByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const extremeRate = aggregateScore.extremeErrorRate[horizon];
+
+    // Always disqualify: degenerate, high extreme error rate, or hard fail
+    if (degenerate || extremeRate > 0.2 || sanity.level === 'hard_fail') {
+      disqualified.add(horizon);
+      continue;
+    }
+
+    // Optionally disqualify soft fails
+    if (includeSoftFails && sanity.level === 'soft_fail') {
+      disqualified.add(horizon);
+    }
+  }
+
+  return disqualified;
+}
+
 /**
  * Small epsilon to prevent log(0) in baseline calculations
  */
@@ -76,8 +240,6 @@ export interface Phase0AggregateScore {
   extremeErrorRate: Record<TimeframeId, number>;
   degenerateByHorizon: Record<TimeframeId, boolean>;
 }
-
-const HORIZONS: TimeframeId[] = ['15m', '1h', '4h', '24h'];
 
 /**
  * Score a single round for Phase 0 metrics

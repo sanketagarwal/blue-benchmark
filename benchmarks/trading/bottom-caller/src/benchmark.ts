@@ -19,6 +19,8 @@ import {
   computePredictionDiversity,
   createHashFromInputs,
 } from './diagnostics/index.js';
+import { computeModelWeights, computeEnsemblePrediction, scoreEnsemble, getDefaultEnsembleConfig } from './ensemble/online-ensemble.js';
+import { buildExtensionPlan, checkHorizonRankability, getDefaultExtensionTriggerConfig } from './extension/extension-trigger.js';
 import { resolveNoNewLowGroundTruth } from './ground-truth/no-new-low.js';
 import { getModelIds } from './matrix.js';
 import { persistResults, persistQuickResults, persistScoredDatapoints, type BenchmarkDiagnostics, type LabelByTimestamp } from './persist-results.js';
@@ -50,6 +52,7 @@ import {
   getPhase0DisqualifiedHorizonsWithBaselines,
   computeBaselineLogLoss,
 } from './scorers/phase-0-scorer.js';
+import { qualifyModels, computePrevalenceLogLoss, getDefaultQualificationConfig } from './scorers/phase-1-qualification.js';
 import {
   computePercentileRanks,
   getQualifiedHorizons,
@@ -63,6 +66,7 @@ import {
 } from './scorers/phase-2-scorer.js';
 import { rankModelsPerHorizon } from './scorers/phase-3-scorer.js';
 import { computeTrackBMetrics } from './scorers/timing-metrics.js';
+import { checkModelValidity, getDefaultValidityConfig } from './scorers/validity-gates.js';
 import {
   printPerHorizonArenaTable,
   printFinalSummaryTable,
@@ -85,13 +89,17 @@ import type {
   ParseDiagnostics,
   ScoredDatapointRecord,
 } from './diagnostics/index.js';
+import type { EnsemblePerformance, ModelHistory, ModelRoundPrediction, EnsembleRoundResult } from './ensemble/online-ensemble.js';
+import type { ExtensionPlan, HorizonRankabilityStatus } from './extension/extension-trigger.js';
 import type { NoNewLowResult } from './ground-truth/no-new-low.js';
+import type { QuickEnsembleBaselines, QuickTopContributor } from './quick-mode-report.js';
 import type { Candle } from './replay-lab/ohlcv.js';
 import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { Phase1ModelScore } from './scorers/phase-1-scorer.js';
 import type { Phase2ModelScore } from './scorers/phase-2-scorer.js';
 import type { ModelWithHorizonMetrics, PerHorizonRankings } from './scorers/phase-3-scorer.js';
+import type { ModelValidityResult } from './scorers/validity-gates.js';
 import type { RoundScore } from './state/model-state.js';
 import type { TimeframeId } from './timeframe-config.js';
 
@@ -1010,6 +1018,304 @@ function convertToBenchmarkDiagnostics(
   }
 
   return result;
+}
+
+/**
+ * Compute validity results for quick mode preview
+ * @param models - Map of model states
+ * @param totalRounds - Total number of rounds
+ * @returns Array of validity results for each model
+ */
+function computeQuickModeValidityResults(
+  models: Map<string, ModelState>,
+  totalRounds: number
+): ModelValidityResult[] {
+  const validityConfig = getDefaultValidityConfig();
+  const results: ModelValidityResult[] = [];
+
+  for (const state of models.values()) {
+    const predictionsByHorizon: Record<TimeframeId, number[]> = {
+      '15m': [],
+      '1h': [],
+      '4h': [],
+      '24h': [],
+    };
+    const failedRoundsByHorizon: Record<TimeframeId, number> = {
+      '15m': 0,
+      '1h': 0,
+      '4h': 0,
+      '24h': 0,
+    };
+
+    for (const round of state.roundScores) {
+      for (const horizon of HORIZONS) {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        const pred = round.predictions[horizon];
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        predictionsByHorizon[horizon].push(pred);
+      }
+    }
+
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      failedRoundsByHorizon[horizon] = state.failedRounds.length;
+    }
+
+    const validityResult = checkModelValidity(
+      state.modelId,
+      predictionsByHorizon,
+      state.labelsByHorizon,
+      failedRoundsByHorizon,
+      totalRounds,
+      validityConfig
+    );
+    results.push(validityResult);
+  }
+
+  return results;
+}
+
+/**
+ * Compute extension plan for quick mode preview
+ * @param models - Map of model states
+ * @param diagnostics - Benchmark diagnostics with dataset info
+ * @returns Extension plan preview
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Complex data aggregation across horizons and models
+function computeQuickModeExtensionPlan(
+  models: Map<string, ModelState>,
+  diagnostics: BenchmarkDiagnostics
+): ExtensionPlan {
+  const extensionConfig = getDefaultExtensionTriggerConfig();
+  const qualificationConfig = getDefaultQualificationConfig();
+  const validityConfig = getDefaultValidityConfig();
+
+  const rankabilityByHorizon: Record<TimeframeId, HorizonRankabilityStatus> = {} as Record<TimeframeId, HorizonRankabilityStatus>;
+  const qualifiedByHorizon: Record<TimeframeId, string[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
+  const eligibleByHorizon: Record<TimeframeId, string[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const datasetHorizon = diagnostics.dataset?.byHorizon[horizon];
+    const trueCount = datasetHorizon?.labels.countTrue ?? 0;
+    const falseCount = datasetHorizon?.labels.countFalse ?? 0;
+    const effectiveRounds = datasetHorizon?.labels.n ?? 0;
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    rankabilityByHorizon[horizon] = checkHorizonRankability(
+      effectiveRounds,
+      trueCount,
+      falseCount,
+      extensionConfig.nBase,
+      5,
+      [0.1, 0.9]
+    );
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    rankabilityByHorizon[horizon].horizon = horizon;
+  }
+
+  interface ModelInput { modelId: string; meanLogLossByHorizon: Record<TimeframeId, number>; validHorizons: TimeframeId[] }
+  const modelInputs: ModelInput[] = [];
+  const prevalenceLLByHorizon: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const datasetHorizon = diagnostics.dataset?.byHorizon[horizon];
+    const trueCount = datasetHorizon?.labels.countTrue ?? 0;
+    const falseCount = datasetHorizon?.labels.countFalse ?? 0;
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    prevalenceLLByHorizon[horizon] = computePrevalenceLogLoss(trueCount, falseCount);
+  }
+
+  for (const state of models.values()) {
+    const meanLogLossByHorizon: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
+    const validHorizons: TimeframeId[] = [];
+
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const losses = state.logLossByHorizon[horizon];
+      if (losses.length > 0) {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        meanLogLossByHorizon[horizon] = losses.reduce((sum, l) => sum + l, 0) / losses.length;
+        validHorizons.push(horizon);
+      }
+    }
+
+    modelInputs.push({ modelId: state.modelId, meanLogLossByHorizon, validHorizons });
+  }
+
+  const qualificationResult = qualifyModels(modelInputs, prevalenceLLByHorizon, qualificationConfig);
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    qualifiedByHorizon[horizon] = qualificationResult.byHorizon[horizon].qualifiedModels;
+  }
+
+  for (const state of models.values()) {
+    const predictionsByHorizon: Record<TimeframeId, number[]> = { '15m': [], '1h': [], '4h': [], '24h': [] };
+    const failedRoundsByHorizon: Record<TimeframeId, number> = { '15m': 0, '1h': 0, '4h': 0, '24h': 0 };
+
+    for (const round of state.roundScores) {
+      for (const horizon of HORIZONS) {
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        const pred = round.predictions[horizon];
+        // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+        predictionsByHorizon[horizon].push(pred);
+      }
+    }
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      failedRoundsByHorizon[horizon] = state.failedRounds.length;
+    }
+
+    const validityResult = checkModelValidity(
+      state.modelId,
+      predictionsByHorizon,
+      state.labelsByHorizon,
+      failedRoundsByHorizon,
+      state.roundScores.length + state.failedRounds.length,
+      validityConfig
+    );
+
+    for (const horizon of validityResult.validHorizons) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      eligibleByHorizon[horizon].push(state.modelId);
+    }
+  }
+
+  return buildExtensionPlan(rankabilityByHorizon, qualifiedByHorizon, eligibleByHorizon, extensionConfig);
+}
+
+/**
+ * Compute ensemble data for quick mode preview
+ * @param models - Map of model states
+ * @returns Ensemble performance, baselines, and top contributors by horizon
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Ensemble computation requires nested iteration over models and rounds
+function computeQuickModeEnsemble(
+  models: Map<string, ModelState>
+): {
+  byHorizon: Record<TimeframeId, EnsemblePerformance>;
+  baselines: Record<TimeframeId, QuickEnsembleBaselines>;
+  topContributors: Record<TimeframeId, QuickTopContributor[]>;
+} {
+  const ensembleConfig = getDefaultEnsembleConfig();
+  const byHorizon: Record<TimeframeId, EnsemblePerformance> = {} as Record<TimeframeId, EnsemblePerformance>;
+  const baselines: Record<TimeframeId, QuickEnsembleBaselines> = {} as Record<TimeframeId, QuickEnsembleBaselines>;
+  const topContributors: Record<TimeframeId, QuickTopContributor[]> = {} as Record<TimeframeId, QuickTopContributor[]>;
+
+  const modelArray = [...models.values()];
+  if (modelArray.length === 0) {
+    for (const horizon of HORIZONS) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      byHorizon[horizon] = { horizon, meanLogLoss: Infinity, bestWindowLogLoss: Infinity, stability: Infinity, roundResults: [] };
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      baselines[horizon] = { prevalenceLL: Infinity, bestSingleModelLL: Infinity, equalWeightLL: Infinity };
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      topContributors[horizon] = [];
+    }
+    return { byHorizon, baselines, topContributors };
+  }
+
+  const maxRounds = Math.max(...modelArray.map(s => s.roundScores.length));
+
+  for (const horizon of HORIZONS) {
+    const histories: ModelHistory[] = [];
+    const allLabels: boolean[] = [];
+
+    for (const state of modelArray) {
+      const logLossByRound: number[] = [];
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const losses = state.logLossByHorizon[horizon];
+      for (const loss of losses) {
+        logLossByRound.push(loss);
+      }
+      histories.push({
+        modelId: state.modelId,
+        logLossByRound,
+        effectiveRounds: logLossByRound.length,
+      });
+    }
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    const firstModelWithLabels = modelArray.find(s => s.labelsByHorizon[horizon].length > 0);
+    if (firstModelWithLabels !== undefined) {
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      allLabels.push(...firstModelWithLabels.labelsByHorizon[horizon]);
+    }
+
+    const roundResults: EnsembleRoundResult[] = [];
+    const weightSums = new Map<string, number>();
+
+    for (let round = 0; round < maxRounds; round++) {
+      const weights = computeModelWeights(histories, round, ensembleConfig);
+
+      const predictions: ModelRoundPrediction[] = [];
+      for (const state of modelArray) {
+        // eslint-disable-next-line security/detect-object-injection -- round is controlled loop index
+        const roundScore = state.roundScores[round];
+        if (roundScore === undefined) {
+          predictions.push({
+            modelId: state.modelId,
+            prediction: 0.5,
+            failed: true,
+          });
+        } else {
+          // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+          const pred = roundScore.predictions[horizon];
+          predictions.push({
+            modelId: state.modelId,
+            prediction: pred,
+            failed: false,
+          });
+        }
+      }
+
+      const ensembleResult = computeEnsemblePrediction(predictions, weights, ensembleConfig);
+      ensembleResult.round = round;
+      ensembleResult.horizon = horizon;
+      roundResults.push(ensembleResult);
+
+      for (const [modelId, weight] of ensembleResult.weights) {
+        const current = weightSums.get(modelId) ?? 0;
+        weightSums.set(modelId, current + weight);
+      }
+    }
+
+    const performance = scoreEnsemble(roundResults, allLabels, horizon);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    byHorizon[horizon] = performance;
+
+    const trueCount = allLabels.filter(Boolean).length;
+    const falseCount = allLabels.length - trueCount;
+    const prevalenceLL = computePrevalenceLogLoss(trueCount, falseCount);
+    const bestSingleModelLL = Math.min(...histories.map(h => {
+      if (h.logLossByRound.length === 0) {
+        return Infinity;
+      }
+      return h.logLossByRound.reduce((sum, l) => sum + l, 0) / h.logLossByRound.length;
+    }));
+
+    const equalWeightLL = performance.meanLogLoss;
+
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    baselines[horizon] = {
+      prevalenceLL,
+      bestSingleModelLL,
+      equalWeightLL,
+    };
+
+    const contributors: QuickTopContributor[] = [];
+    for (const [modelId, weightSum] of weightSums) {
+      const avgWeight = maxRounds > 0 ? weightSum / maxRounds : 0;
+      contributors.push({ modelId, avgWeight });
+    }
+    contributors.sort((a, b) => b.avgWeight - a.avgWeight);
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+    topContributors[horizon] = contributors.slice(0, 5);
+  }
+
+  return { byHorizon, baselines, topContributors };
 }
 
 /**
@@ -2702,6 +3008,15 @@ async function main(): Promise<void> {
     const quickDiagnostics = computeFinalDiagnostics(diagnosticsState);
     const benchmarkDiagnostics = convertToBenchmarkDiagnostics(quickDiagnostics, diagnosticsState.labelsByTimestamp);
 
+    // Compute validity gates for quick mode preview
+    const validityResults = computeQuickModeValidityResults(models, totalRounds);
+
+    // Build extension plan preview
+    const extensionPlan = computeQuickModeExtensionPlan(models, benchmarkDiagnostics);
+
+    // Compute ensemble preview
+    const ensembleData = computeQuickModeEnsemble(models);
+
     // Write quick mode report with full methodology documentation
     persistQuickResults(models, {
       startTime: benchmarkStartTime.toISOString(),
@@ -2709,6 +3024,11 @@ async function main(): Promise<void> {
       totalRounds,
       modelCount: models.size,
       diagnostics: benchmarkDiagnostics,
+      validityResults,
+      extensionPlan,
+      ensembleByHorizon: ensembleData.byHorizon,
+      ensembleBaselinesByHorizon: ensembleData.baselines,
+      ensembleTopContributorsByHorizon: ensembleData.topContributors,
     });
     logger.log(`Quick mode report written to BENCHMARK_RESULTS_QUICK.md`);
 
@@ -2764,13 +3084,23 @@ async function main(): Promise<void> {
 
   // Final persistence with diagnostics
   const fullRunDiagnostics = convertToBenchmarkDiagnostics(finalDiagnostics, diagnosticsState.labelsByTimestamp);
+  const fullRunValidityResults = computeQuickModeValidityResults(models, totalRounds);
+  const fullRunExtensionPlan = computeQuickModeExtensionPlan(models, fullRunDiagnostics);
+  const fullRunEnsembleData = computeQuickModeEnsemble(models);
+
   persistResults(models, {
     startTime,
     symbolId: SYMBOL_ID,
     totalRounds,
     currentRound: roundNumber,
     currentPhase: 3,
-  }, perHorizonRankings, { logger, diagnostics: fullRunDiagnostics });
+  }, perHorizonRankings, { 
+    logger, 
+    diagnostics: fullRunDiagnostics,
+    validityResults: fullRunValidityResults,
+    extensionPlan: fullRunExtensionPlan,
+    ensembleData: fullRunEnsembleData,
+  });
 
   // Persist scored datapoints for exact re-scoring
   if (scoredDatapoints.length > 0) {

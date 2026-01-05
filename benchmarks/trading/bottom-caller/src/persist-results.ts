@@ -17,8 +17,11 @@ import type {
   HorizonPredictionDiversity,
   ModelPredictionDiversity,
 } from './diagnostics/prediction-diagnostics.js';
+import type { EnsemblePerformance } from './ensemble/online-ensemble.js';
+import type { ExtensionPlan, ExtensionDecision } from './extension/extension-trigger.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { HorizonRanking, PerHorizonRankings } from './scorers/phase-3-scorer.js';
+import type { ModelValidityResult, ValidityFailureReason } from './scorers/validity-gates.js';
 import type { TimeframeId } from './timeframe-config.js';
 import type { BenchmarkLogger } from '@nullagent/cli-utils';
 
@@ -520,7 +523,7 @@ export function generateMethodology(): string[] {
     '- **Phase 2 – Stability filter**: Evaluates consistency using rolling windows; eliminates models with no qualified horizons remaining',
     '- **Phase 3 – Final ranking**: Composite scoring of surviving models',
     '',
-    '> **Quick mode note:** This verification run only calculates raw log loss per horizon. Full Phase 0–3 elimination is applied in the complete benchmark only.',
+    '> **Quick mode note:** Verification runs apply the same Phase 0–3 scoring pipeline as full benchmarks but with fewer rounds (N=3 per horizon). All metrics (log loss, best window, stability) are computed; however, with limited samples, rankings are indicative only and should not be used for final model selection.',
     '',
     '**Status codes:**',
     '- `✅ Active`: Survived all phases with ≥1 qualified horizon',
@@ -605,12 +608,19 @@ const LEADERBOARD_SEPARATOR =
   '|------|-------|--------|------|-----|-----|-----|-----|-----|------|-------|---------|--------|-----|-------|';
 const SURVIVORS_TITLE = '## Final Standings (Survivors)';
 
-function formatCoverageCell(m: ModelMetrics): string {
+/**
+ * Format coverage cell for leaderboard display
+ * Uses benchmark totalRounds as denominator for comparability across models
+ * @param m - Model metrics
+ * @param benchmarkTotalRounds - Benchmark's total rounds for normalization
+ * @returns Formatted coverage string like "32/48 (67%)⚠️"
+ */
+function formatCoverageCell(m: ModelMetrics, benchmarkTotalRounds: number): string {
   const totalEffective = Object.values(m.effectiveRoundsByHorizon).reduce((a, b) => a + b, 0);
-  const totalIntended = m.intendedRounds * HORIZONS.length;
-  const covPct = Math.round(m.coverageRatio * 100);
+  const normalizedIntended = benchmarkTotalRounds * HORIZONS.length;
+  const covPct = normalizedIntended > 0 ? Math.round((totalEffective / normalizedIntended) * 100) : 0;
   const warning = m.hasLowCoverage ? '⚠️' : '';
-  return `${String(totalEffective)}/${String(totalIntended)} (${String(covPct)}%)${warning}`;
+  return `${String(totalEffective)}/${String(normalizedIntended)} (${String(covPct)}%)${warning}`;
 }
 
 /**
@@ -626,7 +636,7 @@ function formatLogLossCell(ll: number): string {
   return `${getLogLossEmoji(ll)}${formatNumber(ll, 3)}`;
 }
 
-function formatLeaderboardRow(m: ModelMetrics, medal: string): string {
+function formatLeaderboardRow(m: ModelMetrics, medal: string, benchmarkTotalRounds: number): string {
   const ll15m = formatLogLossCell(m.logLoss15m);
   const ll1h = formatLogLossCell(m.logLoss1h);
   const ll4h = formatLogLossCell(m.logLoss4h);
@@ -637,7 +647,7 @@ function formatLeaderboardRow(m: ModelMetrics, medal: string): string {
   const stability = formatNumber(m.avgStability, 3);
   const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
   const score = formatNumber(m.compositeScore, 4);
-  const cov = formatCoverageCell(m);
+  const cov = formatCoverageCell(m, benchmarkTotalRounds);
   return `| ${medal} | ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${cov} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | **${score}** |`;
 }
 
@@ -663,9 +673,10 @@ function hasAllHorizonsLowCoverage(m: ModelMetrics): boolean {
  * Generate the survivors leaderboard (active models only)
  * Excludes models with insufficient coverage on all horizons
  * @param metrics - Array of model metrics sorted by composite score
+ * @param benchmarkTotalRounds - Benchmark's total rounds for coverage normalization
  * @returns Array of markdown lines
  */
-function generateSurvivorsLeaderboard(metrics: ModelMetrics[]): string[] {
+function generateSurvivorsLeaderboard(metrics: ModelMetrics[], benchmarkTotalRounds: number): string[] {
   const survivors = metrics
     .filter(m => m.status.startsWith('✅'))
     .filter(m => !hasAllHorizonsLowCoverage(m));
@@ -684,7 +695,7 @@ function generateSurvivorsLeaderboard(metrics: ModelMetrics[]): string[] {
   ];
 
   for (const [index, m] of survivors.entries()) {
-    lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
+    lines.push(formatLeaderboardRow(m, getMedal(index + 1), benchmarkTotalRounds));
   }
 
   lines.push('');
@@ -702,9 +713,10 @@ const INSUFFICIENT_COVERAGE_SEPARATOR =
 /**
  * Format a leaderboard row without rank column (for insufficient coverage models)
  * @param m - Model metrics
+ * @param benchmarkTotalRounds - Benchmark's total rounds for normalization
  * @returns Formatted markdown table row
  */
-function formatLeaderboardRowNoRank(m: ModelMetrics): string {
+function formatLeaderboardRowNoRank(m: ModelMetrics, benchmarkTotalRounds: number): string {
   const ll15m = formatLogLossCell(m.logLoss15m);
   const ll1h = formatLogLossCell(m.logLoss1h);
   const ll4h = formatLogLossCell(m.logLoss4h);
@@ -715,18 +727,18 @@ function formatLeaderboardRowNoRank(m: ModelMetrics): string {
   const stability = formatNumber(m.avgStability, 3);
   const ttp = formatNumber(m.avgTimeToPivotRatio, 2);
   const score = formatNumber(m.compositeScore, 4);
-  const cov = formatCoverageCell(m);
+  const cov = formatCoverageCell(m, benchmarkTotalRounds);
   return `| ${m.modelId} | ${m.status} | ${String(m.rounds)} | ${cov} | ${ll15m} | ${ll1h} | ${ll4h} | ${ll24h} | ${llMean} | ${pctRank} | ${bestWin} | ${stability} | ${ttp} | ${score} |`;
 }
 
-function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
+function generateAllModelsLeaderboard(metrics: ModelMetrics[], benchmarkTotalRounds: number): string[] {
   const adequateCoverage = metrics.filter(m => !m.hasLowCoverage);
   const insufficientCoverage = metrics.filter(m => m.hasLowCoverage);
 
   const lines: string[] = [
     '## All Models (Research Reference)',
     '',
-    '*Rankings are by composite score among models with adequate coverage (≥80%).*',
+    '*Rankings are by composite score among models with adequate coverage (≥80% and ≥10 rounds).*',
     '',
   ];
 
@@ -735,24 +747,24 @@ function generateAllModelsLeaderboard(metrics: ModelMetrics[]): string[] {
     lines.push(LEADERBOARD_SEPARATOR);
 
     for (const [index, m] of adequateCoverage.entries()) {
-      lines.push(formatLeaderboardRow(m, getMedal(index + 1)));
+      lines.push(formatLeaderboardRow(m, getMedal(index + 1), benchmarkTotalRounds));
     }
     lines.push('');
   } else {
-    lines.push('*No models have adequate coverage (≥80%).*');
+    lines.push('*No models have adequate coverage (≥80% and ≥10 rounds).*');
     lines.push('');
   }
 
   if (insufficientCoverage.length > 0) {
-    lines.push('### Insufficient Coverage (Not Ranked)');
+    lines.push('### Not Ranked (Low Coverage or Early Stopped)');
     lines.push('');
-    lines.push('*These models had <80% coverage and are shown for reference only, not as competitive rankings.*');
+    lines.push('*These models had <80% coverage OR <10 effective rounds and are shown for reference only, not as competitive rankings.*');
     lines.push('');
     lines.push(INSUFFICIENT_COVERAGE_HEADER);
     lines.push(INSUFFICIENT_COVERAGE_SEPARATOR);
 
     for (const m of insufficientCoverage) {
-      lines.push(formatLeaderboardRowNoRank(m));
+      lines.push(formatLeaderboardRowNoRank(m, benchmarkTotalRounds));
     }
     lines.push('');
   }
@@ -1471,8 +1483,8 @@ function generateModelDiversityTable(
   const lines: string[] = [
     `### ${model.modelId}`,
     '',
-    '| Horizon | N | Unique P | pMean | pMin | pMax | pStdDev | NoNewLow Rate |',
-    '|---------|---|----------|-------|------|------|---------|---------------|',
+    '| Horizon | Effective N | Unique P | pMean | pMin | pMax | pStdDev | NoNewLow Rate |',
+    '|---------|-------------|----------|-------|------|------|---------|---------------|',
   ];
 
   for (const horizon of HORIZONS) {
@@ -1532,6 +1544,8 @@ function generatePredictionDiversitySection(
     '## Prediction Diversity',
     '',
     '*Variety of predictions per model. Low diversity suggests caching or degenerate behavior.*',
+    '',
+    '*Stats (pMean, pStdDev, etc.) are computed only on successful predictions (Effective N). Failed rounds are excluded.*',
     '',
   ];
 
@@ -1716,6 +1730,162 @@ function generateFailedSection(models: ModelState[]): string[] {
   return lines;
 }
 
+interface FailureMetrics {
+  coverage: number;
+  failureRate: number;
+  uniqueP: number;
+  pStdDev: number;
+  confidentWrongRate: number;
+}
+
+/**
+ * Format failure reason with metrics for detail view
+ * @param reason - The failure reason type
+ * @param metrics - Metrics associated with the failure
+ * @returns Human-readable failure description with metrics
+ */
+function formatFailureDetail(reason: ValidityFailureReason, metrics: FailureMetrics): string {
+  switch (reason) {
+    case 'coverage':
+      return `coverage (${(metrics.coverage * 100).toFixed(1)}%)`;
+    case 'failure_rate':
+      return `failure_rate (${(metrics.failureRate * 100).toFixed(1)}%)`;
+    case 'constant_predictor':
+      return `constant_predictor (uniqueP=${String(metrics.uniqueP)}, stdDev=${metrics.pStdDev.toFixed(2)})`;
+    case 'extreme_predictions':
+      return 'extreme_predictions';
+    case 'extreme_wrong_rate':
+      return `extreme_wrong_rate (${(metrics.confidentWrongRate * 100).toFixed(1)}%)`;
+  }
+}
+
+interface HorizonValiditySummary {
+  evaluated: number;
+  valid: number;
+  invalid: number;
+  byReason: Record<ValidityFailureReason, number>;
+}
+
+function createEmptySummary(evaluated: number): HorizonValiditySummary {
+  return {
+    evaluated,
+    valid: 0,
+    invalid: 0,
+    byReason: {
+      coverage: 0,
+      failure_rate: 0,
+      constant_predictor: 0,
+      extreme_predictions: 0,
+      extreme_wrong_rate: 0,
+    },
+  };
+}
+
+function updateSummaryForResult(
+  summary: HorizonValiditySummary,
+  result: ModelValidityResult,
+  horizon: TimeframeId
+): void {
+  if (result.validHorizons.includes(horizon)) {
+    summary.valid++;
+    return;
+  }
+  summary.invalid++;
+  const horizonResult = result.invalidHorizons.get(horizon);
+  if (horizonResult === undefined) {
+    return;
+  }
+  for (const reason of horizonResult.failureReasons) {
+    // eslint-disable-next-line security/detect-object-injection -- reason from typed union
+    summary.byReason[reason]++;
+  }
+}
+
+function computeSummaryByHorizon(
+  validityResults: ModelValidityResult[]
+): Map<TimeframeId, HorizonValiditySummary> {
+  const summaryByHorizon = new Map<TimeframeId, HorizonValiditySummary>();
+  for (const horizon of HORIZONS) {
+    const summary = createEmptySummary(validityResults.length);
+    for (const result of validityResults) {
+      updateSummaryForResult(summary, result, horizon);
+    }
+    summaryByHorizon.set(horizon, summary);
+  }
+  return summaryByHorizon;
+}
+
+function formatSummaryRow(horizon: TimeframeId, s: HorizonValiditySummary): string {
+  return (
+    `| ${horizon} | ${String(s.evaluated)} | ${String(s.valid)} | ${String(s.invalid)} | ` +
+    `${String(s.byReason.coverage)} | ${String(s.byReason.failure_rate)} | ` +
+    `${String(s.byReason.constant_predictor)} | ${String(s.byReason.extreme_wrong_rate)} |`
+  );
+}
+
+function generateSummaryTable(summaryByHorizon: Map<TimeframeId, HorizonValiditySummary>): string[] {
+  const lines: string[] = [
+    '### Summary by Horizon',
+    '',
+    '| Horizon | Evaluated | Valid | Invalid | Coverage | Failures | Degeneracy | Extreme Wrong |',
+    '|---------|-----------|-------|---------|----------|----------|------------|---------------|',
+  ];
+  for (const horizon of HORIZONS) {
+    const s = summaryByHorizon.get(horizon);
+    if (s !== undefined) {
+      lines.push(formatSummaryRow(horizon, s));
+    }
+  }
+  lines.push('');
+  return lines;
+}
+
+function generateInvalidModelsDetail(invalidModels: ModelValidityResult[]): string[] {
+  if (invalidModels.length === 0) {
+    return [];
+  }
+  const lines: string[] = ['### Invalid Models Detail', ''];
+  for (const result of invalidModels) {
+    const invalidHorizonIds = [...result.invalidHorizons.keys()].join(', ');
+    lines.push(`**${result.modelId}** (invalid on: ${invalidHorizonIds})`);
+    for (const [horizon, horizonResult] of result.invalidHorizons) {
+      const details = horizonResult.failureReasons
+        .map(r => formatFailureDetail(r, horizonResult.metrics))
+        .join(', ');
+      lines.push(`- ${horizon}: ${details}`);
+    }
+    lines.push('');
+  }
+  return lines;
+}
+
+/**
+ * Generate validity gate summary section
+ * Shows per-horizon validity status and reasons for failures
+ * @param validityResults - Array of model validity results from Phase 0A
+ * @returns Array of markdown lines for the validity gate section
+ */
+export function generateValidityGateSection(validityResults: ModelValidityResult[]): string[] {
+  if (validityResults.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [
+    '## Phase 0A Validity Gates',
+    '',
+    '*Strict filters to block garbage models before qualification.*',
+    '',
+  ];
+
+  const summaryByHorizon = computeSummaryByHorizon(validityResults);
+  lines.push(...generateSummaryTable(summaryByHorizon));
+
+  const invalidModels = validityResults.filter(r => r.invalidHorizons.size > 0);
+  lines.push(...generateInvalidModelsDetail(invalidModels));
+
+  return lines;
+}
+
 /**
  * Label record for a single timestamp with labels per horizon
  */
@@ -1740,13 +1910,26 @@ export interface BenchmarkDiagnostics {
  * @param meta - Run metadata
  * @param perHorizonRankings - Optional per-horizon rankings from phase-3-scorer
  * @param diagnostics - Optional diagnostics bundle
+ * @param validityResults - Optional validity gate results
+ * @param extensionPlan - Optional extension plan
+ * @param ensembleData - Optional ensemble performance data
+ * @param ensembleData.byHorizon - Ensemble performance by horizon
+ * @param ensembleData.baselines - Baseline metrics by horizon
+ * @param ensembleData.topContributors - Top contributing models by horizon
  * @returns Markdown string
  */
 function generateMarkdown(
   models: Map<string, ModelState>,
   meta: RunMetadata,
   perHorizonRankings?: PerHorizonRankings,
-  diagnostics?: BenchmarkDiagnostics
+  diagnostics?: BenchmarkDiagnostics,
+  validityResults?: ModelValidityResult[],
+  extensionPlan?: ExtensionPlan,
+  ensembleData?: {
+    byHorizon: Record<TimeframeId, EnsemblePerformance>;
+    baselines: Record<TimeframeId, { prevalenceLL: number; bestSingleModelLL: number; equalWeightLL: number }>;
+    topContributors: Record<TimeframeId, { modelId: string; avgWeight: number }[]>;
+  }
 ): string {
   const allModels = [...models.values()];
   const activeModels = allModels.filter(m => !m.eliminated);
@@ -1792,11 +1975,26 @@ function generateMarkdown(
     ...generatePredictionDiversitySection(diagnostics?.predictionDiversity, diagnostics?.parseDiagnostics),
     ...generateFailureAuditSection(diagnostics?.parseDiagnostics, meta.totalRounds, allModels.length),
     ...generateSummary(activeModels.length, eliminatedModels.length, failedModels.length),
+    ...(validityResults === undefined || validityResults.length === 0
+      ? []
+      : generateValidityGateSection(validityResults)),
+    ...(extensionPlan === undefined
+      ? []
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define -- function defined later in file
+      : generateExtensionPlanSection(extensionPlan, meta.totalRounds)),
+    ...(ensembleData === undefined
+      ? []
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define -- function defined later in file
+      : generateEnsembleSection(
+          ensembleData.byHorizon,
+          ensembleData.baselines,
+          ensembleData.topContributors
+        )),
     ...generateMassTieWarning(modelMetrics),
     ...generateArenaResultsByHorizon(perHorizonRankings, metricsMap, rankabilityMap),
     ...generateCrossHorizonStrength(perHorizonRankings, rankabilityMap),
-    ...generateSurvivorsLeaderboard(modelMetrics),
-    ...generateAllModelsLeaderboard(modelMetrics),
+    ...generateSurvivorsLeaderboard(modelMetrics, meta.totalRounds),
+    ...generateAllModelsLeaderboard(modelMetrics, meta.totalRounds),
     ...generateHorizonBreakdown(perHorizonRankings, metricsMap, rankabilityMap),
     ...generateEliminationAuditSection(allModels),
     ...generateFailedSection(allModels),
@@ -1817,6 +2015,16 @@ interface PersistOptions {
   logger?: BenchmarkLogger;
   /** Diagnostics bundle for the run */
   diagnostics?: BenchmarkDiagnostics;
+  /** Validity gate results */
+  validityResults?: ModelValidityResult[];
+  /** Extension plan */
+  extensionPlan?: ExtensionPlan;
+  /** Ensemble performance data */
+  ensembleData?: {
+    byHorizon: Record<TimeframeId, EnsemblePerformance>;
+    baselines: Record<TimeframeId, { prevalenceLL: number; bestSingleModelLL: number; equalWeightLL: number }>;
+    topContributors: Record<TimeframeId, { modelId: string; avgWeight: number }[]>;
+  };
 }
 
 /**
@@ -1836,7 +2044,15 @@ export function persistResults(
     options.logger?.log('Skipping results file update in quick mode');
     return;
   }
-  const markdown = generateMarkdown(models, meta, perHorizonRankings, options?.diagnostics);
+  const markdown = generateMarkdown(
+    models,
+    meta,
+    perHorizonRankings,
+    options?.diagnostics,
+    options?.validityResults,
+    options?.extensionPlan,
+    options?.ensembleData
+  );
   const filePath = join(process.cwd(), RESULTS_FILE);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
   writeFileSync(filePath, markdown, 'utf8');
@@ -1912,6 +2128,98 @@ export function generateTaskSpecSection(): string[] {
   return lines;
 }
 
+interface ExtendingHorizon {
+  horizon: TimeframeId;
+  decision: ExtensionDecision;
+}
+
+function determineRankableStatus(decision: ExtensionDecision): string {
+  if (decision.shouldExtend || decision.qualifiedCount > 0) {
+    return '✅ Yes';
+  }
+  if (decision.reason.includes('Rankable')) {
+    return '✅ Yes';
+  }
+  return decision.reason.includes('not rankable') ? '❌ No' : '✅ Yes';
+}
+
+function formatExtensionTableRow(horizon: TimeframeId, decision: ExtensionDecision): string {
+  const rankableString = determineRankableStatus(decision);
+  const extendString = decision.shouldExtend ? '✅ Yes' : '❌ No';
+  const modelsIncludedString = decision.shouldExtend
+    ? `${String(decision.modelsToInclude.length)} (all eligible)`
+    : '-';
+
+  return `| ${horizon} | ${rankableString} | ${String(decision.qualifiedCount)} | ${String(decision.eligibleCount)} | ${extendString} | ${String(decision.extraRounds)} | ${modelsIncludedString} |`;
+}
+
+function formatModelList(models: string[]): string {
+  if (models.length <= 3) {
+    return models.join(', ');
+  }
+  return `${models.slice(0, 3).join(', ')}, ... (${String(models.length)} total)`;
+}
+
+function generateExtensionDetails(extendingHorizons: ExtendingHorizon[]): string[] {
+  const lines: string[] = ['', '### Extension Details'];
+
+  for (const { horizon, decision } of extendingHorizons) {
+    lines.push('');
+    lines.push(`**${horizon} Horizon** (extending by ${String(decision.extraRounds)} rounds)`);
+    lines.push(`- Reason: ${String(decision.qualifiedCount)} qualified models > threshold (5)`);
+    lines.push(`- Models: ${formatModelList(decision.modelsToInclude)}`);
+  }
+
+  return lines;
+}
+
+/**
+ * Generate extension rule outcome section
+ * Shows per-horizon extension decisions and which models are included
+ * @param plan - Extension plan with per-horizon decisions
+ * @param baseRounds - Number of base rounds (used for context)
+ * @returns Array of markdown lines for the extension section
+ */
+export function generateExtensionPlanSection(
+  plan: ExtensionPlan,
+  baseRounds: number
+): string[] {
+  void baseRounds;
+  const lines: string[] = [
+    '## Extension Rule Outcome',
+    '',
+    '*Horizons with >5 qualified models get 6 additional rounds.*',
+    '',
+    '| Horizon | Rankable | Qualified | Eligible | Extend? | Extra Rounds | Models Included |',
+    '|---------|----------|-----------|----------|---------|--------------|-----------------|',
+  ];
+
+  const extendingHorizons: ExtendingHorizon[] = [];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const decision = plan.byHorizon[horizon];
+    lines.push(formatExtensionTableRow(horizon, decision));
+
+    if (decision.shouldExtend) {
+      extendingHorizons.push({ horizon, decision });
+    }
+  }
+
+  const horizonWord = extendingHorizons.length === 1 ? 'horizon' : 'horizons';
+  lines.push('');
+  lines.push(
+    `**Summary:** ${String(extendingHorizons.length)} ${horizonWord} will receive extension rounds (${String(plan.totalExtraRounds)} total extra rounds).`
+  );
+
+  if (extendingHorizons.length > 0) {
+    lines.push(...generateExtensionDetails(extendingHorizons));
+  }
+
+  lines.push('');
+  return lines;
+}
+
 /**
  * Minority class threshold for label imbalance warning (percentage)
  */
@@ -1957,6 +2265,128 @@ export function checkLabelImbalance(
     return `⚠️ **Warning**: ${horizon} horizon has only ${String(minorityCount)} ${minorityLabel} examples out of ${String(labels.n)} (${(minorityPct * 100).toFixed(1)}%). Metrics are dominated by base rate.`;
   }
   return undefined;
+}
+
+interface EnsembleBaselines {
+  prevalenceLL: number;
+  bestSingleModelLL: number;
+  equalWeightLL: number;
+}
+
+interface TopContributor {
+  modelId: string;
+  avgWeight: number;
+}
+
+function formatComparisonString(diff: number): string {
+  return diff < 0 ? `✅ ${diff.toFixed(3)}` : `❌ +${diff.toFixed(3)}`;
+}
+
+function generateBaselinesTable(
+  ensembleByHorizon: Record<TimeframeId, EnsemblePerformance>,
+  baselinesByHorizon: Record<TimeframeId, EnsembleBaselines>
+): string[] {
+  const rows: string[] = [];
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const ensemble = ensembleByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const baselines = baselinesByHorizon[horizon];
+
+    const ensembleLL = ensemble.meanLogLoss;
+    const vsPrevalence = ensembleLL - baselines.prevalenceLL;
+    const vsBestSingle = ensembleLL - baselines.bestSingleModelLL;
+
+    const vsPrevalenceString = formatComparisonString(vsPrevalence);
+    const vsBestSingleString = formatComparisonString(vsBestSingle);
+
+    rows.push(
+      `| ${horizon} | ${ensembleLL.toFixed(3)} | ${baselines.prevalenceLL.toFixed(3)} | ` +
+      `${baselines.bestSingleModelLL.toFixed(3)} | ${baselines.equalWeightLL.toFixed(3)} | ` +
+      `${vsPrevalenceString} | ${vsBestSingleString} |`
+    );
+  }
+  return rows;
+}
+
+function generateDiagnosticsTable(
+  ensembleByHorizon: Record<TimeframeId, EnsemblePerformance>
+): string[] {
+  const rows: string[] = [];
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const ensemble = ensembleByHorizon[horizon];
+    const scorableRounds = ensemble.roundResults.filter(r => r.isScoreable).length;
+    const totalRounds = ensemble.roundResults.length;
+    const avgEntropy = scorableRounds > 0
+      ? ensemble.roundResults
+          .filter(r => r.isScoreable)
+          .reduce((sum, r) => sum + r.weightEntropy, 0) / scorableRounds
+      : 0;
+
+    rows.push(
+      `| ${horizon} | ${ensemble.meanLogLoss.toFixed(3)} | ${ensemble.bestWindowLogLoss.toFixed(3)} | ` +
+      `${ensemble.stability.toFixed(3)} | ${String(scorableRounds)}/${String(totalRounds)} | ${avgEntropy.toFixed(2)} |`
+    );
+  }
+  return rows;
+}
+
+function generateContributorsSection(
+  topContributorsByHorizon: Record<TimeframeId, TopContributor[]>
+): string[] {
+  const lines: string[] = [];
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const topContributors = topContributorsByHorizon[horizon];
+    lines.push(`**${horizon} Horizon:**`);
+
+    if (topContributors.length === 0) {
+      lines.push('*No contributors.*');
+    } else {
+      for (const [index, contributor] of topContributors.entries()) {
+        lines.push(`${String(index + 1)}. ${contributor.modelId} (avg weight: ${contributor.avgWeight.toFixed(3)})`);
+      }
+    }
+
+    lines.push('');
+  }
+  return lines;
+}
+
+/**
+ * Generate meta ensemble benchmark section showing ensemble performance vs baselines per horizon.
+ * @param ensembleByHorizon - Ensemble performance metrics keyed by timeframe
+ * @param baselinesByHorizon - Baseline metrics (prevalence, best single, equal weight) keyed by timeframe
+ * @param topContributorsByHorizon - Top contributing models with weights keyed by timeframe
+ * @returns Array of markdown lines for the ensemble section
+ */
+export function generateEnsembleSection(
+  ensembleByHorizon: Record<TimeframeId, EnsemblePerformance>,
+  baselinesByHorizon: Record<TimeframeId, EnsembleBaselines>,
+  topContributorsByHorizon: Record<TimeframeId, TopContributor[]>
+): string[] {
+  return [
+    '## Meta Ensemble Benchmark',
+    '',
+    '*Score-weighted composite prediction per horizon (online, leakage-safe).*',
+    '',
+    '### Ensemble vs Baselines',
+    '',
+    '| Horizon | Ensemble LL | Prevalence | Best Single | Equal Weight | vs Prevalence | vs Best Single |',
+    '|---------|-------------|------------|-------------|--------------|---------------|----------------|',
+    ...generateBaselinesTable(ensembleByHorizon, baselinesByHorizon),
+    '',
+    '### Ensemble Diagnostics',
+    '',
+    '| Horizon | Mean LL | Best Window | Stability | Scorable Rounds | Avg Weight Entropy |',
+    '|---------|---------|-------------|-----------|-----------------|-------------------|',
+    ...generateDiagnosticsTable(ensembleByHorizon),
+    '',
+    '### Top Contributing Models',
+    '',
+    ...generateContributorsSection(topContributorsByHorizon),
+  ];
 }
 
 // Re-export quick mode functions from dedicated module
