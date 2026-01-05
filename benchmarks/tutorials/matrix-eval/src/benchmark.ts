@@ -35,6 +35,13 @@ async function runModelRound(
   const result = await runRound(forecaster);
   const output = result.output;
 
+  // Verbose: show model's reasoning and predictions
+  logger.log(`\n  [${modelId}] Reasoning: ${output.reasoning}`);
+  logger.log(`  [${modelId}] Predictions:`);
+  for (const [contract, probability] of Object.entries(output.predictions)) {
+    logger.log(`    ${contract}: ${probability.toFixed(3)}`);
+  }
+
   const predictionWindow = getPredictionWindow();
   const groundTruth = await getGroundTruthBatch(
     symbolId,
