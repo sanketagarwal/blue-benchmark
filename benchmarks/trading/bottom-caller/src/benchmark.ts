@@ -45,6 +45,7 @@ import {
   formatSeparabilityTable,
   MIN_MODELS_FOR_SEPARABILITY,
 } from './reports/separability.js';
+import { computeRunInvariants } from './run-invariants.js';
 import { brierScore } from './scorers/brier-scorer.js';
 import {
   scorePhase0Round,
@@ -92,7 +93,7 @@ import type {
 import type { EnsemblePerformance, ModelHistory, ModelRoundPrediction, EnsembleRoundResult } from './ensemble/online-ensemble.js';
 import type { ExtensionPlan, HorizonRankabilityStatus } from './extension/extension-trigger.js';
 import type { NoNewLowResult } from './ground-truth/no-new-low.js';
-import type { QuickEnsembleBaselines, QuickTopContributor } from './quick-mode-report.js';
+import type { QuickEnsembleBaselines, QuickTopContributor, EnsembleDataBundle } from './quick-mode-report.js';
 import type { Candle } from './replay-lab/ohlcv.js';
 import type { MetricSeparability, ModelProfile } from './reports/separability.js';
 import type { BaselineLogLoss, Phase0RoundScore } from './scorers/phase-0-scorer.js';
@@ -1187,43 +1188,53 @@ function computeQuickModeExtensionPlan(
 }
 
 /**
- * Compute ensemble data for quick mode preview
- * @param models - Map of model states
- * @returns Ensemble performance, baselines, and top contributors by horizon
+ * Compute ensemble data for a given mode (strict or wide)
+ * @param models - Array of model states
+ * @param validModelIds - Set of valid model IDs (for strict mode filtering)
+ * @param eligibleModelIds - Set of eligible model IDs (valid + adequate coverage, for baseline)
+ * @param mode - 'strict' for valid models only, 'wide' for all models
+ * @returns Ensemble data bundle
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Ensemble computation requires nested iteration over models and rounds
-function computeQuickModeEnsemble(
-  models: Map<string, ModelState>
-): {
-  byHorizon: Record<TimeframeId, EnsemblePerformance>;
-  baselines: Record<TimeframeId, QuickEnsembleBaselines>;
-  topContributors: Record<TimeframeId, QuickTopContributor[]>;
-} {
-  const ensembleConfig = getDefaultEnsembleConfig();
+function computeEnsembleForMode(
+  models: ModelState[],
+  validModelIds: Set<string>,
+  eligibleModelIds: Set<string>,
+  mode: 'strict' | 'wide'
+): EnsembleDataBundle {
+  const ensembleConfig = getDefaultEnsembleConfig(mode);
+  ensembleConfig.validModelIds = validModelIds;
+
   const byHorizon: Record<TimeframeId, EnsemblePerformance> = {} as Record<TimeframeId, EnsemblePerformance>;
   const baselines: Record<TimeframeId, QuickEnsembleBaselines> = {} as Record<TimeframeId, QuickEnsembleBaselines>;
   const topContributors: Record<TimeframeId, QuickTopContributor[]> = {} as Record<TimeframeId, QuickTopContributor[]>;
+  let totalEntropy = 0;
+  let entropyCount = 0;
 
-  const modelArray = [...models.values()];
-  if (modelArray.length === 0) {
+  if (models.length === 0) {
     for (const horizon of HORIZONS) {
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       byHorizon[horizon] = { horizon, meanLogLoss: Infinity, bestWindowLogLoss: Infinity, stability: Infinity, roundResults: [] };
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-      baselines[horizon] = { prevalenceLL: Infinity, bestSingleModelLL: Infinity, equalWeightLL: Infinity };
+      baselines[horizon] = { prevalenceLL: Infinity, bestEligibleSingleLL: Infinity, bestOverallSingleLL: Infinity, equalWeightLL: Infinity };
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       topContributors[horizon] = [];
     }
-    return { byHorizon, baselines, topContributors };
+    return { byHorizon, baselines, topContributors, avgWeightEntropy: 0 };
   }
 
-  const maxRounds = Math.max(...modelArray.map(s => s.roundScores.length));
+  const maxRounds = Math.max(...models.map(s => s.roundScores.length));
+
+  // Filter models based on mode
+  const effectiveModels = mode === 'strict'
+    ? models.filter(s => validModelIds.has(s.modelId))
+    : models;
 
   for (const horizon of HORIZONS) {
     const histories: ModelHistory[] = [];
     const allLabels: boolean[] = [];
 
-    for (const state of modelArray) {
+    for (const state of effectiveModels) {
       const logLossByRound: number[] = [];
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       const losses = state.logLossByHorizon[horizon];
@@ -1238,7 +1249,7 @@ function computeQuickModeEnsemble(
     }
 
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
-    const firstModelWithLabels = modelArray.find(s => s.labelsByHorizon[horizon].length > 0);
+    const firstModelWithLabels = models.find(s => s.labelsByHorizon[horizon].length > 0);
     if (firstModelWithLabels !== undefined) {
       // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
       allLabels.push(...firstModelWithLabels.labelsByHorizon[horizon]);
@@ -1251,7 +1262,7 @@ function computeQuickModeEnsemble(
       const weights = computeModelWeights(histories, round, ensembleConfig);
 
       const predictions: ModelRoundPrediction[] = [];
-      for (const state of modelArray) {
+      for (const state of effectiveModels) {
         // eslint-disable-next-line security/detect-object-injection -- round is controlled loop index
         const roundScore = state.roundScores[round];
         if (roundScore === undefined) {
@@ -1280,6 +1291,11 @@ function computeQuickModeEnsemble(
         const current = weightSums.get(modelId) ?? 0;
         weightSums.set(modelId, current + weight);
       }
+
+      if (ensembleResult.isScoreable) {
+        totalEntropy += ensembleResult.weightEntropy;
+        entropyCount++;
+      }
     }
 
     const performance = scoreEnsemble(roundResults, allLabels, horizon);
@@ -1289,7 +1305,33 @@ function computeQuickModeEnsemble(
     const trueCount = allLabels.filter(Boolean).length;
     const falseCount = allLabels.length - trueCount;
     const prevalenceLL = computePrevalenceLogLoss(trueCount, falseCount);
-    const bestSingleModelLL = Math.min(...histories.map(h => {
+
+    // Build histories for all models (for overall best single)
+    const allHistories: ModelHistory[] = models.map(state => {
+      const logLossByRound: number[] = [];
+      // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
+      const losses = state.logLossByHorizon[horizon];
+      for (const loss of losses) {
+        logLossByRound.push(loss);
+      }
+      return {
+        modelId: state.modelId,
+        logLossByRound,
+        effectiveRounds: logLossByRound.length,
+      };
+    });
+
+    // Best eligible single: valid + adequate coverage
+    const eligibleHistories = allHistories.filter(h => eligibleModelIds.has(h.modelId));
+    const bestEligibleSingleLL = Math.min(...eligibleHistories.map(h => {
+      if (h.logLossByRound.length === 0) {
+        return Infinity;
+      }
+      return h.logLossByRound.reduce((sum, l) => sum + l, 0) / h.logLossByRound.length;
+    }));
+
+    // Best overall single: any model (oracle/diagnostic)
+    const bestOverallSingleLL = Math.min(...allHistories.map(h => {
       if (h.logLossByRound.length === 0) {
         return Infinity;
       }
@@ -1301,10 +1343,12 @@ function computeQuickModeEnsemble(
     // eslint-disable-next-line security/detect-object-injection -- horizon from typed array
     baselines[horizon] = {
       prevalenceLL,
-      bestSingleModelLL,
+      bestEligibleSingleLL,
+      bestOverallSingleLL,
       equalWeightLL,
     };
 
+    // Top contributors - only from effective models in this mode
     const contributors: QuickTopContributor[] = [];
     for (const [modelId, weightSum] of weightSums) {
       const avgWeight = maxRounds > 0 ? weightSum / maxRounds : 0;
@@ -1315,7 +1359,69 @@ function computeQuickModeEnsemble(
     topContributors[horizon] = contributors.slice(0, 5);
   }
 
-  return { byHorizon, baselines, topContributors };
+  const avgWeightEntropy = entropyCount > 0 ? totalEntropy / entropyCount : 0;
+  return { byHorizon, baselines, topContributors, avgWeightEntropy };
+}
+
+/**
+ * Compute ensemble data for quick mode preview (both strict and wide modes)
+ * @param models - Map of model states
+ * @param validityResults - Validity gate results for determining valid models
+ * @param totalRounds - Total rounds for coverage calculation
+ * @returns Strict and wide ensemble data bundles
+ */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Building valid/eligible model sets requires nested conditions
+function computeQuickModeEnsemble(
+  models: Map<string, ModelState>,
+  validityResults?: ModelValidityResult[],
+  totalRounds?: number
+): {
+  strictEnsemble: EnsembleDataBundle;
+  wideEnsemble: EnsembleDataBundle;
+} {
+  const modelArray = [...models.values()];
+
+  // Build valid model IDs from validity results
+  const validModelIds = new Set<string>();
+  if (validityResults === undefined) {
+    for (const state of modelArray) {
+      validModelIds.add(state.modelId);
+    }
+  } else {
+    for (const result of validityResults) {
+      if (result.validHorizons.length > 0) {
+        validModelIds.add(result.modelId);
+      }
+    }
+  }
+
+  // Build eligible model IDs (valid + adequate coverage)
+  const eligibleModelIds = new Set<string>();
+  const minCoverageRatio = 0.8;
+  const minEffectiveRounds = 10;
+  const effectiveTotalRounds = totalRounds ?? Math.max(...modelArray.map(s => s.roundScores.length), 1);
+
+  for (const state of modelArray) {
+    if (validModelIds.has(state.modelId)) {
+      const effectiveRounds = state.roundScores.length;
+      const coverage = effectiveTotalRounds > 0 ? effectiveRounds / effectiveTotalRounds : 0;
+      if (effectiveRounds >= minEffectiveRounds && coverage >= minCoverageRatio) {
+        eligibleModelIds.add(state.modelId);
+      }
+    }
+  }
+
+  // If no models are eligible, fall back to valid models
+  if (eligibleModelIds.size === 0) {
+    for (const modelId of validModelIds) {
+      eligibleModelIds.add(modelId);
+    }
+  }
+
+  const strictEnsemble = computeEnsembleForMode(modelArray, validModelIds, eligibleModelIds, 'strict');
+  const wideEnsemble = computeEnsembleForMode(modelArray, validModelIds, eligibleModelIds, 'wide');
+
+  return { strictEnsemble, wideEnsemble };
 }
 
 /**
@@ -3014,8 +3120,17 @@ async function main(): Promise<void> {
     // Build extension plan preview
     const extensionPlan = computeQuickModeExtensionPlan(models, benchmarkDiagnostics);
 
-    // Compute ensemble preview
-    const ensembleData = computeQuickModeEnsemble(models);
+    // Compute ensemble preview (both strict and wide)
+    const ensembleData = computeQuickModeEnsemble(models, validityResults, totalRounds);
+
+    // Compute run invariants once for consistent reporting
+    const validityResultsMap = new Map(validityResults.map(r => [r.modelId, r]));
+    const quickRunInvariants = computeRunInvariants(
+      models,
+      totalRounds,
+      validityResultsMap,
+      benchmarkDiagnostics.dataset
+    );
 
     // Write quick mode report with full methodology documentation
     persistQuickResults(models, {
@@ -3026,9 +3141,9 @@ async function main(): Promise<void> {
       diagnostics: benchmarkDiagnostics,
       validityResults,
       extensionPlan,
-      ensembleByHorizon: ensembleData.byHorizon,
-      ensembleBaselinesByHorizon: ensembleData.baselines,
-      ensembleTopContributorsByHorizon: ensembleData.topContributors,
+      strictEnsemble: ensembleData.strictEnsemble,
+      wideEnsemble: ensembleData.wideEnsemble,
+      invariants: quickRunInvariants,
     });
     logger.log(`Quick mode report written to BENCHMARK_RESULTS_QUICK.md`);
 
@@ -3086,7 +3201,16 @@ async function main(): Promise<void> {
   const fullRunDiagnostics = convertToBenchmarkDiagnostics(finalDiagnostics, diagnosticsState.labelsByTimestamp);
   const fullRunValidityResults = computeQuickModeValidityResults(models, totalRounds);
   const fullRunExtensionPlan = computeQuickModeExtensionPlan(models, fullRunDiagnostics);
-  const fullRunEnsembleData = computeQuickModeEnsemble(models);
+  const fullRunEnsembleData = computeQuickModeEnsemble(models, fullRunValidityResults, totalRounds);
+
+  // Compute run invariants once for consistent reporting
+  const fullRunValidityResultsMap = new Map(fullRunValidityResults.map(r => [r.modelId, r]));
+  const runInvariants = computeRunInvariants(
+    models,
+    totalRounds,
+    fullRunValidityResultsMap,
+    fullRunDiagnostics.dataset
+  );
 
   persistResults(models, {
     startTime,
@@ -3099,7 +3223,11 @@ async function main(): Promise<void> {
     diagnostics: fullRunDiagnostics,
     validityResults: fullRunValidityResults,
     extensionPlan: fullRunExtensionPlan,
-    ensembleData: fullRunEnsembleData,
+    ensembleData: {
+      strictEnsemble: fullRunEnsembleData.strictEnsemble,
+      wideEnsemble: fullRunEnsembleData.wideEnsemble,
+    },
+    invariants: runInvariants,
   });
 
   // Persist scored datapoints for exact re-scoring

@@ -6,6 +6,10 @@ export interface EnsembleConfig {
   rollingWindowSize: number;
   alpha: number;
   minModels: number;
+  /** strict = valid models only, wide = all models */
+  mode: 'strict' | 'wide';
+  /** Model IDs that pass validity gates (used in strict mode) */
+  validModelIds?: Set<string> | undefined;
 }
 
 export interface ModelRoundPrediction {
@@ -42,11 +46,13 @@ const DEFAULT_ROLLING_WINDOW_SIZE = 6;
 const DEFAULT_ALPHA = 4;
 const DEFAULT_MIN_MODELS = 3;
 
-export function getDefaultEnsembleConfig(): EnsembleConfig {
+export function getDefaultEnsembleConfig(mode: 'strict' | 'wide' = 'wide'): EnsembleConfig {
   return {
     rollingWindowSize: DEFAULT_ROLLING_WINDOW_SIZE,
     alpha: DEFAULT_ALPHA,
     minModels: DEFAULT_MIN_MODELS,
+    mode,
+    validModelIds: undefined,
   };
 }
 
@@ -76,6 +82,7 @@ export function computeRollingMeanLL(
   return sum / windowSize;
 }
 
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Weight computation involves nested conditions for filtering and fallback logic
 export function computeModelWeights(
   histories: ModelHistory[],
   round: number,
@@ -83,7 +90,13 @@ export function computeModelWeights(
 ): Map<string, number> {
   const weights = new Map<string, number>();
 
-  const truncatedHistories = histories.map(h => ({
+  // Filter histories based on mode
+  const filteredHistories = config.mode === 'strict' && config.validModelIds !== undefined
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- validModelIds is checked in outer condition
+    ? histories.filter(h => config.validModelIds!.has(h.modelId))
+    : histories;
+
+  const truncatedHistories = filteredHistories.map(h => ({
     ...h,
     logLossByRound: h.logLossByRound.slice(0, round),
   }));
@@ -112,8 +125,8 @@ export function computeModelWeights(
   }
 
   if (totalRawWeight === 0) {
-    for (const history of histories) {
-      weights.set(history.modelId, 1 / histories.length);
+    for (const history of filteredHistories) {
+      weights.set(history.modelId, 1 / filteredHistories.length);
     }
     return weights;
   }

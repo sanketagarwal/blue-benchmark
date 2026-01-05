@@ -19,6 +19,8 @@ import type {
 } from './diagnostics/prediction-diagnostics.js';
 import type { EnsemblePerformance } from './ensemble/online-ensemble.js';
 import type { ExtensionPlan, ExtensionDecision } from './extension/extension-trigger.js';
+import type { EnsembleDataBundle, QuickEnsembleBaselines, QuickTopContributor } from './quick-mode-report.js';
+import type { RunInvariants } from './run-invariants.js';
 import type { Phase0RoundScore } from './scorers/phase-0-scorer.js';
 import type { HorizonRanking, PerHorizonRankings } from './scorers/phase-3-scorer.js';
 import type { ModelValidityResult, ValidityFailureReason } from './scorers/validity-gates.js';
@@ -172,6 +174,67 @@ export function computeHorizonRankability(
   }
 
   return rankabilityMap;
+}
+
+/**
+ * Build rankability map from pre-computed invariants
+ * @param invariants - Pre-computed run invariants
+ * @returns Map of horizon to rankability status
+ */
+function buildRankabilityMapFromInvariants(
+  invariants: RunInvariants
+): Map<TimeframeId, HorizonRankability> {
+  const rankabilityMap = new Map<TimeframeId, HorizonRankability>();
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const horizonInvariants = invariants.byHorizon[horizon];
+    rankabilityMap.set(horizon, {
+      horizon,
+      isRankable: horizonInvariants.isRankable,
+      ...(horizonInvariants.rankabilityReason !== undefined && { reason: horizonInvariants.rankabilityReason }),
+    });
+  }
+
+  return rankabilityMap;
+}
+
+/**
+ * Generate Run Invariants section showing computed values used throughout the report
+ * @param invariants - Pre-computed run invariants
+ * @returns Array of markdown lines
+ */
+export function generateRunInvariantsSection(invariants: RunInvariants): string[] {
+  const lines: string[] = [
+    '## Run Invariants',
+    '',
+    '*Computed once, used consistently throughout this report.*',
+    '',
+    '### Horizon Summary',
+    '| Horizon | Labels | True | False | pTrue | Rankable | Reason |',
+    '|---------|--------|------|-------|-------|----------|--------|',
+  ];
+
+  for (const horizon of TIMEFRAME_IDS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const h = invariants.byHorizon[horizon];
+    const rankableString = h.isRankable ? '✅ Yes' : '❌ No';
+    const reasonString = h.rankabilityReason ?? '-';
+    lines.push(
+      `| ${horizon} | ${String(h.labelCount)} | ${String(h.trueCount)} | ${String(h.falseCount)} | ${h.pTrue.toFixed(2)} | ${rankableString} | ${reasonString} |`
+    );
+  }
+
+  lines.push('');
+  lines.push('### Model Sets');
+  lines.push(`- **Evaluated:** ${String(invariants.sets.evaluated.length)} models`);
+  lines.push(`- **Effective:** ${String(invariants.sets.effective.length)} models (at least 1 successful prediction)`);
+  lines.push(`- **Valid (Phase 0A):** ${String(invariants.sets.valid.length)} models`);
+  lines.push(`- **Qualified (Phase 1):** ${String(invariants.sets.qualified.length)} models`);
+  lines.push(`- **Arena Eligible:** ${String(invariants.sets.arenaEligible.length)} models (qualified + adequate coverage)`);
+  lines.push('');
+
+  return lines;
 }
 
 // Quality thresholds for log loss (lower is better)
@@ -523,7 +586,7 @@ export function generateMethodology(): string[] {
     '- **Phase 2 – Stability filter**: Evaluates consistency using rolling windows; eliminates models with no qualified horizons remaining',
     '- **Phase 3 – Final ranking**: Composite scoring of surviving models',
     '',
-    '> **Quick mode note:** Verification runs apply the same Phase 0–3 scoring pipeline as full benchmarks but with fewer rounds (N=3 per horizon). All metrics (log loss, best window, stability) are computed; however, with limited samples, rankings are indicative only and should not be used for final model selection.',
+    '> **Quick mode note:** Verification runs apply the same Phase 0–3 scoring pipeline as full benchmarks. With limited samples, rankings are indicative only and should not be used for final model selection.',
     '',
     '**Status codes:**',
     '- `✅ Active`: Survived all phases with ≥1 qualified horizon',
@@ -1500,17 +1563,10 @@ function generateModelDiversityTable(
   }
 
   if (parseDiagnostic?.failuresByType !== undefined) {
-    const totalN = parseDiagnostic.parseSuccessCount +
-      parseDiagnostic.parseFailCount +
-      parseDiagnostic.schemaFailCount;
-    const effectiveN = parseDiagnostic.parseSuccessCount;
     const parts = formatFailuresByTypeParts(parseDiagnostic.failuresByType);
 
     if (parts.length > 0) {
-      lines.push(
-        `**Failures:** ${parts.join(', ')} ` +
-        `(effectiveN: ${String(effectiveN)}/${String(totalN)})`
-      );
+      lines.push(`**Failures:** ${parts.join(', ')}`);
       lines.push('');
     }
   }
@@ -1825,7 +1881,7 @@ function formatSummaryRow(horizon: TimeframeId, s: HorizonValiditySummary): stri
 
 function generateSummaryTable(summaryByHorizon: Map<TimeframeId, HorizonValiditySummary>): string[] {
   const lines: string[] = [
-    '### Summary by Horizon',
+    '### Summary by Horizon (Violation Counts)',
     '',
     '| Horizon | Evaluated | Valid | Invalid | Coverage | Failures | Degeneracy | Extreme Wrong |',
     '|---------|-----------|-------|---------|----------|----------|------------|---------------|',
@@ -1837,6 +1893,8 @@ function generateSummaryTable(summaryByHorizon: Map<TimeframeId, HorizonValidity
     }
   }
   lines.push('');
+  lines.push('*Note: Reason counts are not mutually exclusive. A single model can fail multiple gates.*');
+  lines.push('');
   return lines;
 }
 
@@ -1846,8 +1904,10 @@ function generateInvalidModelsDetail(invalidModels: ModelValidityResult[]): stri
   }
   const lines: string[] = ['### Invalid Models Detail', ''];
   for (const result of invalidModels) {
-    const invalidHorizonIds = [...result.invalidHorizons.keys()].join(', ');
-    lines.push(`**${result.modelId}** (invalid on: ${invalidHorizonIds})`);
+    const invalidHorizonList = [...result.invalidHorizons.keys()];
+    const gateCount = invalidHorizonList.length;
+    const invalidHorizonIds = invalidHorizonList.join(', ');
+    lines.push(`**${result.modelId}** (failed ${String(gateCount)} gate${gateCount === 1 ? '' : 's'} on: ${invalidHorizonIds})`);
     for (const [horizon, horizonResult] of result.invalidHorizons) {
       const details = horizonResult.failureReasons
         .map(r => formatFailureDetail(r, horizonResult.metrics))
@@ -1912,10 +1972,10 @@ export interface BenchmarkDiagnostics {
  * @param diagnostics - Optional diagnostics bundle
  * @param validityResults - Optional validity gate results
  * @param extensionPlan - Optional extension plan
- * @param ensembleData - Optional ensemble performance data
- * @param ensembleData.byHorizon - Ensemble performance by horizon
- * @param ensembleData.baselines - Baseline metrics by horizon
- * @param ensembleData.topContributors - Top contributing models by horizon
+ * @param ensembleData - Optional ensemble performance data (strict and wide modes)
+ * @param ensembleData.strictEnsemble - Ensemble data using only valid models
+ * @param ensembleData.wideEnsemble - Ensemble data using all models (diagnostic)
+ * @param invariants - Optional pre-computed run invariants (single source of truth)
  * @returns Markdown string
  */
 function generateMarkdown(
@@ -1926,10 +1986,10 @@ function generateMarkdown(
   validityResults?: ModelValidityResult[],
   extensionPlan?: ExtensionPlan,
   ensembleData?: {
-    byHorizon: Record<TimeframeId, EnsemblePerformance>;
-    baselines: Record<TimeframeId, { prevalenceLL: number; bestSingleModelLL: number; equalWeightLL: number }>;
-    topContributors: Record<TimeframeId, { modelId: string; avgWeight: number }[]>;
-  }
+    strictEnsemble: EnsembleDataBundle;
+    wideEnsemble: EnsembleDataBundle;
+  },
+  invariants?: RunInvariants
 ): string {
   const allModels = [...models.values()];
   const activeModels = allModels.filter(m => !m.eliminated);
@@ -1951,8 +2011,10 @@ function generateMarkdown(
       return calculateMean(losses);
     });
 
-  // Compute horizon rankability from dataset diagnostics
-  const rankabilityMap = computeHorizonRankability(diagnostics?.dataset);
+  // Use invariants for rankability if available, otherwise compute from diagnostics
+  const rankabilityMap = invariants === undefined
+    ? computeHorizonRankability(diagnostics?.dataset)
+    : buildRankabilityMapFromInvariants(invariants);
 
   // Calculate metrics for all models with data (pass rankability to exclude non-rankable from composite)
   const modelMetrics = allModels
@@ -1971,6 +2033,7 @@ function generateMarkdown(
     ...generateRunConfigSection(meta, models.size),
     ...generateBenchmarkOverview(),
     ...generateMethodology(),
+    ...(invariants === undefined ? [] : generateRunInvariantsSection(invariants)),
     ...generateDatasetDiagnosticsSection(diagnostics),
     ...generatePredictionDiversitySection(diagnostics?.predictionDiversity, diagnostics?.parseDiagnostics),
     ...generateFailureAuditSection(diagnostics?.parseDiagnostics, meta.totalRounds, allModels.length),
@@ -1986,9 +2049,8 @@ function generateMarkdown(
       ? []
       // eslint-disable-next-line @typescript-eslint/no-use-before-define -- function defined later in file
       : generateEnsembleSection(
-          ensembleData.byHorizon,
-          ensembleData.baselines,
-          ensembleData.topContributors
+          ensembleData.strictEnsemble,
+          ensembleData.wideEnsemble
         )),
     ...generateMassTieWarning(modelMetrics),
     ...generateArenaResultsByHorizon(perHorizonRankings, metricsMap, rankabilityMap),
@@ -2008,7 +2070,7 @@ function generateMarkdown(
 /**
  * Options for persisting results
  */
-interface PersistOptions {
+export interface PersistOptions {
   /** Skip writing the results file (used in quick mode) */
   skipWrite?: boolean;
   /** Logger instance for output messages */
@@ -2019,12 +2081,13 @@ interface PersistOptions {
   validityResults?: ModelValidityResult[];
   /** Extension plan */
   extensionPlan?: ExtensionPlan;
-  /** Ensemble performance data */
+  /** Ensemble performance data (strict and wide modes) */
   ensembleData?: {
-    byHorizon: Record<TimeframeId, EnsemblePerformance>;
-    baselines: Record<TimeframeId, { prevalenceLL: number; bestSingleModelLL: number; equalWeightLL: number }>;
-    topContributors: Record<TimeframeId, { modelId: string; avgWeight: number }[]>;
+    strictEnsemble: EnsembleDataBundle;
+    wideEnsemble: EnsembleDataBundle;
   };
+  /** Pre-computed run invariants (single source of truth) */
+  invariants?: RunInvariants;
 }
 
 /**
@@ -2032,7 +2095,7 @@ interface PersistOptions {
  * @param models - Map of model states
  * @param meta - Run metadata
  * @param perHorizonRankings - Optional per-horizon rankings from phase-3-scorer
- * @param options - Optional persist options
+ * @param options - Optional persist options (includes invariants for consistent values)
  */
 export function persistResults(
   models: Map<string, ModelState>,
@@ -2051,7 +2114,8 @@ export function persistResults(
     options?.diagnostics,
     options?.validityResults,
     options?.extensionPlan,
-    options?.ensembleData
+    options?.ensembleData,
+    options?.invariants
   );
   const filePath = join(process.cwd(), RESULTS_FILE);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is constructed from constants
@@ -2188,7 +2252,7 @@ export function generateExtensionPlanSection(
   const lines: string[] = [
     '## Extension Rule Outcome',
     '',
-    '*Horizons with >5 qualified models get 6 additional rounds.*',
+    '*Horizons with >5 qualified models get 6 additional rounds (rankability determines purpose: refine rankings vs achieve rankability).*',
     '',
     '| Horizon | Rankable | Qualified | Eligible | Extend? | Extra Rounds | Models Included |',
     '|---------|----------|-----------|----------|---------|--------------|-----------------|',
@@ -2267,24 +2331,13 @@ export function checkLabelImbalance(
   return undefined;
 }
 
-interface EnsembleBaselines {
-  prevalenceLL: number;
-  bestSingleModelLL: number;
-  equalWeightLL: number;
-}
-
-interface TopContributor {
-  modelId: string;
-  avgWeight: number;
-}
-
 function formatComparisonString(diff: number): string {
   return diff < 0 ? `✅ ${diff.toFixed(3)}` : `❌ +${diff.toFixed(3)}`;
 }
 
-function generateBaselinesTable(
+function generateStrictBaselinesTable(
   ensembleByHorizon: Record<TimeframeId, EnsemblePerformance>,
-  baselinesByHorizon: Record<TimeframeId, EnsembleBaselines>
+  baselinesByHorizon: Record<TimeframeId, QuickEnsembleBaselines>
 ): string[] {
   const rows: string[] = [];
   for (const horizon of HORIZONS) {
@@ -2295,15 +2348,40 @@ function generateBaselinesTable(
 
     const ensembleLL = ensemble.meanLogLoss;
     const vsPrevalence = ensembleLL - baselines.prevalenceLL;
-    const vsBestSingle = ensembleLL - baselines.bestSingleModelLL;
+    const vsBestEligible = ensembleLL - baselines.bestEligibleSingleLL;
 
     const vsPrevalenceString = formatComparisonString(vsPrevalence);
-    const vsBestSingleString = formatComparisonString(vsBestSingle);
+    const vsBestEligibleString = formatComparisonString(vsBestEligible);
 
     rows.push(
-      `| ${horizon} | ${ensembleLL.toFixed(3)} | ${baselines.prevalenceLL.toFixed(3)} | ` +
-      `${baselines.bestSingleModelLL.toFixed(3)} | ${baselines.equalWeightLL.toFixed(3)} | ` +
-      `${vsPrevalenceString} | ${vsBestSingleString} |`
+      `| ${horizon} | ${ensembleLL.toFixed(3)} | ${baselines.bestEligibleSingleLL.toFixed(3)} | ` +
+      `${baselines.prevalenceLL.toFixed(3)} | ${vsPrevalenceString} | ${vsBestEligibleString} |`
+    );
+  }
+  return rows;
+}
+
+function generateWideBaselinesTable(
+  ensembleByHorizon: Record<TimeframeId, EnsemblePerformance>,
+  baselinesByHorizon: Record<TimeframeId, QuickEnsembleBaselines>
+): string[] {
+  const rows: string[] = [];
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const ensemble = ensembleByHorizon[horizon];
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const baselines = baselinesByHorizon[horizon];
+
+    const ensembleLL = ensemble.meanLogLoss;
+    const vsPrevalence = ensembleLL - baselines.prevalenceLL;
+    const vsBestOverall = ensembleLL - baselines.bestOverallSingleLL;
+
+    const vsPrevalenceString = formatComparisonString(vsPrevalence);
+    const vsBestOverallString = formatComparisonString(vsBestOverall);
+
+    rows.push(
+      `| ${horizon} | ${ensembleLL.toFixed(3)} | ${baselines.bestOverallSingleLL.toFixed(3)} | ` +
+      `${baselines.prevalenceLL.toFixed(3)} | ${vsPrevalenceString} | ${vsBestOverallString} |`
     );
   }
   return rows;
@@ -2333,7 +2411,7 @@ function generateDiagnosticsTable(
 }
 
 function generateContributorsSection(
-  topContributorsByHorizon: Record<TimeframeId, TopContributor[]>
+  topContributorsByHorizon: Record<TimeframeId, QuickTopContributor[]>
 ): string[] {
   const lines: string[] = [];
   for (const horizon of HORIZONS) {
@@ -2354,38 +2432,72 @@ function generateContributorsSection(
   return lines;
 }
 
+function generateWeightEntropyNote(avgWeightEntropy: number, modelCount: number): string[] {
+  const maxEntropy = modelCount > 0 ? Math.log(modelCount) : 0;
+  const entropyRatio = maxEntropy > 0 ? avgWeightEntropy / maxEntropy : 0;
+
+  if (entropyRatio > 0.9) {
+    return [
+      '',
+      `> ⚠️ **Note**: Weight entropy is high (${avgWeightEntropy.toFixed(2)} / max ${maxEntropy.toFixed(2)} = ${(entropyRatio * 100).toFixed(0)}%), indicating nearly uniform weighting. This occurs when models have similar performance or insufficient history for differentiation.`,
+      '',
+    ];
+  }
+  return [];
+}
+
 /**
  * Generate meta ensemble benchmark section showing ensemble performance vs baselines per horizon.
- * @param ensembleByHorizon - Ensemble performance metrics keyed by timeframe
- * @param baselinesByHorizon - Baseline metrics (prevalence, best single, equal weight) keyed by timeframe
- * @param topContributorsByHorizon - Top contributing models with weights keyed by timeframe
+ * Shows both strict (valid models only) and wide (all models) ensembles.
+ * @param strictEnsemble - Ensemble data using only valid models
+ * @param wideEnsemble - Ensemble data using all models (diagnostic)
  * @returns Array of markdown lines for the ensemble section
  */
 export function generateEnsembleSection(
-  ensembleByHorizon: Record<TimeframeId, EnsemblePerformance>,
-  baselinesByHorizon: Record<TimeframeId, EnsembleBaselines>,
-  topContributorsByHorizon: Record<TimeframeId, TopContributor[]>
+  strictEnsemble: EnsembleDataBundle,
+  wideEnsemble: EnsembleDataBundle
 ): string[] {
+  let strictModelCount = 0;
+  for (const contributors of Object.values(strictEnsemble.topContributors)) {
+    strictModelCount = Math.max(strictModelCount, contributors.length);
+  }
+  let wideModelCount = 0;
+  for (const contributors of Object.values(wideEnsemble.topContributors)) {
+    wideModelCount = Math.max(wideModelCount, contributors.length);
+  }
+
   return [
     '## Meta Ensemble Benchmark',
     '',
     '*Score-weighted composite prediction per horizon (online, leakage-safe).*',
     '',
-    '### Ensemble vs Baselines',
+    '### Strict Ensemble (Valid Models Only)',
     '',
-    '| Horizon | Ensemble LL | Prevalence | Best Single | Equal Weight | vs Prevalence | vs Best Single |',
-    '|---------|-------------|------------|-------------|--------------|---------------|----------------|',
-    ...generateBaselinesTable(ensembleByHorizon, baselinesByHorizon),
+    '*Uses only models that pass Phase 0A validity gates.*',
+    '',
+    '| Horizon | Ensemble LL | Best Eligible | Prevalence | vs Prevalence | vs Best Eligible |',
+    '|---------|-------------|---------------|------------|---------------|------------------|',
+    ...generateStrictBaselinesTable(strictEnsemble.byHorizon, strictEnsemble.baselines),
+    ...generateWeightEntropyNote(strictEnsemble.avgWeightEntropy, strictModelCount),
+    '',
+    '**Top Contributors (Valid Models):**',
+    '',
+    ...generateContributorsSection(strictEnsemble.topContributors),
+    '### Wide Ensemble (All Models - Diagnostic)',
+    '',
+    '*Uses all models regardless of validity. For diagnostic purposes only.*',
+    '',
+    '| Horizon | Ensemble LL | Best Overall | Prevalence | vs Prevalence | vs Best Overall |',
+    '|---------|-------------|--------------|------------|---------------|-----------------|',
+    ...generateWideBaselinesTable(wideEnsemble.byHorizon, wideEnsemble.baselines),
+    ...generateWeightEntropyNote(wideEnsemble.avgWeightEntropy, wideModelCount),
     '',
     '### Ensemble Diagnostics',
     '',
     '| Horizon | Mean LL | Best Window | Stability | Scorable Rounds | Avg Weight Entropy |',
     '|---------|---------|-------------|-----------|-----------------|-------------------|',
-    ...generateDiagnosticsTable(ensembleByHorizon),
+    ...generateDiagnosticsTable(strictEnsemble.byHorizon),
     '',
-    '### Top Contributing Models',
-    '',
-    ...generateContributorsSection(topContributorsByHorizon),
   ];
 }
 

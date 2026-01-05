@@ -1,9 +1,10 @@
 /**
  * Extension trigger logic for bottom-caller benchmark
  *
- * Extends horizon H by N_ext rounds if:
- * 1. Horizon H is rankable after Stage A (base run)
- * 2. count(qualifiedModels(H)) > N_threshold
+ * Extension decision tree:
+ * 1. If qualified count <= threshold -> No extension (insufficient competition)
+ * 2. If qualified count > threshold -> Yes extension (competitive horizon worth extending)
+ * 3. Rankability determines PURPOSE: "refine rankings" vs "achieve rankability"
  *
  * Two modes for who plays extension rounds:
  * - E1 (focused): Only qualified models for that horizon
@@ -91,23 +92,16 @@ export function decideExtension(
   const qualifiedCount = qualifiedModels.length;
   const eligibleCount = eligibleModels.length;
 
-  if (!rankability.isRankable) {
-    return {
-      horizon,
-      shouldExtend: false,
-      reason: `Horizon not rankable (effective=${String(rankability.effectiveRounds)}, minority=${String(rankability.minorityCount)}, prevalence=${rankability.prevalence.toFixed(3)})`,
-      qualifiedCount,
-      eligibleCount,
-      modelsToInclude: [],
-      extraRounds: 0,
-    };
-  }
+  // Extension decision tree:
+  // 1. If qualified count <= threshold -> No (not enough competition)
+  // 2. If qualified count > threshold -> Yes (competitive horizon worth extending)
+  // 3. Rankability determines PURPOSE: "refine rankings" vs "achieve rankability"
 
   if (qualifiedCount <= config.nThreshold) {
     return {
       horizon,
       shouldExtend: false,
-      reason: `Qualified count (${String(qualifiedCount)}) <= threshold (${String(config.nThreshold)})`,
+      reason: `${String(qualifiedCount)} qualified models <= threshold (${String(config.nThreshold)}) - insufficient competition`,
       qualifiedCount,
       eligibleCount,
       modelsToInclude: [],
@@ -118,10 +112,14 @@ export function decideExtension(
   const modelsToInclude =
     config.includeModels === 'qualified' ? qualifiedModels : eligibleModels;
 
+  const purpose = rankability.isRankable
+    ? 'extending to refine rankings'
+    : 'extending to achieve rankability';
+
   return {
     horizon,
     shouldExtend: true,
-    reason: `Rankable with ${String(qualifiedCount)} qualified models > threshold (${String(config.nThreshold)})`,
+    reason: `${String(qualifiedCount)} qualified models > threshold (${String(config.nThreshold)}) - ${purpose}`,
     qualifiedCount,
     eligibleCount,
     modelsToInclude,

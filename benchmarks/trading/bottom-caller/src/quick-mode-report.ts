@@ -33,6 +33,7 @@ import type { ModelParseDiagnostics } from './diagnostics/parse-diagnostics.js';
 import type { ModelPredictionDiversity } from './diagnostics/prediction-diagnostics.js';
 import type { EnsemblePerformance } from './ensemble/online-ensemble.js';
 import type { ExtensionPlan } from './extension/extension-trigger.js';
+import type { RunInvariants } from './run-invariants.js';
 import type { ModelValidityResult } from './scorers/validity-gates.js';
 import type { TimeframeId } from './timeframe-config.js';
 
@@ -45,7 +46,10 @@ const QUICK_RUN_ROUNDS_NOTE = '- With N=3 rounds per horizon, treat rankings as 
  */
 export interface QuickEnsembleBaselines {
   prevalenceLL: number;
-  bestSingleModelLL: number;
+  /** Best single model among eligible (valid + adequate coverage) */
+  bestEligibleSingleLL: number;
+  /** Best single model overall (oracle/diagnostic) */
+  bestOverallSingleLL: number;
   equalWeightLL: number;
 }
 
@@ -55,6 +59,17 @@ export interface QuickEnsembleBaselines {
 export interface QuickTopContributor {
   modelId: string;
   avgWeight: number;
+}
+
+/**
+ * Ensemble data bundle for a single mode (strict or wide)
+ */
+export interface EnsembleDataBundle {
+  byHorizon: Record<TimeframeId, EnsemblePerformance>;
+  baselines: Record<TimeframeId, QuickEnsembleBaselines>;
+  topContributors: Record<TimeframeId, QuickTopContributor[]>;
+  /** Average weight entropy across horizons (high = near uniform) */
+  avgWeightEntropy: number;
 }
 
 /**
@@ -68,9 +83,17 @@ export interface QuickRunMetadata {
   diagnostics?: BenchmarkDiagnostics;
   validityResults?: ModelValidityResult[];
   extensionPlan?: ExtensionPlan;
+  /** Strict ensemble: only valid models */
+  strictEnsemble?: EnsembleDataBundle;
+  /** Wide ensemble: all models (diagnostic) */
+  wideEnsemble?: EnsembleDataBundle;
+  /** @deprecated Use strictEnsemble/wideEnsemble instead */
   ensembleByHorizon?: Record<TimeframeId, EnsemblePerformance>;
+  /** @deprecated Use strictEnsemble/wideEnsemble instead */
   ensembleBaselinesByHorizon?: Record<TimeframeId, QuickEnsembleBaselines>;
+  /** @deprecated Use strictEnsemble/wideEnsemble instead */
   ensembleTopContributorsByHorizon?: Record<TimeframeId, QuickTopContributor[]>;
+  invariants?: RunInvariants;
 }
 
 /**
@@ -380,9 +403,7 @@ export function generateQuickInterpretationNote(): string[] {
 export function generateExtensionEnsemblePreview(meta: QuickRunMetadata): string[] {
   const hasValidity = meta.validityResults !== undefined && meta.validityResults.length > 0;
   const hasExtension = meta.extensionPlan !== undefined;
-  const hasEnsemble = meta.ensembleByHorizon !== undefined &&
-    meta.ensembleBaselinesByHorizon !== undefined &&
-    meta.ensembleTopContributorsByHorizon !== undefined;
+  const hasEnsemble = meta.strictEnsemble !== undefined && meta.wideEnsemble !== undefined;
 
   if (!hasValidity && !hasExtension && !hasEnsemble) {
     return [];
@@ -404,13 +425,11 @@ export function generateExtensionEnsemblePreview(meta: QuickRunMetadata): string
   }
 
   if (hasEnsemble &&
-      meta.ensembleByHorizon !== undefined &&
-      meta.ensembleBaselinesByHorizon !== undefined &&
-      meta.ensembleTopContributorsByHorizon !== undefined) {
+      meta.strictEnsemble !== undefined &&
+      meta.wideEnsemble !== undefined) {
     lines.push(...generateEnsembleSection(
-      meta.ensembleByHorizon,
-      meta.ensembleBaselinesByHorizon,
-      meta.ensembleTopContributorsByHorizon
+      meta.strictEnsemble,
+      meta.wideEnsemble
     ));
     lines.push('');
   }
@@ -448,6 +467,38 @@ function buildFailureTypeParts(byType: FailuresByType): string[] {
     parts.push(`other: ${String(byType.other)}`);
   }
   return parts;
+}
+
+/**
+ * Generate invariants section for quick mode report
+ * @param invariants - Run invariants
+ * @returns Array of markdown lines
+ */
+function generateQuickInvariantsSection(invariants: RunInvariants): string[] {
+  const lines: string[] = [
+    '## Run Invariants',
+    '',
+    '*Single source of truth for this run.*',
+    '',
+    '### Horizons',
+    '',
+    '| Horizon | Labels | pTrue | Rankable | Reason |',
+    '|---------|--------|-------|----------|--------|',
+  ];
+
+  for (const horizon of HORIZONS) {
+    // eslint-disable-next-line security/detect-object-injection -- horizon from typed constant array
+    const h = invariants.byHorizon[horizon];
+    const rankable = h.isRankable ? '✅' : '❌';
+    const reason = h.rankabilityReason ?? '-';
+    lines.push(`| ${horizon} | ${String(h.labelCount)} | ${h.pTrue.toFixed(2)} | ${rankable} | ${reason} |`);
+  }
+
+  lines.push('');
+  lines.push(`**Model sets:** ${String(invariants.sets.evaluated.length)} evaluated → ${String(invariants.sets.valid.length)} valid → ${String(invariants.sets.qualified.length)} qualified`);
+  lines.push('');
+
+  return lines;
 }
 
 /**
@@ -585,6 +636,10 @@ export function generateQuickMarkdown(
     lines.push(...singleClassWarning);
   } else {
     lines.push(...generateQuickInterpretationNote());
+  }
+
+  if (meta.invariants !== undefined) {
+    lines.push(...generateQuickInvariantsSection(meta.invariants));
   }
 
   lines.push(...generateQuickDatasetDiagnosticsSection(meta.diagnostics?.dataset));
