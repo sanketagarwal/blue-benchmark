@@ -56,6 +56,7 @@ export const DEFAULT_CONTEXT_WINDOW = 100_000;
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   // Anthropic
   'anthropic/claude-haiku-4-5': 200_000,
+  'anthropic/claude-haiku-4.5': 200_000,
   'anthropic/claude-sonnet-4-5': 200_000,
   'anthropic/claude-opus-4-5': 200_000,
   'anthropic/claude-3-5-sonnet-20241022': 200_000,
@@ -79,6 +80,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   // xAI
   'xai/grok-2-vision': 128_000,
   'xai/grok-4-fast-non-reasoning': 2_000_000,
+  'xai/grok-4-fast-reasoning': 200_000,
   'xai/grok-4.1-fast-reasoning': 200_000,
   'xai/grok-4': 1_049_000,
   // Mistral
