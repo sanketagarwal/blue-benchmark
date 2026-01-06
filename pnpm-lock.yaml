@@ -268,7 +268,7 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
 
-  benchmarks/tutorials/crossword-v2:
+  benchmarks/tutorials/002-crossword-v2:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
