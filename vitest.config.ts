@@ -55,23 +55,23 @@ export default defineConfig({
         // CLI benchmark entry points don't need unit tests
         'benchmarks/**/src/benchmark.ts',
         // bottom-caller CLI utilities (tested via integration)
-        'benchmarks/trading/bottom-caller/src/prefetch-warmup.ts',
-        'benchmarks/trading/bottom-caller/src/persist-results.ts',
-        'benchmarks/trading/bottom-caller/src/scorers/timing-metrics.ts',
+        'benchmarks/trading/006-bottom-caller/src/prefetch-warmup.ts',
+        'benchmarks/trading/006-bottom-caller/src/persist-results.ts',
+        'benchmarks/trading/006-bottom-caller/src/scorers/timing-metrics.ts',
         // twenty-questions game state is simpler and not unit tested
-        'benchmarks/tutorials/twenty-questions/src/game-state.ts',
+        'benchmarks/tutorials/000-twenty-questions/src/game-state.ts',
         // matrix-eval has no unit tests yet (matrix benchmark tool)
-        'benchmarks/tutorials/matrix-eval/src/**/*.ts',
+        'benchmarks/tutorials/004-matrix-eval/src/**/*.ts',
         // market-maker benchmark helper files (tested via integration)
-        'benchmarks/trading/market-maker/src/matrix.ts',
-        'benchmarks/trading/market-maker/src/results.ts',
-        'benchmarks/trading/market-maker/src/table.ts',
+        'benchmarks/trading/005-market-maker/src/matrix.ts',
+        'benchmarks/trading/005-market-maker/src/results.ts',
+        'benchmarks/trading/005-market-maker/src/table.ts',
         // Script files for generating chart URLs
         'benchmarks/**/scripts/**',
         // Next.js API routes (tested via e2e)
         'benchmarks/**/src/app/api/**',
         // Market maker agent template code (tested via benchmark)
-        'benchmarks/trading/market-maker/src/market-maker.ts',
+        'benchmarks/trading/005-market-maker/src/market-maker.ts',
       ],
     },
     include: [
