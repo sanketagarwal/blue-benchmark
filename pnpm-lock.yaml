@@ -48,7 +48,7 @@ importers:
         specifier: 2.0.2
         version: 2.0.2(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
 
-  benchmarks/trading/bottom-caller:
+  benchmarks/trading/005-market-maker:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
@@ -115,7 +115,7 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
 
-  benchmarks/trading/market-maker:
+  benchmarks/trading/006-bottom-caller:
     dependencies:
       '@nullagent/agent-core':
         specifier: workspace:*
