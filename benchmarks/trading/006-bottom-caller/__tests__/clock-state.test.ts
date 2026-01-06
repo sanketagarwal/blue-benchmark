@@ -12,7 +12,9 @@ import {
 
 const CLOCK_NOT_INITIALIZED_ERROR = 'Clock not initialized';
 const SIMULATION_START_TIME_ENV_VAR = 'SIMULATION_START_TIME';
+const QUICK_SIMULATION_START_TIME_ENV_VAR = 'QUICK_SIMULATION_START_TIME';
 const SIMULATION_START_TIME = '2024-01-01T00:00:00.000Z';
+const QUICK_START_TIME = '2024-01-01T02:00:00.000Z';
 // 15-minute intervals for bottom prediction benchmark
 const SIMULATION_START_TIME_PLUS_15M = '2024-01-01T00:15:00.000Z';
 const SIMULATION_START_TIME_PLUS_30M = '2024-01-01T00:30:00.000Z';
@@ -59,6 +61,44 @@ describe('clock-state', () => {
       const state2 = initializeClock();
 
       expect(state1).toBe(state2);
+    });
+
+    test('uses QUICK_SIMULATION_START_TIME when isQuickMode is true', () => {
+      vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME);
+      vi.stubEnv(QUICK_SIMULATION_START_TIME_ENV_VAR, QUICK_START_TIME);
+
+      const state = initializeClock({ isQuickMode: true });
+
+      expect(state.currentTime).toEqual(new Date(QUICK_START_TIME));
+      expect(state.startTime).toEqual(new Date(QUICK_START_TIME));
+    });
+
+    test('falls back to SIMULATION_START_TIME in quick mode when QUICK_SIMULATION_START_TIME is not set', () => {
+      vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME);
+
+      const state = initializeClock({ isQuickMode: true });
+
+      expect(state.currentTime).toEqual(new Date(SIMULATION_START_TIME));
+      expect(state.startTime).toEqual(new Date(SIMULATION_START_TIME));
+    });
+
+    test('ignores QUICK_SIMULATION_START_TIME when isQuickMode is false', () => {
+      vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME);
+      vi.stubEnv(QUICK_SIMULATION_START_TIME_ENV_VAR, QUICK_START_TIME);
+
+      const state = initializeClock({ isQuickMode: false });
+
+      expect(state.currentTime).toEqual(new Date(SIMULATION_START_TIME));
+      expect(state.startTime).toEqual(new Date(SIMULATION_START_TIME));
+    });
+
+    test('throws error with correct env var name when QUICK_SIMULATION_START_TIME is invalid', () => {
+      vi.stubEnv(SIMULATION_START_TIME_ENV_VAR, SIMULATION_START_TIME);
+      vi.stubEnv(QUICK_SIMULATION_START_TIME_ENV_VAR, 'invalid-date');
+
+      expect(() => initializeClock({ isQuickMode: true })).toThrow(
+        'QUICK_SIMULATION_START_TIME must be a valid ISO 8601 date string'
+      );
     });
   });
 

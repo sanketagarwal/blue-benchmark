@@ -184,8 +184,16 @@ AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
 AI_GATEWAY_API_KEY=your-key
 REPLAY_LAB_API_KEY=rn_...
 REPLAY_LAB_BASE_URL=https://replay-lab-delta.preview.recall.network
-SIMULATION_START_TIME=2025-01-01T12:00:00Z
+
+# Full benchmark start time (14 rounds)
+SIMULATION_START_TIME=2025-12-18T18:00:00Z
+
+# Quick mode start time (3 rounds) - optimized for label diversity
+# If set, --quick mode uses this instead of SIMULATION_START_TIME
+QUICK_SIMULATION_START_TIME=2025-12-18T19:30:00Z
 ```
+
+The quick mode start time was identified using `scripts/find-quick-start.ts` to ensure all 4 horizons have at least one sample of each label class (0 and 1) within the 3-round window.
 
 Note: `SYMBOL_ID` is hardcoded to `COINBASE_SPOT_BTC_USD` (Bitcoin only).
 

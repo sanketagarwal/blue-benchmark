@@ -13,19 +13,35 @@ const CLOCK_NOT_INITIALIZED_ERROR = 'Clock not initialized';
 
 let clockState: ClockState | undefined;
 
-export function initializeClock(): ClockState {
+export interface InitializeClockOptions {
+  isQuickMode?: boolean;
+}
+
+export function initializeClock(options: InitializeClockOptions = {}): ClockState {
   if (clockState !== undefined) {
     return clockState;
   }
 
-  const startTimeString = process.env['SIMULATION_START_TIME'];
+  const { isQuickMode = false } = options;
+
+  const quickStartTime = process.env['QUICK_SIMULATION_START_TIME'];
+  const simulationStartTime = process.env['SIMULATION_START_TIME'];
+
+  const startTimeString = isQuickMode
+    ? (quickStartTime ?? simulationStartTime)
+    : simulationStartTime;
+
   if (startTimeString === undefined || startTimeString === '') {
     throw new Error('SIMULATION_START_TIME environment variable is required');
   }
 
   const startTime = new Date(startTimeString);
   if (Number.isNaN(startTime.getTime())) {
-    throw new TypeError('SIMULATION_START_TIME must be a valid ISO 8601 date string');
+    const usedQuickEnvironmentVariable = isQuickMode && quickStartTime !== undefined && quickStartTime !== '';
+    const environmentVariableName = usedQuickEnvironmentVariable
+      ? 'QUICK_SIMULATION_START_TIME'
+      : 'SIMULATION_START_TIME';
+    throw new TypeError(`${environmentVariableName} must be a valid ISO 8601 date string`);
   }
 
   clockState = {

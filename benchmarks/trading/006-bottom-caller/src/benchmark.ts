@@ -3004,7 +3004,7 @@ async function main(): Promise<void> {
 
   // Initialize clock
   resetClockState();
-  let clockState = initializeClock();
+  let clockState = initializeClock({ isQuickMode });
   const benchmarkStartTime = new Date(); // Real wall-clock time for session isolation
   const startTime = clockState.currentTime.toISOString();
 
