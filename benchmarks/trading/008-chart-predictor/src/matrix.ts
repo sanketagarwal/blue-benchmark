@@ -1,5 +1,5 @@
 /**
- * Model matrix loader for 007-chart-reader benchmark.
+ * Model matrix loader for 008-chart-predictor benchmark.
  */
 import modelsData from './models.json' with { type: 'json' };
 
@@ -24,8 +24,8 @@ interface ModelsJson {
  * Best value for quick iterations
  */
 const CHEAP_MODELS = [
-  'google/gemini-2.5-flash-lite',     // $0.075/M input - CHEAPEST
-  'google/gemini-2.0-flash',          // $0.10/M input
+  'google/gemini-2.0-flash',          // $0.10/M input - most reliable cheap
+  'google/gemini-2.5-flash',          // $0.15/M input
   'openai/gpt-4o-mini',               // $0.15/M input
 ];
 
@@ -40,22 +40,35 @@ const EXPENSIVE_MODELS = [
 ];
 
 /**
+ * Load cheap models
+ */
+export function loadCheapModels(): ModelConfig[] {
+  const data = modelsData as ModelsJson;
+  return data.models.filter((m) => CHEAP_MODELS.includes(m.id));
+}
+
+/**
+ * Load expensive models
+ */
+export function loadExpensiveModels(): ModelConfig[] {
+  const data = modelsData as ModelsJson;
+  return data.models.filter((m) => EXPENSIVE_MODELS.includes(m.id));
+}
+
+/**
  * Load models based on --cheap or --expensive flag
  * Default to cheap models if no flag specified
  */
 export function loadModelMatrix(): ModelConfig[] {
-  const data = modelsData as ModelsJson;
   const args = process.argv.slice(2);
   
   const useExpensive = args.includes('--expensive');
   const useCheap = args.includes('--cheap');
   
   // Default to cheap if no flag specified
-  const selectedModels = useExpensive ? EXPENSIVE_MODELS 
-                       : useCheap || !useExpensive ? CHEAP_MODELS 
-                       : CHEAP_MODELS;
-  
-  return data.models.filter((m) => selectedModels.includes(m.id));
+  if (useExpensive) return loadExpensiveModels();
+  if (useCheap || !useExpensive) return loadCheapModels();
+  return loadCheapModels();
 }
 
 /**
@@ -70,22 +83,22 @@ export function loadFullModelMatrix(): ModelConfig[] {
  * Get a specific model by ID
  */
 export function getModel(modelId: string): ModelConfig | undefined {
-  const models = loadModelMatrix();
-  return models.find((m) => m.id === modelId);
+  const data = modelsData as ModelsJson;
+  return data.models.find((m) => m.id === modelId);
 }
 
 /**
  * Get models by tier
  */
 export function getModelsByTier(tier: 'budget' | 'mid' | 'frontier'): ModelConfig[] {
-  const models = loadModelMatrix();
-  return models.filter((m) => m.tier === tier);
+  const data = modelsData as ModelsJson;
+  return data.models.filter((m) => m.tier === tier);
 }
 
 /**
  * Get models by provider
  */
 export function getModelsByProvider(provider: string): ModelConfig[] {
-  const models = loadModelMatrix();
-  return models.filter((m) => m.provider === provider);
+  const data = modelsData as ModelsJson;
+  return data.models.filter((m) => m.provider === provider);
 }

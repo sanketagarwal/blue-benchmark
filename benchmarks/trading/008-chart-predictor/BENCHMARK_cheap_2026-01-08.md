@@ -1,0 +1,169 @@
+# Multi-Step Reasoning Benchmark — Results
+
+**Focus:** Testing models' ability to combine multiple chart signals into compound trading conclusions.
+
+**Run Date:** 2026-01-08  
+**Symbol:** COINBASE_SPOT_BTC_USD  
+**Duration:** 0.0s  
+**Mode:** Quick  
+**Total Frames:** 2  
+**Models Evaluated:** 3
+
+---
+
+## 📊 The 6 Multi-Step Reasoning Fields
+
+| # | Field | What It Tests |
+|---|-------|---------------|
+| 1 | `uptrend_pullback_to_vwap` | Trend detection + VWAP proximity |
+| 2 | `volatility_direction_combo` | Volatility assessment + direction |
+| 3 | `tested_and_held_support` | Support identification + reaction |
+| 4 | `breakout_with_volume` | Price breakout + volume confirmation |
+| 5 | `potential_reversal_at_support` | Support + reversal pattern |
+| 6 | `overall_bias` | Synthesis of all signals |
+
+---
+
+## 📋 Per-Model Results
+
+### 🤖 openai/gpt-4o-mini
+
+**Success Rate:** 2/2 frames  
+**Average Accuracy:** 54.2%
+
+#### Frame: 50c_15m_01 (15m)
+
+**Timestamp:** 2025-12-20T12:00:00.000Z  
+**Duration:** 0ms  
+**Status:** ✅ Success
+
+| Field | Predicted | Ground Truth | Score |
+|-------|-----------|--------------|:-----:|
+| uptrend_pullback_to_vwap | true | false | ❌ |
+| volatility_direction_combo | "low_vol_drift_up" | "consolidation" | ❌ |
+| tested_and_held_support | true | true | ✅ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | true | false | ❌ |
+| overall_bias | "mildly_bullish" | "neutral" | 🟡 |
+
+**Frame Accuracy:** 41.7% (2/6 exact matches)
+
+---
+
+#### Frame: 50c_1h_01 (1h)
+
+**Timestamp:** 2025-12-20T12:00:00.000Z  
+**Duration:** 0ms  
+**Status:** ✅ Success
+
+| Field | Predicted | Ground Truth | Score |
+|-------|-----------|--------------|:-----:|
+| uptrend_pullback_to_vwap | false | true | ❌ |
+| volatility_direction_combo | "consolidation" | "low_vol_drift_up" | ❌ |
+| tested_and_held_support | false | false | ✅ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | false | false | ✅ |
+| overall_bias | "neutral" | "neutral" | ✅ |
+
+**Frame Accuracy:** 66.7% (4/6 exact matches)
+
+---
+
+### 🤖 google/gemini-2.0-flash
+
+**Success Rate:** 2/2 frames  
+**Average Accuracy:** 75.0%
+
+#### Frame: 50c_15m_01 (15m)
+
+**Timestamp:** 2025-12-20T12:00:00.000Z  
+**Duration:** 0ms  
+**Status:** ✅ Success
+
+| Field | Predicted | Ground Truth | Score |
+|-------|-----------|--------------|:-----:|
+| uptrend_pullback_to_vwap | false | false | ✅ |
+| volatility_direction_combo | "consolidation" | "consolidation" | ✅ |
+| tested_and_held_support | false | true | ❌ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | false | false | ✅ |
+| overall_bias | "neutral" | "neutral" | ✅ |
+
+**Frame Accuracy:** 83.3% (5/6 exact matches)
+
+---
+
+#### Frame: 50c_1h_01 (1h)
+
+**Timestamp:** 2025-12-20T12:00:00.000Z  
+**Duration:** 0ms  
+**Status:** ✅ Success
+
+| Field | Predicted | Ground Truth | Score |
+|-------|-----------|--------------|:-----:|
+| uptrend_pullback_to_vwap | false | true | ❌ |
+| volatility_direction_combo | "consolidation" | "low_vol_drift_up" | ❌ |
+| tested_and_held_support | false | false | ✅ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | false | false | ✅ |
+| overall_bias | "neutral" | "neutral" | ✅ |
+
+**Frame Accuracy:** 66.7% (4/6 exact matches)
+
+---
+
+### 🤖 google/gemini-2.5-flash
+
+**Success Rate:** 2/2 frames  
+**Average Accuracy:** 66.7%
+
+#### Frame: 50c_15m_01 (15m)
+
+**Timestamp:** 2025-12-20T12:00:00.000Z  
+**Duration:** 0ms  
+**Status:** ✅ Success
+
+| Field | Predicted | Ground Truth | Score |
+|-------|-----------|--------------|:-----:|
+| uptrend_pullback_to_vwap | false | false | ✅ |
+| volatility_direction_combo | "consolidation" | "consolidation" | ✅ |
+| tested_and_held_support | true | true | ✅ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | true | false | ❌ |
+| overall_bias | "mildly_bullish" | "neutral" | 🟡 |
+
+**Frame Accuracy:** 75.0% (4/6 exact matches)
+
+---
+
+#### Frame: 50c_1h_01 (1h)
+
+**Timestamp:** 2025-12-20T12:00:00.000Z  
+**Duration:** 0ms  
+**Status:** ✅ Success
+
+| Field | Predicted | Ground Truth | Score |
+|-------|-----------|--------------|:-----:|
+| uptrend_pullback_to_vwap | false | true | ❌ |
+| volatility_direction_combo | "consolidation" | "low_vol_drift_up" | ❌ |
+| tested_and_held_support | false | false | ✅ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | false | false | ✅ |
+| overall_bias | "mildly_bullish" | "neutral" | 🟡 |
+
+**Frame Accuracy:** 58.3% (3/6 exact matches)
+
+---
+
+## 📈 Summary by Model
+
+| Model | Success Rate | Avg Accuracy | Exact Matches |
+|-------|-------------|--------------|---------------|
+| openai/gpt-4o-mini | 2/2 | 54.2% | 3.0/6 |
+| google/gemini-2.0-flash | 2/2 | 75.0% | 4.5/6 |
+| google/gemini-2.5-flash | 2/2 | 66.7% | 3.5/6 |
+
+---
+
+*Auto-generated by Multi-Step Reasoning Benchmark*  
+*Completed: 2026-01-08T17:29:01.133Z*

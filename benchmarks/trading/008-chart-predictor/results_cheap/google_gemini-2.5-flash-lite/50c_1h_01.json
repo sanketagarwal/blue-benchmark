@@ -1,0 +1,31 @@
+{
+  "frameId": "50c_1h_01",
+  "timeframe": "1h",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-18T10%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767896678&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=44iFiiIOwxHERIeb5alOHBpFTuBvc0lSRSdh0ce3EQw",
+  "timestamp": "2025-12-20T12:00:00.000Z",
+  "durationMs": 0,
+  "error": "MODEL_ID environment variable is required",
+  "prediction": null,
+  "groundTruth": {
+    "meta": {
+      "base_quote": "Bitcoin / U.S. Dollar",
+      "venue": "Coinbase",
+      "timeframe": "1h"
+    },
+    "active_readout": {
+      "open": 87310.515,
+      "high": 87322,
+      "low": 87016.545,
+      "close": 87220.375
+    },
+    "multi_step": {
+      "uptrend_pullback_to_vwap": true,
+      "volatility_direction_combo": "low_vol_drift_up",
+      "tested_and_held_support": false,
+      "breakout_with_volume": false,
+      "potential_reversal_at_support": false,
+      "overall_bias": "neutral"
+    }
+  },
+  "score": null
+}

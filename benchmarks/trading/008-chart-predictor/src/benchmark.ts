@@ -10,17 +10,18 @@
  * - 12 configurations total (3 lengths × 4 timeframes)
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 import { runRound } from '@nullagent/agent-core';
 import { createBenchmarkLogger } from '@nullagent/cli-utils';
 
 import { createChartPredictor, setContext, clearContext } from './chart-predictor.js';
 import { computeGroundTruth } from './ground-truth/index.js';
 import { loadCheapModels, loadExpensiveModels, type ModelConfig } from './matrix.js';
-import { fetchSignedChartUrl } from './replay-lab/charts.js';
-import { fetchOHLCV, type CandleTimeframe } from './replay-lab/ohlcv.js';
+import { getSignedChartUrl, STANDARD_CHART_LAYERS } from './replay-lab/charts.js';
+import { getCandles, type CandleTimeframe } from './replay-lab/ohlcv.js';
 import { scoreChartReading, type ChartReadingScore } from './scorers/index.js';
-import { ResultsWriter } from './results-writer.js';
+import { writeResultsFile, writeJsonResultsFile, writePerFrameResults, type BenchmarkResults, type FrameResult as WriterFrameResult, type ModelResult as WriterModelResult } from './results-writer.js';
 import type { ChartPredictionOutput } from './output-schema.js';
 
 // =============================================================================
@@ -172,16 +173,30 @@ async function generatePredictionFrames(
         logger.log(`  [${frameIdx}/${totalConfigs}] ${configId}: Fetching data...`);
 
         try {
+          // Calculate chart time range (N candles ending at currentTime)
+          const chartFrom = new Date(currentTime.getTime() - chartLength * tfMs);
+          const chartTo = currentTime;
+
           // Fetch chart URL for current time (what model sees)
-          const chartUrl = await fetchSignedChartUrl(config.symbolId, timeframe, currentTime);
+          const chartUrl = await getSignedChartUrl({
+            symbolId: config.symbolId,
+            timeframe,
+            from: chartFrom,
+            to: chartTo,
+            layers: STANDARD_CHART_LAYERS,
+          });
 
           // Fetch OHLCV data for NEXT time period (for ground truth)
-          // We need enough candles to compute indicators
+          // We need enough candles to compute indicators (at least 25)
           const candlesNeeded = Math.max(chartLength, 25);
-          const ohlcvData = await fetchOHLCV(
+          const ohlcvFrom = new Date(nextTime.getTime() - candlesNeeded * tfMs);
+          const ohlcvTo = nextTime;
+          
+          const ohlcvData = await getCandles(
             config.symbolId,
             timeframe,
-            nextTime,
+            ohlcvFrom,
+            ohlcvTo,
             candlesNeeded
           );
 
@@ -192,7 +207,7 @@ async function generatePredictionFrames(
 
           // Compute ground truth from NEXT period data
           const groundTruth = computeGroundTruth({
-            candles: ohlcvData.map((c) => ({ ...c, time: c.time })),
+            candles: ohlcvData.map((c) => ({ ...c, time: c.timestamp })),
             meta: {
               base_quote: 'Bitcoin / U.S. Dollar',
               venue: 'Coinbase',
@@ -244,6 +259,9 @@ async function evaluateModel(
   let totalAccuracy = 0;
   let totalExactMatches = 0;
 
+  // Set MODEL_ID for agent-core
+  process.env['MODEL_ID'] = modelId;
+  
   const agent = createChartPredictor(modelId);
 
   for (let i = 0; i < frames.length; i++) {
@@ -417,8 +435,50 @@ async function main(): Promise<void> {
   logger.log('                         FINAL RESULTS');
   logger.log('═══════════════════════════════════════════════════════════════════\n');
 
-  const resultsWriter = new ResultsWriter(modelSetName, '008-chart-predictor');
-  await resultsWriter.writeDetailedResults(modelResults, config.timeframes, logger);
+  // Build BenchmarkResults object
+  const benchmarkResults: BenchmarkResults = {
+    config: {
+      symbolId: config.symbolId,
+      timeframes: config.timeframes,
+      samplesPerTimeframe: config.samplesPerConfig,
+      startTime: config.startTime,
+      quickMode: config.quickMode,
+      totalFrames: frames.length,
+      modelsEvaluated: models.length,
+    },
+    results: modelResults.map((r): WriterModelResult => ({
+      modelId: r.modelId,
+      frames: r.frames.map((f): WriterFrameResult => ({
+        frameId: f.frame.configId,
+        timeframe: f.frame.timeframe,
+        chartUrl: f.frame.chartUrl,
+        timestamp: f.frame.currentTime.toISOString(),
+        prediction: f.prediction,
+        groundTruth: f.frame.groundTruth,
+        score: f.score,
+        error: f.error ?? null,
+        durationMs: 0,
+      })),
+      failures: r.failCount,
+      successCount: r.successCount,
+    })),
+    startedAt: new Date(),
+    completedAt: new Date(),
+  };
+
+  // Generate output filenames
+  const dateStr = new Date().toISOString().split('T')[0];
+  const mdFile = `BENCHMARK_${modelSetName}_${dateStr}.md`;
+  const jsonFile = `BENCHMARK_${modelSetName}_${dateStr}.json`;
+  const resultsDir = `results_${modelSetName}`;
+
+  writeResultsFile(benchmarkResults, mdFile);
+  writeJsonResultsFile(benchmarkResults, jsonFile);
+  writePerFrameResults(benchmarkResults, resultsDir);
+
+  logger.log(`📄 Results written to: ${mdFile}`);
+  logger.log(`📄 JSON written to: ${jsonFile}`);
+  logger.log(`📁 Per-frame results in: ${resultsDir}/`);
 
   // Print summary
   logger.log('\n📊 Summary');
