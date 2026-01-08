@@ -20,6 +20,8 @@ import { computeGroundTruth } from './ground-truth/index.js';
 import { loadCheapModels, loadExpensiveModels, type ModelConfig } from './matrix.js';
 import { getSignedChartUrl, STANDARD_CHART_LAYERS } from './replay-lab/charts.js';
 import { getCandles, type CandleTimeframe } from './replay-lab/ohlcv.js';
+import { getLocalExtrema } from './replay-lab/annotations.js';
+import type { LocalExtremaAnnotation } from './replay-lab/annotations.js';
 import { scoreChartReading, type ChartReadingScore } from './scorers/index.js';
 import { writeResultsFile, writeJsonResultsFile, writePerFrameResults, type BenchmarkResults, type FrameResult as WriterFrameResult, type ModelResult as WriterModelResult } from './results-writer.js';
 import type { ChartPredictionOutput } from './output-schema.js';
@@ -205,6 +207,15 @@ async function generatePredictionFrames(
             continue;
           }
 
+          // Fetch Replay Labs annotations for support/resistance
+          let localExtrema: LocalExtremaAnnotation[] = [];
+          try {
+            localExtrema = await getLocalExtrema(config.symbolId, ohlcvFrom, ohlcvTo);
+            logger.log(`    📊 Fetched ${String(localExtrema.length)} local extrema from Replay Labs`);
+          } catch {
+            logger.log(`    ⚠️ Using computed support/resistance (annotations unavailable)`);
+          }
+
           // Compute ground truth from NEXT period data
           const groundTruth = computeGroundTruth({
             candles: ohlcvData.map((c) => ({ ...c, time: c.timestamp })),
@@ -218,7 +229,11 @@ async function generatePredictionFrames(
               bb_upper: null,
               bb_mid: null,
               bb_lower: null,
+              sma20: null,
+              ema20: null,
             },
+            timeframeMinutes: tfMs / 60000,
+            localExtrema,
           });
 
           frames.push({

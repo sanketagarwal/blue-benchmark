@@ -1,7 +1,7 @@
 {
   "frameId": "50c_15m_01",
   "timeframe": "15m",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T23%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767896892&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=Ulv5UOAPpmg9Ry3azQq9-Z-AXwhZ6k8TyzcJ-Jp3J5Y",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T23%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767900677&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=MQJyXbEYhujuVdFoNIfcESDxOvmmOjejNC6-b28Ri_o",
   "timestamp": "2025-12-20T12:00:00.000Z",
   "durationMs": 0,
   "error": null,
@@ -41,23 +41,37 @@
     "multi_step": {
       "uptrend_pullback_to_vwap": false,
       "volatility_direction_combo": "consolidation",
-      "tested_and_held_support": true,
+      "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
-      "overall_bias": "neutral"
+      "overall_bias": "mildly_bearish"
+    },
+    "_debug": {
+      "supportLevel": 88204,
+      "resistanceLevel": 88306.61,
+      "supportFromAnnotations": true,
+      "resistanceFromAnnotations": true,
+      "vwap": 88198.41665370473,
+      "bb": {
+        "upper": 88300.71705905472,
+        "lower": 87941.54594094526,
+        "mid": 88121.13149999999
+      },
+      "trendDir": "flat",
+      "volLevel": "low"
     }
   },
   "score": {
     "fieldScores": {
       "uptrend_pullback_to_vwap": 1,
       "volatility_direction_combo": 1,
-      "tested_and_held_support": 0,
+      "tested_and_held_support": 1,
       "breakout_with_volume": 1,
       "potential_reversal_at_support": 1,
-      "overall_bias": 1
+      "overall_bias": 0.5
     },
     "exactMatchCount": 5,
     "totalFields": 6,
-    "accuracy": 0.8333333333333334
+    "accuracy": 0.9166666666666666
   }
 }

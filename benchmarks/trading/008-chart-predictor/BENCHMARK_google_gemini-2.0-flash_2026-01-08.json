@@ -20,7 +20,7 @@
         {
           "frameId": "50c_15m_01",
           "timeframe": "15m",
-          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T23%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767896892&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=Ulv5UOAPpmg9Ry3azQq9-Z-AXwhZ6k8TyzcJ-Jp3J5Y",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T23%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767900677&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=MQJyXbEYhujuVdFoNIfcESDxOvmmOjejNC6-b28Ri_o",
           "timestamp": "2025-12-20T12:00:00.000Z",
           "durationMs": 0,
           "error": null,
@@ -60,36 +60,50 @@
             "multi_step": {
               "uptrend_pullback_to_vwap": false,
               "volatility_direction_combo": "consolidation",
-              "tested_and_held_support": true,
+              "tested_and_held_support": false,
               "breakout_with_volume": false,
               "potential_reversal_at_support": false,
-              "overall_bias": "neutral"
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88306.61,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88198.41665370473,
+              "bb": {
+                "upper": 88300.71705905472,
+                "lower": 87941.54594094526,
+                "mid": 88121.13149999999
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
             }
           },
           "score": {
             "fieldScores": {
               "uptrend_pullback_to_vwap": 1,
               "volatility_direction_combo": 1,
-              "tested_and_held_support": 0,
+              "tested_and_held_support": 1,
               "breakout_with_volume": 1,
               "potential_reversal_at_support": 1,
-              "overall_bias": 1
+              "overall_bias": 0.5
             },
             "exactMatchCount": 5,
             "totalFields": 6,
-            "accuracy": 0.8333333333333334
+            "accuracy": 0.9166666666666666
           }
         },
         {
           "frameId": "50c_1h_01",
           "timeframe": "1h",
-          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-18T10%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767896893&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=QWbuOCGJ7Si2h1IaTkNgOvTsCIZk4LjWqlLQszUcHnA",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-18T10%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767900678&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=4p3lWyHmZRwLlZrhas9F5mZxU6MbLUsB-w0rmijQmgo",
           "timestamp": "2025-12-20T12:00:00.000Z",
           "durationMs": 0,
           "error": null,
           "prediction": {
             "meta": {
-              "base_quote": "BTC/USD",
+              "base_quote": "Bitcoin / U.S. Dollar",
               "venue": "Coinbase",
               "timeframe": "1h"
             },
@@ -122,30 +136,44 @@
             },
             "multi_step": {
               "uptrend_pullback_to_vwap": true,
-              "volatility_direction_combo": "low_vol_drift_up",
+              "volatility_direction_combo": "consolidation",
               "tested_and_held_support": false,
               "breakout_with_volume": false,
               "potential_reversal_at_support": false,
               "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88139.955,
+              "resistanceLevel": 88223.335,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87298.8545247552,
+              "bb": {
+                "upper": 89031.7073549244,
+                "lower": 84051.82164507562,
+                "mid": 86541.7645
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
             }
           },
           "score": {
             "fieldScores": {
               "uptrend_pullback_to_vwap": 0,
-              "volatility_direction_combo": 0,
+              "volatility_direction_combo": 1,
               "tested_and_held_support": 1,
               "breakout_with_volume": 1,
               "potential_reversal_at_support": 1,
               "overall_bias": 1
             },
-            "exactMatchCount": 4,
+            "exactMatchCount": 5,
             "totalFields": 6,
-            "accuracy": 0.6666666666666666
+            "accuracy": 0.8333333333333334
           }
         }
       ]
     }
   ],
-  "startedAt": "2026-01-08T17:28:20.231Z",
-  "completedAt": "2026-01-08T17:28:20.231Z"
+  "startedAt": "2026-01-08T18:31:25.820Z",
+  "completedAt": "2026-01-08T18:31:25.820Z"
 }

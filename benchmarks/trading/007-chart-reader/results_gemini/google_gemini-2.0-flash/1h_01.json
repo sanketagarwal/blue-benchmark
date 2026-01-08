@@ -1,9 +1,9 @@
 {
-  "frameId": "50c_1h_01",
+  "frameId": "1h_01",
   "timeframe": "1h",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-18T10%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767900678&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=4p3lWyHmZRwLlZrhas9F5mZxU6MbLUsB-w0rmijQmgo",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767900509&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=GL77TkMtCksibR16ayHroUhkTrMz_2u_A_V1bj-QR9k",
   "timestamp": "2025-12-20T12:00:00.000Z",
-  "durationMs": 0,
+  "durationMs": 3076,
   "error": null,
   "prediction": {
     "meta": {
@@ -19,7 +19,7 @@
     },
     "multi_step": {
       "uptrend_pullback_to_vwap": false,
-      "volatility_direction_combo": "consolidation",
+      "volatility_direction_combo": "low_vol_drift_up",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
@@ -33,45 +33,45 @@
       "timeframe": "1h"
     },
     "active_readout": {
-      "open": 87310.515,
-      "high": 87322,
-      "low": 87016.545,
-      "close": 87220.375
+      "open": 87078.425,
+      "high": 87430.945,
+      "low": 86845.68,
+      "close": 87429.48
     },
     "multi_step": {
-      "uptrend_pullback_to_vwap": true,
-      "volatility_direction_combo": "consolidation",
+      "uptrend_pullback_to_vwap": false,
+      "volatility_direction_combo": "low_vol_drift_down",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
-      "overall_bias": "neutral"
+      "overall_bias": "mildly_bearish"
     },
     "_debug": {
-      "supportLevel": 88139.955,
-      "resistanceLevel": 88223.335,
+      "supportLevel": 88204,
+      "resistanceLevel": 88265.7,
       "supportFromAnnotations": true,
       "resistanceFromAnnotations": true,
-      "vwap": 87298.8545247552,
+      "vwap": 87924.25921744344,
       "bb": {
-        "upper": 89031.7073549244,
-        "lower": 84051.82164507562,
-        "mid": 86541.7645
+        "upper": 88562.89168146682,
+        "lower": 87176.00881853317,
+        "mid": 87869.45025
       },
-      "trendDir": "up",
-      "volLevel": "medium"
+      "trendDir": "down",
+      "volLevel": "low"
     }
   },
   "score": {
     "fieldScores": {
-      "uptrend_pullback_to_vwap": 0,
-      "volatility_direction_combo": 1,
+      "uptrend_pullback_to_vwap": 1,
+      "volatility_direction_combo": 0,
       "tested_and_held_support": 1,
       "breakout_with_volume": 1,
       "potential_reversal_at_support": 1,
-      "overall_bias": 1
+      "overall_bias": 0.5
     },
-    "exactMatchCount": 5,
+    "exactMatchCount": 4,
     "totalFields": 6,
-    "accuracy": 0.8333333333333334
+    "accuracy": 0.75
   }
 }

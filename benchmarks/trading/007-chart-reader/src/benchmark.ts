@@ -7,12 +7,16 @@
  * Tests 6 multi-step reasoning fields.
  */
 
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { createBenchmarkLogger } from '@nullagent/cli-utils';
 import { runRound } from '@nullagent/agent-core';
 
 import { createChartReader, setChartReaderContext, clearChartReaderContext } from './chart-reader.js';
 import { getSignedChartUrl, STANDARD_CHART_LAYERS } from './replay-lab/charts.js';
 import { getCandles } from './replay-lab/ohlcv.js';
+import { getLocalExtrema } from './replay-lab/annotations.js';
 import { computeGroundTruth } from './ground-truth/index.js';
 import { scoreChartReading } from './scorers/index.js';
 import { loadModelMatrix } from './matrix.js';
@@ -20,6 +24,7 @@ import { writeResultsFile, writeJsonResultsFile, writePerFrameResults } from './
 
 import type { ChartParams } from './replay-lab/charts.js';
 import type { CandleTimeframe } from './replay-lab/ohlcv.js';
+import type { LocalExtremaAnnotation } from './replay-lab/annotations.js';
 import type { GroundTruthInput, ChartMeta, IndicatorValues } from './ground-truth/index.js';
 import type { ChartReadingOutput } from './output-schema.js';
 import type { BenchmarkResults, ModelResult, FrameResult } from './results-writer.js';
@@ -170,6 +175,16 @@ async function generateFrames(config: BenchmarkConfig, logger: ReturnType<typeof
           continue;
         }
 
+        // Fetch Replay Labs annotations for support/resistance
+        let localExtrema: LocalExtremaAnnotation[] = [];
+        try {
+          localExtrema = await getLocalExtrema(symbolId, fromTime, toTime);
+          logger.log(`    📊 Fetched ${String(localExtrema.length)} local extrema from Replay Labs`);
+        } catch (annotationError) {
+          // Annotations are optional - fall back to computed BB
+          logger.log(`    ⚠️ Could not fetch annotations, using computed support/resistance`);
+        }
+
         const meta: ChartMeta = {
           base_quote: 'Bitcoin / U.S. Dollar',
           venue: 'Coinbase',
@@ -183,6 +198,7 @@ async function generateFrames(config: BenchmarkConfig, logger: ReturnType<typeof
           meta,
           indicators,
           timeframeMinutes: tfMinutes,
+          localExtrema, // NEW: Pass Replay Labs annotations
         };
 
         const groundTruth = computeGroundTruth(groundTruthInput);
