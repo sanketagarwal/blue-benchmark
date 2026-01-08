@@ -1,0 +1,81 @@
+╔═══════════════════════════════════════════════════════════╗
+║           009 SIMPLE LEARNING LOOP TEST                   ║
+╚═══════════════════════════════════════════════════════════╝
+
+Model: google/gemini-2.0-flash
+Symbol: COINBASE_SPOT_BTC_USD
+
+📊 Step 1: Getting chart...
+✅ Chart URL obtained
+
+📋 Ground Truth (for comparison):
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "consolidation",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "neutral"
+}
+
+────────────────────────────────────────────────────────────
+🔵 ROUND 1: Baseline (no feedback)
+────────────────────────────────────────────────────────────
+
+Model prediction:
+{
+  "uptrend_pullback_to_vwap": true,
+  "volatility_direction_combo": "low_vol_drift_down",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": true,
+  "overall_bias": "mildly_bearish"
+}
+
+📊 Baseline Score: 2/6 (33%)
+
+────────────────────────────────────────────────────────────
+📝 Generating feedback...
+────────────────────────────────────────────────────────────
+
+=== FEEDBACK ON YOUR PREVIOUS ANALYSIS ===
+
+❌ uptrend_pullback_to_vwap: WRONG. You said "true", correct answer is "false"
+❌ volatility_direction_combo: WRONG. You said "low_vol_drift_down", correct answer is "consolidation"
+✅ tested_and_held_support: Correct (false)
+✅ breakout_with_volume: Correct (false)
+❌ potential_reversal_at_support: WRONG. You said "true", correct answer is "false"
+❌ overall_bias: WRONG. You said "mildly_bearish", correct answer is "neutral"
+
+Score: 2/6
+
+Now analyze the chart again using this feedback.
+
+────────────────────────────────────────────────────────────
+🟢 ROUND 2: Same chart WITH feedback
+────────────────────────────────────────────────────────────
+
+Model prediction after feedback:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "low_vol_drift_down",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": true,
+  "overall_bias": "mildly_bearish"
+}
+
+📊 Round 2 Score: 3/6 (50%)
+
+════════════════════════════════════════════════════════════
+                      RESULTS
+════════════════════════════════════════════════════════════
+
+Baseline:   2/6 (33%)
+After FB:   3/6 (50%)
+Delta:      +1 fields
+
+✅ Model IMPROVED after feedback!
+
+✅ Test complete!
+

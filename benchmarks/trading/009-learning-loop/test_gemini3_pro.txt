@@ -1,0 +1,38 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║           009 LEARNING LOOP - Same Setup as 007                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+Model: google/gemini-3-pro-preview
+Symbol: COINBASE_SPOT_BTC_USD
+Time Offset: 14 days back
+
+📊 Step 1: Fetching chart and ground truth...
+  Time: 2025-12-17T21:38:49.445Z to 2025-12-18T21:38:49.445Z
+  ✅ Chart URL obtained
+  ✅ Fetched 25 candles
+  ✅ Ground truth computed
+
+📋 Ground Truth (multi_step):
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "low_vol_drift_down",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "mildly_bearish"
+}
+
+────────────────────────────────────────────────────────────
+🔵 ROUND 1: Baseline (no feedback)
+────────────────────────────────────────────────────────────
+
+Model prediction:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "high_vol_bearish",
+  "tested_and_held_support": true,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": true,
+  "overall_bias": "bearish"
+}
+❌ Round 1 failed: TypeError: Cannot read properties of undefined (reading 'multi_step')

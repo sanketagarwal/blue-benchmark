@@ -1,0 +1,281 @@
+{
+  "models": [
+    {
+      "id": "anthropic/claude-haiku-4-5",
+      "provider": "anthropic",
+      "inputCostPerMillion": 0.80,
+      "outputCostPerMillion": 4.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Claude Haiku 4.5 - fast with vision"
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-5",
+      "provider": "anthropic",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Claude Sonnet 4.5 - balanced with vision"
+    },
+    {
+      "id": "anthropic/claude-opus-4-5",
+      "provider": "anthropic",
+      "inputCostPerMillion": 5.00,
+      "outputCostPerMillion": 25.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Claude Opus 4.5 - most capable with vision"
+    },
+    {
+      "id": "anthropic/claude-3-5-sonnet-20241022",
+      "provider": "anthropic",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Claude 3.5 Sonnet - strong reasoning with vision"
+    },
+    {
+      "id": "anthropic/claude-3-5-haiku-latest",
+      "provider": "anthropic",
+      "inputCostPerMillion": 0.80,
+      "outputCostPerMillion": 4.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Claude 3.5 Haiku - fast tier with vision"
+    },
+    {
+      "id": "anthropic/claude-3-7-sonnet-latest",
+      "provider": "anthropic",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Claude 3.7 Sonnet - latest with vision"
+    },
+    {
+      "id": "openai/gpt-4o",
+      "provider": "openai",
+      "inputCostPerMillion": 2.50,
+      "outputCostPerMillion": 10.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "GPT-4o - omni model with vision"
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "provider": "openai",
+      "inputCostPerMillion": 0.15,
+      "outputCostPerMillion": 0.60,
+      "tier": "budget",
+      "vision": true,
+      "notes": "GPT-4o Mini - fast and cheap with vision"
+    },
+    {
+      "id": "openai/gpt-4.1",
+      "provider": "openai",
+      "inputCostPerMillion": 2.00,
+      "outputCostPerMillion": 8.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "GPT-4.1 with vision"
+    },
+    {
+      "id": "openai/gpt-4.1-mini",
+      "provider": "openai",
+      "inputCostPerMillion": 0.40,
+      "outputCostPerMillion": 1.60,
+      "tier": "mid",
+      "vision": true,
+      "notes": "GPT-4.1 Mini with vision"
+    },
+    {
+      "id": "openai/gpt-5",
+      "provider": "openai",
+      "inputCostPerMillion": 5.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "GPT-5 flagship with vision"
+    },
+    {
+      "id": "openai/gpt-5-mini",
+      "provider": "openai",
+      "inputCostPerMillion": 0.50,
+      "outputCostPerMillion": 2.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "GPT-5 Mini with vision"
+    },
+    {
+      "id": "openai/gpt-5-nano",
+      "provider": "openai",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "GPT-5 Nano - cheapest with vision"
+    },
+    {
+      "id": "openai/gpt-5.2",
+      "provider": "openai",
+      "inputCostPerMillion": 0.50,
+      "outputCostPerMillion": 3.00,
+      "tier": "mid",
+      "vision": true,
+      "notes": "GPT-5.2 with vision"
+    },
+    {
+      "id": "google/gemini-2.0-flash",
+      "provider": "google",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.40,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Gemini 2.0 Flash multimodal"
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "provider": "google",
+      "inputCostPerMillion": 0.15,
+      "outputCostPerMillion": 0.60,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Gemini 2.5 Flash multimodal"
+    },
+    {
+      "id": "google/gemini-2.5-flash-lite",
+      "provider": "google",
+      "inputCostPerMillion": 0.075,
+      "outputCostPerMillion": 0.30,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Gemini 2.5 Flash Lite - cheapest"
+    },
+    {
+      "id": "google/gemini-2.5-pro",
+      "provider": "google",
+      "inputCostPerMillion": 1.25,
+      "outputCostPerMillion": 5.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Gemini 2.5 Pro multimodal"
+    },
+    {
+      "id": "google/gemini-3-pro-preview",
+      "provider": "google",
+      "inputCostPerMillion": 2.00,
+      "outputCostPerMillion": 8.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Gemini 3 Pro Preview multimodal"
+    },
+    {
+      "id": "xai/grok-2-vision",
+      "provider": "xai",
+      "inputCostPerMillion": 2.00,
+      "outputCostPerMillion": 10.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 2 with vision"
+    },
+    {
+      "id": "xai/grok-4-fast-non-reasoning",
+      "provider": "xai",
+      "inputCostPerMillion": 0.30,
+      "outputCostPerMillion": 2.50,
+      "tier": "mid",
+      "vision": true,
+      "notes": "Grok 4 Fast with vision"
+    },
+    {
+      "id": "xai/grok-4.1-fast-reasoning",
+      "provider": "xai",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 4.1 Fast Reasoning with vision"
+    },
+    {
+      "id": "xai/grok-4",
+      "provider": "xai",
+      "inputCostPerMillion": 3.00,
+      "outputCostPerMillion": 15.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Grok 4 flagship with vision"
+    },
+    {
+      "id": "mistral/pixtral-large-latest",
+      "provider": "mistral",
+      "inputCostPerMillion": 2.00,
+      "outputCostPerMillion": 6.00,
+      "tier": "frontier",
+      "vision": true,
+      "notes": "Pixtral Large vision model"
+    },
+    {
+      "id": "mistral/pixtral-12b-2409",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.15,
+      "outputCostPerMillion": 0.15,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Pixtral 12B vision model"
+    },
+    {
+      "id": "mistral/ministral-3b-latest",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.04,
+      "outputCostPerMillion": 0.04,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Ministral 3B"
+    },
+    {
+      "id": "mistral/ministral-8b-latest",
+      "provider": "mistral",
+      "inputCostPerMillion": 0.10,
+      "outputCostPerMillion": 0.10,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Ministral 8B"
+    },
+    {
+      "id": "perplexity/sonar-pro",
+      "provider": "perplexity",
+      "inputCostPerMillion": 1.00,
+      "outputCostPerMillion": 1.00,
+      "tier": "budget",
+      "vision": true,
+      "notes": "Sonar Pro - search-augmented"
+    }
+  ],
+  "tiers": {
+    "budget": {
+      "description": "Under $1/M output tokens",
+      "maxOutputCost": 1.00
+    },
+    "mid": {
+      "description": "$1-5/M output tokens",
+      "minOutputCost": 1.00,
+      "maxOutputCost": 5.00
+    },
+    "frontier": {
+      "description": "$5-15/M output tokens",
+      "minOutputCost": 5.00,
+      "maxOutputCost": 15.00
+    }
+  },
+  "providers": [
+    "anthropic",
+    "openai",
+    "google",
+    "xai",
+    "mistral",
+    "perplexity"
+  ]
+}
+

@@ -1,0 +1,97 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║           009 LEARNING LOOP - Same Setup as 007                   ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+Model: google/gemini-3-pro-preview
+Symbol: COINBASE_SPOT_BTC_USD
+Time Offset: 14 days back
+
+📊 Step 1: Fetching chart and ground truth...
+  Time: 2025-12-17T21:41:41.778Z to 2025-12-18T21:41:41.778Z
+  ✅ Chart URL obtained
+  ✅ Fetched 25 candles
+  ✅ Ground truth computed
+
+📋 Ground Truth (multi_step):
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "low_vol_drift_down",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "mildly_bearish"
+}
+
+────────────────────────────────────────────────────────────
+🔵 ROUND 1: Baseline (no feedback)
+────────────────────────────────────────────────────────────
+
+Model prediction:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "high_vol_bearish",
+  "tested_and_held_support": true,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": true,
+  "overall_bias": "bearish"
+}
+
+📊 Baseline: 41.7% (2/6 exact)
+
+────────────────────────────────────────────────────────────
+📝 Feedback
+────────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════════
+                FEEDBACK ON YOUR PREVIOUS ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+✅ uptrend_pullback_to_vwap: Correct (false)
+❌ volatility_direction_combo: WRONG. You said "high_vol_bearish", correct is "low_vol_drift_down"
+❌ tested_and_held_support: WRONG. You said "true", correct is "false"
+✅ breakout_with_volume: Correct (false)
+❌ potential_reversal_at_support: WRONG. You said "true", correct is "false"
+❌ overall_bias: WRONG. You said "bearish", correct is "mildly_bearish"
+
+Your Score: 2/6
+
+Now analyze the same chart again. Apply these corrections.
+═══════════════════════════════════════════════════════════════
+
+
+────────────────────────────────────────────────────────────
+🟢 ROUND 2: Same chart WITH feedback
+────────────────────────────────────────────────────────────
+
+Model prediction after feedback:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "low_vol_drift_down",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "mildly_bearish"
+}
+
+📊 After Feedback: 100.0% (6/6 exact)
+
+════════════════════════════════════════════════════════════
+                      FINAL RESULTS
+════════════════════════════════════════════════════════════
+
+Baseline:       41.7% (2/6)
+After Feedback: 100.0% (6/6)
+Delta:          +58.3%
+
+Field Changes:
+  uptrend_pullback_to_vwap: ✓ correct
+  volatility_direction_combo: ✅ FIXED
+  tested_and_held_support: ✅ FIXED
+  breakout_with_volume: ✓ correct
+  potential_reversal_at_support: ✅ FIXED
+  overall_bias: ✅ FIXED
+
+✅ Model IMPROVED!
+
+✅ Done!
+

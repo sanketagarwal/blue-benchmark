@@ -1,0 +1,22 @@
+{
+  "name": "009-learning-loop",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "npx tsx src/benchmark.ts",
+    "quick": "npx tsx src/benchmark.ts --quick",
+    "cheap": "npx tsx src/benchmark.ts --cheap",
+    "expensive": "npx tsx src/benchmark.ts --expensive"
+  },
+  "dependencies": {
+    "@nullagent/agent-core": "workspace:*",
+    "@nullagent/cli-utils": "workspace:*",
+    "dotenv": "^16.3.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

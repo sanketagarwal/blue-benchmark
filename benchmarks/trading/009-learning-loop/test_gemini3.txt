@@ -1,0 +1,12 @@
+/Users/sanketagarwal/Documents/blueteam-benchmark/nullagent-benchmark-clean/benchmarks/trading/009-learning-loop/src/simple-test.ts:327
+(setChartReaderContext as any) = (ctx: any) => {
+ ^
+
+
+TypeError: Assignment to constant variable.
+    at <anonymous> (/Users/sanketagarwal/Documents/blueteam-benchmark/nullagent-benchmark-clean/benchmarks/trading/009-learning-loop/src/simple-test.ts:327:2)
+    at ModuleJob.run (node:internal/modules/esm/module_job:345:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:651:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+
+Node.js v22.19.0
