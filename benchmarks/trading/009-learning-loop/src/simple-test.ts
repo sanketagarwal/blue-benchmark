@@ -1,6 +1,10 @@
 #!/usr/bin/env npx tsx
 /**
- * 009 Learning Loop Test - Using 007's exact setup
+ * 009 Learning Loop Test - Full 3-Round Test
+ * 
+ * Round 1: Baseline (original timeframe)
+ * Round 2: Same chart with feedback (memorization test)
+ * Round 3: Different timeframe, same time period (abstraction test)
  */
 
 import { config } from 'dotenv';
@@ -14,12 +18,21 @@ import { computeGroundTruth } from './ground-truth/index.js';
 import { scoreChartReading } from './scorers/index.js';
 import type { ChartReadingOutput } from './output-schema.js';
 import type { IndicatorValues } from './ground-truth/index.js';
+import type { CandleTimeframe } from './replay-lab/ohlcv.js';
 
 // Global context
 let currentChartUrl = '';
 let currentFeedback = '';
-let currentTimeframe = '1h';
+let currentTimeframe = '4h';
 let currentSymbolId = '';
+
+// Timeframe drill-down for abstraction test
+const TIMEFRAME_DRILLDOWN: Record<string, CandleTimeframe> = {
+  '4h': '1h',
+  '1h': '15m',
+  '15m': '5m',
+  '5m': '1m',
+};
 
 function computeIndicators(candles: { open: number; high: number; low: number; close: number; volume: number }[]): IndicatorValues {
   if (candles.length === 0) {
@@ -58,7 +71,7 @@ function generateFeedback(prediction: ChartReadingOutput, groundTruth: ChartRead
       : `❌ ${field}: WRONG. You said "${String(pred)}", correct is "${String(gt)}"\n`;
   }
   fb += `\nYour Score: ${correct}/6\n\n`;
-  fb += 'Now analyze the same chart again. Apply these corrections.\n';
+  fb += 'Apply these corrections to improve your analysis.\n';
   fb += '═══════════════════════════════════════════════════════════════\n';
   return fb;
 }
@@ -103,58 +116,98 @@ async function main() {
   const modelId = process.argv.find(a => a.startsWith('--model='))?.split('=')[1] || 'google/gemini-3-pro-preview';
   const symbolId = process.env['SYMBOL_ID'] || 'COINBASE_SPOT_BTC_USD';
   const timeOffset = parseInt(process.argv.find(a => a.startsWith('--offset='))?.split('=')[1] || '14', 10);
+  const originalTimeframe: CandleTimeframe = (process.argv.find(a => a.startsWith('--tf='))?.split('=')[1] as CandleTimeframe) || '4h';
+  const drilldownTimeframe = TIMEFRAME_DRILLDOWN[originalTimeframe] || '1h';
   
   currentSymbolId = symbolId;
-  currentTimeframe = '1h';
+  currentTimeframe = originalTimeframe;
   
   console.log('╔═══════════════════════════════════════════════════════════════════╗');
-  console.log('║           009 LEARNING LOOP - Same Setup as 007                   ║');
+  console.log('║           009 LEARNING LOOP - Full 3-Round Test                   ║');
+  console.log('╠═══════════════════════════════════════════════════════════════════╣');
+  console.log('║  Round 1: Baseline (original timeframe)                           ║');
+  console.log('║  Round 2: Same chart + feedback (memorization)                    ║');
+  console.log('║  Round 3: Different timeframe + feedback (abstraction)            ║');
   console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
   
   console.log(`Model: ${modelId}`);
   console.log(`Symbol: ${symbolId}`);
+  console.log(`Original TF: ${originalTimeframe} → Drilldown TF: ${drilldownTimeframe}`);
   console.log(`Time Offset: ${timeOffset} days back\n`);
 
-  // Get chart
-  console.log('📊 Step 1: Fetching chart and ground truth...');
+  // Calculate time range
   const now = new Date();
   const baseOffset = (7 + timeOffset) * 24 * 60 * 60 * 1000;
   const to = new Date(now.getTime() - baseOffset);
-  const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
-  console.log(`  Time: ${from.toISOString()} to ${to.toISOString()}`);
+  const from = new Date(to.getTime() - 48 * 60 * 60 * 1000); // 48 hours of data
   
+  console.log(`Time Range: ${from.toISOString()} to ${to.toISOString()}\n`);
+
+  // =========================================================================
+  // SETUP: Get charts and ground truth for both timeframes
+  // =========================================================================
+  console.log('📊 Setting up charts and ground truth...\n');
+  
+  let originalChartUrl: string;
+  let drilldownChartUrl: string;
   let groundTruth: ChartReadingOutput;
+  let drilldownGroundTruth: ChartReadingOutput;
+  
   try {
-    currentChartUrl = await getSignedChartUrl({
-      symbolId, timeframe: '1h', from, to, layers: STANDARD_CHART_LAYERS,
+    // Original timeframe chart
+    originalChartUrl = await getSignedChartUrl({
+      symbolId, timeframe: originalTimeframe, from, to, layers: STANDARD_CHART_LAYERS,
     });
-    console.log('  ✅ Chart URL obtained');
+    console.log(`  ✅ Original chart (${originalTimeframe}) URL obtained`);
     
-    const candles = await getCandles(symbolId, '1h', from, to, 30);
-    console.log(`  ✅ Fetched ${candles.length} candles`);
+    const candles = await getCandles(symbolId, originalTimeframe, from, to, 30);
+    console.log(`  ✅ Fetched ${candles.length} candles (${originalTimeframe})`);
     
     const indicators = computeIndicators(candles);
     groundTruth = computeGroundTruth({
       candles,
-      meta: { base_quote: 'Bitcoin / U.S. Dollar', venue: 'Coinbase', timeframe: '1h' },
+      meta: { base_quote: 'Bitcoin / U.S. Dollar', venue: 'Coinbase', timeframe: originalTimeframe },
       indicators,
-      timeframeMinutes: 60,
+      timeframeMinutes: originalTimeframe === '4h' ? 240 : originalTimeframe === '1h' ? 60 : 15,
     });
-    console.log('  ✅ Ground truth computed');
+    console.log(`  ✅ Ground truth computed (${originalTimeframe})`);
+    
+    // Drilldown timeframe chart (same time period, more granular)
+    drilldownChartUrl = await getSignedChartUrl({
+      symbolId, timeframe: drilldownTimeframe, from, to, layers: STANDARD_CHART_LAYERS,
+    });
+    console.log(`  ✅ Drilldown chart (${drilldownTimeframe}) URL obtained`);
+    
+    const drilldownCandles = await getCandles(symbolId, drilldownTimeframe, from, to, 100);
+    console.log(`  ✅ Fetched ${drilldownCandles.length} candles (${drilldownTimeframe})`);
+    
+    const drilldownIndicators = computeIndicators(drilldownCandles);
+    drilldownGroundTruth = computeGroundTruth({
+      candles: drilldownCandles,
+      meta: { base_quote: 'Bitcoin / U.S. Dollar', venue: 'Coinbase', timeframe: drilldownTimeframe },
+      indicators: drilldownIndicators,
+      timeframeMinutes: drilldownTimeframe === '1h' ? 60 : drilldownTimeframe === '15m' ? 15 : 5,
+    });
+    console.log(`  ✅ Ground truth computed (${drilldownTimeframe})`);
+    
   } catch (err) {
     console.error(`❌ Setup failed: ${err}`);
     process.exit(1);
   }
 
-  console.log('\n📋 Ground Truth (multi_step):');
+  console.log('\n📋 Ground Truth (original timeframe):');
   console.log(JSON.stringify(groundTruth.multi_step, null, 2));
 
-  // ROUND 1: Baseline
-  console.log('\n────────────────────────────────────────────────────────────');
-  console.log('🔵 ROUND 1: Baseline (no feedback)');
-  console.log('────────────────────────────────────────────────────────────\n');
+  // =========================================================================
+  // ROUND 1: Baseline (original timeframe, no feedback)
+  // =========================================================================
+  console.log('\n════════════════════════════════════════════════════════════');
+  console.log(`🔵 ROUND 1: Baseline (${originalTimeframe}, no feedback)`);
+  console.log('════════════════════════════════════════════════════════════\n');
   
   process.env['MODEL_ID'] = modelId;
+  currentChartUrl = originalChartUrl;
+  currentTimeframe = originalTimeframe;
   currentFeedback = '';
   const agent = createAgent(modelId);
   
@@ -165,51 +218,95 @@ async function main() {
     console.log('Model prediction:');
     console.log(JSON.stringify(baseline.multi_step, null, 2));
     const score = scoreChartReading(baseline, groundTruth);
-    console.log(`\n📊 Baseline: ${(score.accuracy * 100).toFixed(1)}% (${score.exactMatchCount}/6 exact)\n`);
+    console.log(`\n📊 Round 1 Score: ${(score.accuracy * 100).toFixed(1)}% (${score.exactMatchCount}/6)\n`);
   } catch (err) {
     console.error(`❌ Round 1 failed: ${err}`);
     process.exit(1);
   }
 
   // Generate feedback
-  console.log('────────────────────────────────────────────────────────────');
-  console.log('📝 Feedback');
-  console.log('────────────────────────────────────────────────────────────\n');
   currentFeedback = generateFeedback(baseline, groundTruth);
+  console.log('────────────────────────────────────────────────────────────');
+  console.log('📝 Feedback Generated');
+  console.log('────────────────────────────────────────────────────────────');
   console.log(currentFeedback);
 
-  // ROUND 2: With feedback
-  console.log('\n────────────────────────────────────────────────────────────');
-  console.log('🟢 ROUND 2: Same chart WITH feedback');
-  console.log('────────────────────────────────────────────────────────────\n');
+  // =========================================================================
+  // ROUND 2: Same chart WITH feedback (memorization test)
+  // =========================================================================
+  console.log('\n════════════════════════════════════════════════════════════');
+  console.log(`🟢 ROUND 2: Same chart + feedback (${originalTimeframe})`);
+  console.log('════════════════════════════════════════════════════════════\n');
   
   let round2: ChartReadingOutput;
   try {
     const result2 = await runRound(agent, '');
     round2 = result2.output as ChartReadingOutput;
-    console.log('Model prediction after feedback:');
+    console.log('Model prediction:');
     console.log(JSON.stringify(round2.multi_step, null, 2));
     const score2 = scoreChartReading(round2, groundTruth);
-    console.log(`\n📊 After Feedback: ${(score2.accuracy * 100).toFixed(1)}% (${score2.exactMatchCount}/6 exact)\n`);
+    console.log(`\n📊 Round 2 Score: ${(score2.accuracy * 100).toFixed(1)}% (${score2.exactMatchCount}/6)\n`);
   } catch (err) {
     console.error(`❌ Round 2 failed: ${err}`);
     process.exit(1);
   }
 
-  // Results
-  console.log('════════════════════════════════════════════════════════════');
-  console.log('                      FINAL RESULTS');
+  // =========================================================================
+  // ROUND 3: Different timeframe WITH feedback (abstraction test)
+  // =========================================================================
+  console.log('\n════════════════════════════════════════════════════════════');
+  console.log(`🟣 ROUND 3: Different timeframe + feedback (${drilldownTimeframe})`);
   console.log('════════════════════════════════════════════════════════════\n');
+  
+  console.log(`Switching from ${originalTimeframe} to ${drilldownTimeframe} (same time period)`);
+  console.log('This tests if the model can ABSTRACT the learning to a different view.\n');
+  
+  currentChartUrl = drilldownChartUrl;
+  currentTimeframe = drilldownTimeframe;
+  // Keep the same feedback from Round 1
+  
+  let round3: ChartReadingOutput;
+  try {
+    const result3 = await runRound(agent, '');
+    round3 = result3.output as ChartReadingOutput;
+    console.log('Model prediction:');
+    console.log(JSON.stringify(round3.multi_step, null, 2));
+    
+    // Score against drilldown ground truth
+    const score3 = scoreChartReading(round3, drilldownGroundTruth);
+    console.log(`\n📊 Round 3 Score: ${(score3.accuracy * 100).toFixed(1)}% (${score3.exactMatchCount}/6)\n`);
+    
+    console.log('📋 Ground Truth (drilldown timeframe):');
+    console.log(JSON.stringify(drilldownGroundTruth.multi_step, null, 2));
+  } catch (err) {
+    console.error(`❌ Round 3 failed: ${err}`);
+    process.exit(1);
+  }
+
+  // =========================================================================
+  // FINAL RESULTS
+  // =========================================================================
+  console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
+  console.log('║                      FINAL RESULTS                                ║');
+  console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
   
   const score1 = scoreChartReading(baseline, groundTruth);
   const score2 = scoreChartReading(round2, groundTruth);
-  const delta = (score2.accuracy - score1.accuracy) * 100;
+  const score3 = scoreChartReading(round3, drilldownGroundTruth);
   
-  console.log(`Baseline:       ${(score1.accuracy * 100).toFixed(1)}% (${score1.exactMatchCount}/6)`);
-  console.log(`After Feedback: ${(score2.accuracy * 100).toFixed(1)}% (${score2.exactMatchCount}/6)`);
-  console.log(`Delta:          ${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%\n`);
+  const memorizationDelta = (score2.accuracy - score1.accuracy) * 100;
+  const abstractionDelta = (score3.accuracy - score1.accuracy) * 100;
   
-  console.log('Field Changes:');
+  console.log('┌─────────────────────────────────────────────────────────────────┐');
+  console.log('│ Round                     │ Accuracy    │ Delta                │');
+  console.log('├─────────────────────────────────────────────────────────────────┤');
+  console.log(`│ 1. Baseline (${originalTimeframe})          │ ${(score1.accuracy * 100).toFixed(1).padStart(5)}%     │ -                    │`);
+  console.log(`│ 2. Same Chart + FB        │ ${(score2.accuracy * 100).toFixed(1).padStart(5)}%     │ ${memorizationDelta >= 0 ? '+' : ''}${memorizationDelta.toFixed(1).padStart(5)}% (memorize)  │`);
+  console.log(`│ 3. Diff TF (${drilldownTimeframe}) + FB      │ ${(score3.accuracy * 100).toFixed(1).padStart(5)}%     │ ${abstractionDelta >= 0 ? '+' : ''}${abstractionDelta.toFixed(1).padStart(5)}% (abstract)  │`);
+  console.log('└─────────────────────────────────────────────────────────────────┘\n');
+  
+  // Field-by-field for Round 2
+  console.log('📊 Round 2 Field Changes (Memorization):');
   const fields = Object.keys(groundTruth.multi_step) as Array<keyof typeof groundTruth.multi_step>;
   for (const f of fields) {
     const gt = groundTruth.multi_step[f];
@@ -223,12 +320,38 @@ async function main() {
     console.log(`  ${f}: ${s}`);
   }
   
-  console.log('');
-  if (delta > 0) console.log('✅ Model IMPROVED!');
-  else if (delta === 0) console.log('⚠️ No change');
-  else console.log('❌ Model got WORSE');
+  // Field-by-field for Round 3
+  console.log('\n📊 Round 3 Field Changes (Abstraction):');
+  for (const f of fields) {
+    const gt = drilldownGroundTruth.multi_step[f];
+    const b = baseline.multi_step[f];
+    const r = round3.multi_step[f];
+    let s = '';
+    if (b !== gt && r === gt) s = '✅ FIXED';
+    else if (b === gt && r !== gt) s = '❌ BROKE';
+    else if (b === gt) s = '✓ correct';
+    else s = '✗ still wrong';
+    console.log(`  ${f}: ${s}`);
+  }
   
-  console.log('\n✅ Done!\n');
+  // Verdict
+  console.log('\n────────────────────────────────────────────────────────────');
+  console.log('VERDICT:');
+  if (memorizationDelta > 0) {
+    console.log(`✅ Memorization: Model improved ${memorizationDelta.toFixed(1)}% on same chart`);
+  } else {
+    console.log(`⚠️ Memorization: No improvement on same chart`);
+  }
+  
+  if (abstractionDelta > 0) {
+    console.log(`✅ Abstraction: Model improved ${abstractionDelta.toFixed(1)}% on different timeframe`);
+  } else if (abstractionDelta === 0) {
+    console.log(`⚠️ Abstraction: No change on different timeframe`);
+  } else {
+    console.log(`❌ Abstraction: Model got worse on different timeframe`);
+  }
+  
+  console.log('\n✅ Test complete!\n');
 }
 
 main().catch(console.error);

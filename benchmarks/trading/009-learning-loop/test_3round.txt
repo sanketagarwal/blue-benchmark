@@ -1,0 +1,151 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║           009 LEARNING LOOP - Full 3-Round Test                   ║
+╠═══════════════════════════════════════════════════════════════════╣
+║  Round 1: Baseline (original timeframe)                           ║
+║  Round 2: Same chart + feedback (memorization)                    ║
+║  Round 3: Different timeframe + feedback (abstraction)            ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+Model: google/gemini-3-pro-preview
+Symbol: COINBASE_SPOT_BTC_USD
+Original TF: 4h → Drilldown TF: 1h
+Time Offset: 14 days back
+
+Time Range: 2025-12-16T21:52:00.880Z to 2025-12-18T21:52:00.880Z
+
+📊 Setting up charts and ground truth...
+
+  ✅ Original chart (4h) URL obtained
+  ✅ Fetched 13 candles (4h)
+  ✅ Ground truth computed (4h)
+  ✅ Drilldown chart (1h) URL obtained
+  ✅ Fetched 49 candles (1h)
+  ✅ Ground truth computed (1h)
+
+📋 Ground Truth (original timeframe):
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "consolidation",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "mildly_bullish"
+}
+
+════════════════════════════════════════════════════════════
+🔵 ROUND 1: Baseline (4h, no feedback)
+════════════════════════════════════════════════════════════
+
+Model prediction:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "high_vol_bearish",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "bearish"
+}
+
+📊 Round 1 Score: 66.7% (4/6)
+
+────────────────────────────────────────────────────────────
+📝 Feedback Generated
+────────────────────────────────────────────────────────────
+═══════════════════════════════════════════════════════════════
+                FEEDBACK ON YOUR PREVIOUS ANALYSIS
+═══════════════════════════════════════════════════════════════
+
+✅ uptrend_pullback_to_vwap: Correct (false)
+❌ volatility_direction_combo: WRONG. You said "high_vol_bearish", correct is "consolidation"
+✅ tested_and_held_support: Correct (false)
+✅ breakout_with_volume: Correct (false)
+✅ potential_reversal_at_support: Correct (false)
+❌ overall_bias: WRONG. You said "bearish", correct is "mildly_bullish"
+
+Your Score: 4/6
+
+Apply these corrections to improve your analysis.
+═══════════════════════════════════════════════════════════════
+
+
+════════════════════════════════════════════════════════════
+🟢 ROUND 2: Same chart + feedback (4h)
+════════════════════════════════════════════════════════════
+
+Model prediction:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "high_vol_bearish",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "bearish"
+}
+
+📊 Round 2 Score: 66.7% (4/6)
+
+
+════════════════════════════════════════════════════════════
+🟣 ROUND 3: Different timeframe + feedback (1h)
+════════════════════════════════════════════════════════════
+
+Switching from 4h to 1h (same time period)
+This tests if the model can ABSTRACT the learning to a different view.
+
+Model prediction:
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "high_vol_bearish",
+  "tested_and_held_support": true,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": true,
+  "overall_bias": "bearish"
+}
+
+📊 Round 3 Score: 33.3% (2/6)
+
+📋 Ground Truth (drilldown timeframe):
+{
+  "uptrend_pullback_to_vwap": false,
+  "volatility_direction_combo": "low_vol_drift_up",
+  "tested_and_held_support": false,
+  "breakout_with_volume": false,
+  "potential_reversal_at_support": false,
+  "overall_bias": "mildly_bullish"
+}
+
+╔═══════════════════════════════════════════════════════════════════╗
+║                      FINAL RESULTS                                ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────┐
+│ Round                     │ Accuracy    │ Delta                │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Baseline (4h)          │  66.7%     │ -                    │
+│ 2. Same Chart + FB        │  66.7%     │ +  0.0% (memorize)  │
+│ 3. Diff TF (1h) + FB      │  33.3%     │ -33.3% (abstract)  │
+└─────────────────────────────────────────────────────────────────┘
+
+📊 Round 2 Field Changes (Memorization):
+  uptrend_pullback_to_vwap: ✓ correct
+  volatility_direction_combo: ✗ still wrong
+  tested_and_held_support: ✓ correct
+  breakout_with_volume: ✓ correct
+  potential_reversal_at_support: ✓ correct
+  overall_bias: ✗ still wrong
+
+📊 Round 3 Field Changes (Abstraction):
+  uptrend_pullback_to_vwap: ✓ correct
+  volatility_direction_combo: ✗ still wrong
+  tested_and_held_support: ❌ BROKE
+  breakout_with_volume: ✓ correct
+  potential_reversal_at_support: ❌ BROKE
+  overall_bias: ✗ still wrong
+
+────────────────────────────────────────────────────────────
+VERDICT:
+⚠️ Memorization: No improvement on same chart
+❌ Abstraction: Model got worse on different timeframe
+
+✅ Test complete!
+
