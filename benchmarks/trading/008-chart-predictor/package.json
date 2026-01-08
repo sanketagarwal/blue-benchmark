@@ -1,0 +1,28 @@
+{
+  "name": "@nullagent/008-chart-predictor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "benchmark": "tsx src/benchmark.ts",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@nullagent/agent-core": "workspace:*",
+    "@nullagent/cli-utils": "workspace:*",
+    "dotenv": "^16.3.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@nullagent/eslint-config": "workspace:*",
+    "@nullagent/typescript-config": "workspace:*",
+    "@types/node": "^20.10.4",
+    "eslint": "^9.8.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^2.0.0"
+  }
+}
+

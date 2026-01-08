@@ -8,6 +8,33 @@ Built on the [NullAgent](https://github.com/recallnet/nullagent-tutorial) minima
 
 ## Benchmarks
 
+### 008 Chart Predictor ⭐ NEW
+
+**Test vision LLMs' ability to PREDICT future chart patterns.**
+
+Models see a chart at time T and predict what patterns will appear at T+1:
+
+```
+Chart at T  →  Model Predicts T+1  →  Validate vs Actual T+1
+  (input)        (prediction)           (ground truth)
+```
+
+Tests across multiple configurations:
+- **Chart lengths**: 20, 50, 100 candles
+- **Timeframes**: 5m, 15m, 1h, 4h
+
+📁 Location: `benchmarks/trading/008-chart-predictor/`
+📖 [Full Documentation](benchmarks/trading/008-chart-predictor/README.md)
+
+**Quick Run:**
+```bash
+cd benchmarks/trading/008-chart-predictor
+cp env.example .env.local  # Add your API keys
+pnpm benchmark --cheap --quick
+```
+
+---
+
 ### 007 Chart Reader
 
 **Test vision LLMs' ability to see and understand candlestick charts.**
@@ -68,8 +95,8 @@ Tests models across 4 phases:
 
 ```bash
 # Clone the repo
-git clone https://github.com/sanketagarwal/nullagent-benchmark.git
-cd nullagent-benchmark
+git clone https://github.com/sanketagarwal/blue-benchmark.git
+cd blue-benchmark
 
 # Install dependencies
 pnpm install
@@ -109,7 +136,7 @@ pnpm benchmark --cheap --quick
 ## Architecture
 
 ```
-nullagent-benchmark/
+blue-benchmark/
 ├── packages/
 │   ├── agent-core/      # Core agent framework
 │   ├── cli-utils/       # CLI utilities
@@ -119,7 +146,8 @@ nullagent-benchmark/
 │   └── trading/
 │       ├── 005-market-maker/
 │       ├── 006-bottom-caller/
-│       └── 007-chart-reader/   ← Chart reading benchmark
+│       ├── 007-chart-reader/     ← Chart reading (observation)
+│       └── 008-chart-predictor/  ← Chart prediction (forecasting)
 └── apps/                # Example agent apps
 ```
 
