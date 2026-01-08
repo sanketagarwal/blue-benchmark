@@ -151,9 +151,37 @@ More granular data → different pattern classifications
 
 ---
 
+## ⚠️ Important: Conversation State Management
+
+Tests 1-3 used a **simplified feedback injection** approach where feedback was added to the prompt but the model didn't see its own previous response in the proper message array format.
+
+### The Problem
+
+```
+# What we did (simplified):
+Turn 1: [user: analyze chart] → prediction
+Turn 2: [user: here's feedback + analyze again] → prediction
+
+# What we should do (proper stateful):
+Turn 1: [user: analyze chart]
+Turn 2: [assistant: prediction]  ← Model sees its OWN response
+Turn 3: [user: feedback + try again]
+```
+
+The API is stateless. If you don't include the model's previous response in the message array, it doesn't "remember" what it said.
+
+### Impact on Results
+
+- Test 3's 0% memorization may be partially due to missing conversation state
+- Proper stateful tests should show higher learning deltas
+- See `stateful-test.ts` for the correct implementation
+
+---
+
 ## Next Steps
 
-- [ ] Run more tests to understand learning variability
+- [ ] Re-run tests with proper stateful conversation (see `stateful-test.ts`)
+- [ ] Compare learning delta: stateless vs stateful feedback
 - [ ] Try with Claude and GPT-4o
 - [ ] Test if more detailed feedback improves learning
 - [ ] Test if showing both timeframes together helps

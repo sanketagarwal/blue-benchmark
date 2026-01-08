@@ -134,6 +134,60 @@ Total                        | 2/6      | 5/6 (+3) | 4/6 (+2)
 
 ---
 
+## ⚠️ Critical: Conversation State Management
+
+The API is **stateless**. Models only "remember" what you send in the request.
+
+### ✅ CORRECT: Array of Messages
+
+```typescript
+// Each turn is a separate message object with a role
+const messages: Message[] = [
+  { role: 'system', content: 'You are a chart analyst...' },
+  { role: 'user', content: [
+    { type: 'text', text: 'Analyze this chart' },
+    { type: 'image_url', image_url: { url: chartUrl } }
+  ]},
+  { role: 'assistant', content: round1Response },  // Model sees its OWN response
+  { role: 'user', content: [
+    { type: 'text', text: feedback + '\n\nTry again with the same chart.' },
+    { type: 'image_url', image_url: { url: chartUrl } }
+  ]}
+];
+
+// Send the full array
+await callModel(modelId, messages);
+```
+
+### ❌ WRONG: Concatenated String
+
+```typescript
+// This is what most coding agents incorrectly do:
+const prompt = `
+Previous conversation:
+You said: ${round1Response}
+Feedback: ${feedback}
+
+Now analyze the chart again...
+`;
+
+// Model doesn't have proper role boundaries!
+await callModel(modelId, [{ role: 'user', content: prompt }]);
+```
+
+### Why It Matters
+
+| Aspect | Array Format | String Concat |
+|--------|--------------|---------------|
+| Role boundaries | ✅ Clear system/user/assistant | ❌ All blurred together |
+| Attention patterns | ✅ Designed for this | ❌ Suboptimal |
+| Model sees own response | ✅ As assistant role | ❌ As quoted text |
+| Learning effectiveness | ✅ Higher | ❌ Lower |
+
+The `stateful-test.ts` file demonstrates the correct approach.
+
+---
+
 ## Implementation
 
 ### Files
