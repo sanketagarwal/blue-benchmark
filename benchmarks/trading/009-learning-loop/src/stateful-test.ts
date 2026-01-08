@@ -257,13 +257,14 @@ No explanations. Only JSON.`
   console.log('');
 
   let round2: ChartReadingOutput | null;
+  let response2Raw: string;
   
   try {
-    const response2 = await callModel(modelId, conversation);
+    response2Raw = await callModel(modelId, conversation);
     console.log('Model response:');
-    console.log(response2.slice(0, 500));
+    console.log(response2Raw.slice(0, 500));
     
-    round2 = parseJsonFromResponse(response2);
+    round2 = parseJsonFromResponse(response2Raw);
     if (!round2) throw new Error('Could not parse JSON from response');
     
     console.log('\nParsed multi_step:');
@@ -272,8 +273,90 @@ No explanations. Only JSON.`
     const score2 = scoreChartReading(round2, groundTruth);
     console.log(`\n📊 Round 2 Score: ${(score2.accuracy * 100).toFixed(1)}% (${score2.exactMatchCount}/6)`);
     
+    // Add Round 2 response to conversation for Round 3
+    conversation.push({ role: 'assistant', content: response2Raw });
+    
   } catch (err) {
     console.error(`❌ Round 2 failed: ${err}`);
+    process.exit(1);
+  }
+
+  // =========================================================================
+  // ROUND 3: Different Timeframe (Abstraction)
+  // =========================================================================
+  console.log('\n════════════════════════════════════════════════════════════════');
+  console.log('🟡 ROUND 3: Different Timeframe (15m instead of 1h) - ABSTRACTION');
+  console.log('════════════════════════════════════════════════════════════════\n');
+
+  // Get 15m chart for the same time period
+  let chartUrl15m: string;
+  let groundTruth15m: ChartReadingOutput;
+  
+  try {
+    chartUrl15m = await getSignedChartUrl({
+      symbolId, timeframe: '15m', from, to, layers: STANDARD_CHART_LAYERS,
+    });
+    console.log('  ✅ 15m Chart URL obtained');
+    
+    const candles15m = await getCandles(symbolId, '15m', from, to, 100);
+    console.log(`  ✅ Fetched ${candles15m.length} candles (15m)`);
+    
+    const indicators15m = computeIndicators(candles15m);
+    groundTruth15m = computeGroundTruth({
+      candles: candles15m,
+      meta: { base_quote: 'Bitcoin / U.S. Dollar', venue: 'Coinbase', timeframe: '15m' },
+      indicators: indicators15m,
+      timeframeMinutes: 15,
+    });
+    console.log('  ✅ 15m Ground truth computed');
+  } catch (err) {
+    console.error(`❌ Round 3 setup failed: ${err}`);
+    process.exit(1);
+  }
+
+  console.log('\n📋 15m Ground Truth:');
+  console.log(JSON.stringify(groundTruth15m.multi_step, null, 2));
+
+  // Generate feedback for Round 2 errors (comparing to 1h ground truth)
+  const feedback2 = generateFeedback(round2!, groundTruth);
+  
+  // Add user message with feedback + new timeframe chart
+  const userMessage3: Message = {
+    role: 'user',
+    content: [
+      { type: 'text', text: `${feedback2}\n\nNow here's the SAME time period but with 15-minute candles (more granular view). Apply what you've learned and analyze this chart.` },
+      { type: 'image_url', image_url: { url: chartUrl15m } },
+    ],
+  };
+  conversation.push(userMessage3);
+
+  console.log('\n📨 Conversation now has', conversation.length, 'messages:');
+  console.log('  1. System prompt');
+  console.log('  2. User: Analyze 1h chart');
+  console.log('  3. Assistant: [Round 1 prediction]');
+  console.log('  4. User: Feedback + try again (1h)');
+  console.log('  5. Assistant: [Round 2 prediction]');
+  console.log('  6. User: Feedback + now analyze 15m chart');
+  console.log('');
+
+  let round3: ChartReadingOutput | null;
+  
+  try {
+    const response3 = await callModel(modelId, conversation);
+    console.log('Model response:');
+    console.log(response3.slice(0, 500));
+    
+    round3 = parseJsonFromResponse(response3);
+    if (!round3) throw new Error('Could not parse JSON from response');
+    
+    console.log('\nParsed multi_step:');
+    console.log(JSON.stringify(round3.multi_step, null, 2));
+    
+    const score3 = scoreChartReading(round3, groundTruth15m);
+    console.log(`\n📊 Round 3 Score: ${(score3.accuracy * 100).toFixed(1)}% (${score3.exactMatchCount}/6)`);
+    
+  } catch (err) {
+    console.error(`❌ Round 3 failed: ${err}`);
     process.exit(1);
   }
 
@@ -281,42 +364,53 @@ No explanations. Only JSON.`
   // RESULTS
   // =========================================================================
   console.log('\n╔═══════════════════════════════════════════════════════════════════╗');
-  console.log('║                      FINAL RESULTS                                ║');
+  console.log('║                      FINAL RESULTS (3 ROUNDS)                     ║');
   console.log('╚═══════════════════════════════════════════════════════════════════╝\n');
 
   const score1 = scoreChartReading(baseline, groundTruth);
   const score2 = scoreChartReading(round2!, groundTruth);
-  const delta = (score2.accuracy - score1.accuracy) * 100;
+  const score3 = scoreChartReading(round3!, groundTruth15m);
+  
+  const memorizationDelta = (score2.accuracy - score1.accuracy) * 100;
+  const abstractionDelta = (score3.accuracy - score1.accuracy) * 100;
 
-  console.log(`Round 1 (Baseline):      ${(score1.accuracy * 100).toFixed(1)}% (${score1.exactMatchCount}/6)`);
-  console.log(`Round 2 (With History):  ${(score2.accuracy * 100).toFixed(1)}% (${score2.exactMatchCount}/6)`);
-  console.log(`Learning Delta:          ${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%\n`);
+  console.log('┌────────────────────────────────────────────────────────────────┐');
+  console.log('│ Round                      │ Accuracy │ vs Baseline            │');
+  console.log('├────────────────────────────────────────────────────────────────┤');
+  console.log(`│ 1. Baseline (1h)           │ ${(score1.accuracy * 100).toFixed(1).padStart(5)}%   │ -                      │`);
+  console.log(`│ 2. Memorization (1h + FB)  │ ${(score2.accuracy * 100).toFixed(1).padStart(5)}%   │ ${memorizationDelta >= 0 ? '+' : ''}${memorizationDelta.toFixed(1).padStart(5)}%                │`);
+  console.log(`│ 3. Abstraction (15m + FB)  │ ${(score3.accuracy * 100).toFixed(1).padStart(5)}%   │ ${abstractionDelta >= 0 ? '+' : ''}${abstractionDelta.toFixed(1).padStart(5)}%                │`);
+  console.log('└────────────────────────────────────────────────────────────────┘\n');
 
-  console.log('Field Changes:');
+  console.log('📊 Ground Truth Comparison (1h vs 15m):');
   const fields = Object.keys(groundTruth.multi_step) as Array<keyof typeof groundTruth.multi_step>;
   for (const f of fields) {
-    const gt = groundTruth.multi_step[f];
-    const b = baseline.multi_step[f];
-    const r = round2!.multi_step[f];
-    let s = '';
-    if (b !== gt && r === gt) s = '✅ FIXED';
-    else if (b === gt && r !== gt) s = '❌ BROKE';
-    else if (b === gt) s = '✓ already correct';
-    else s = '✗ still wrong';
-    console.log(`  ${f}: ${s}`);
-    if (b !== r) {
-      console.log(`      Changed: "${String(b)}" → "${String(r)}"`);
-    }
+    const gt1h = groundTruth.multi_step[f];
+    const gt15m = groundTruth15m.multi_step[f];
+    const same = gt1h === gt15m ? '✅' : '❌';
+    console.log(`  ${f}: ${same} (1h: ${String(gt1h)}, 15m: ${String(gt15m)})`);
   }
 
-  console.log('');
-  if (delta > 0) {
-    console.log('✅ Model LEARNED from feedback with proper conversation history!');
-  } else if (delta === 0) {
-    console.log('⚠️ No improvement despite seeing its previous response');
-  } else {
-    console.log('❌ Model got worse despite seeing its previous response');
+  console.log('\n📊 Model Predictions Across Rounds:');
+  for (const f of fields) {
+    const gt15m = groundTruth15m.multi_step[f];
+    const r1 = baseline.multi_step[f];
+    const r2 = round2!.multi_step[f];
+    const r3 = round3!.multi_step[f];
+    const r3Correct = r3 === gt15m ? '✅' : '❌';
+    console.log(`  ${f}:`);
+    console.log(`      R1: ${String(r1)} | R2: ${String(r2)} | R3: ${String(r3)} ${r3Correct}`);
   }
+
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  if (memorizationDelta > 0 && abstractionDelta > 0) {
+    console.log('✅ SUCCESS: Model learned AND abstracted to different timeframe!');
+  } else if (memorizationDelta > 0) {
+    console.log('⚠️ PARTIAL: Model memorized but struggled with abstraction');
+  } else {
+    console.log('❌ FAILED: Model did not learn from feedback');
+  }
+  console.log('═══════════════════════════════════════════════════════════════');
 
   console.log('\n✅ Test complete!\n');
 }

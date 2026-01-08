@@ -6,182 +6,230 @@
 
 ## Executive Summary
 
-| Test | Model | Baseline | Memorization | Abstraction |
-|------|-------|----------|--------------|-------------|
-| Test 1 (1h) | gemini-2.0-flash | 33% | 50% (+17%) | - |
-| Test 2 (1h) | gemini-3-pro-preview | 42% | **100%** (+58%) | - |
-| Test 3 (4h→1h) | gemini-3-pro-preview | 67% | 67% (0%) | 33% (-33%) |
+| Model | Baseline | Memorization | Abstraction |
+|-------|----------|--------------|-------------|
+| gemini-2.0-flash (cheap) | 66.7% | **100%** (+33.3%) | 50% (-16.7%) |
+| claude-sonnet-4 (SOTA) | 58.3% | **100%** (+41.7%) | 58.3% (0%) |
+
+**Key Finding**: Both models achieve perfect memorization but fail at abstraction.
 
 ---
 
-## Test 1: gemini-2.0-flash (1h chart)
+## Test Setup
 
-**Time**: Dec 26, 2025
+### Conversation Format (Critical!)
 
-| Round | Accuracy | Delta |
-|-------|----------|-------|
-| Baseline | 33% (2/6) | - |
-| Same Chart + FB | 50% (3/6) | **+17%** |
+We use **proper stateful conversation** with the message array format:
 
-**Verdict**: ✅ Model improved after feedback (fixed 1/4 errors)
+```
+Turn 1: [system] → [user: analyze 1h chart]
+Turn 2: [assistant: Round 1 prediction]
+Turn 3: [user: feedback + try again with same chart]
+Turn 4: [assistant: Round 2 prediction]
+Turn 5: [user: feedback + now analyze 15m chart]
+Turn 6: [assistant: Round 3 prediction]
+```
+
+The model sees its **own previous responses** as `assistant` role messages, not as quoted text.
+
+### Three Rounds
+
+1. **Baseline (1h)**: Initial analysis, no feedback
+2. **Memorization (1h + FB)**: Same chart after seeing feedback
+3. **Abstraction (15m + FB)**: Different timeframe (same time period)
 
 ---
 
-## Test 2: gemini-3-pro-preview (1h chart) 🏆
+## Detailed Results
 
-**Time**: Dec 18, 2025
-
-| Round | Accuracy | Delta |
-|-------|----------|-------|
-| Baseline | 42% (2/6) | - |
-| Same Chart + FB | **100%** (6/6) | **+58%** |
-
-**Verdict**: ✅ Perfect! Model fixed ALL errors after feedback
-
----
-
-## Test 3: gemini-3-pro-preview (4h → 1h) - Full 3-Round Test
-
-**Time**: Dec 16-18, 2025
-**Original**: 4h timeframe
-**Drilldown**: 1h timeframe (same time period)
-
-### Ground Truth Comparison
-
-| Field | 4h GT | 1h GT | Same? |
-|-------|-------|-------|-------|
-| uptrend_pullback_to_vwap | false | false | ✅ |
-| volatility_direction_combo | consolidation | low_vol_drift_up | ❌ |
-| tested_and_held_support | false | false | ✅ |
-| breakout_with_volume | false | false | ✅ |
-| potential_reversal_at_support | false | false | ✅ |
-| overall_bias | mildly_bullish | mildly_bullish | ✅ |
-
-### Results
+### gemini-2.0-flash (Cheap Model)
 
 | Round | Timeframe | Accuracy | Delta |
 |-------|-----------|----------|-------|
-| 1. Baseline | 4h | 67% (4/6) | - |
-| 2. Same Chart + FB | 4h | 67% (4/6) | **0%** |
-| 3. Diff TF + FB | 1h | 33% (2/6) | **-33%** |
+| 1. Baseline | 1h | 66.7% (4/6) | - |
+| 2. Memorization | 1h | **100%** (6/6) | **+33.3%** |
+| 3. Abstraction | 15m | 50% (3/6) | **-16.7%** |
 
-### What Happened
+**Round 1 Errors** (2 wrong):
+- `volatility_direction_combo`: said "high_vol_bearish", should be "low_vol_drift_down"
+- `potential_reversal_at_support`: said true, should be false
 
-**Round 2 (Memorization)**: Model did NOT change its predictions despite feedback
-- `volatility_direction_combo`: Still said "high_vol_bearish" (should be "consolidation")
-- `overall_bias`: Still said "bearish" (should be "mildly_bullish")
+**Round 2**: ✅ Fixed both errors → 100%
 
-**Round 3 (Abstraction)**: Model got WORSE on different timeframe
-- ❌ BROKE `tested_and_held_support`: Changed to true (was correctly false)
-- ❌ BROKE `potential_reversal_at_support`: Changed to true (was correctly false)
-- Model saw different visual patterns in 1h and made different (wrong) conclusions
-
-**Verdict**: 
-- ⚠️ Memorization failed (0% improvement)
-- ❌ Abstraction failed (-33% regression)
+**Round 3 Errors** (3 wrong):
+- `volatility_direction_combo`: kept "low_vol_drift_down" but 15m GT is "consolidation"
+- `tested_and_held_support`: kept false but 15m GT is true
+- `overall_bias`: said "bearish" but 15m GT is "neutral"
 
 ---
 
-## Key Findings
+### claude-sonnet-4 (SOTA Model)
 
-### 1. Learning is Inconsistent
+| Round | Timeframe | Accuracy | Delta |
+|-------|-----------|----------|-------|
+| 1. Baseline | 1h | 58.3% (3/6) | - |
+| 2. Memorization | 1h | **100%** (6/6) | **+41.7%** |
+| 3. Abstraction | 15m | 58.3% (3/6) | **0%** |
 
-| Scenario | Learning |
-|----------|----------|
-| Test 2: Same chart | ✅ Perfect (+58%) |
-| Test 3: Same chart | ❌ None (0%) |
-| Test 3: Different TF | ❌ Worse (-33%) |
+**Round 1 Errors** (3 wrong):
+- `volatility_direction_combo`: said "high_vol_bearish", should be "low_vol_drift_down"
+- `potential_reversal_at_support`: said true, should be false
+- `overall_bias`: said "bearish", should be "mildly_bearish"
 
-The same model (Gemini 3 Pro) showed very different learning behavior across tests.
+**Round 2**: ✅ Fixed all 3 errors → 100%
 
-### 2. Abstraction is Hard
+**Round 3 Errors** (3 wrong):
+- `volatility_direction_combo`: kept "low_vol_drift_down" but 15m GT is "consolidation"
+- `tested_and_held_support`: kept false but 15m GT is true
+- `overall_bias`: kept "mildly_bearish" but 15m GT is "neutral"
 
-When shown a different timeframe of the same time period:
-- Model made NEW errors it didn't have before
-- Visual patterns looked different → different (wrong) interpretations
-- Feedback from 4h chart didn't help with 1h chart
+---
 
-### 3. Ground Truth Can Differ Between Timeframes
+## Ground Truth Comparison
 
-Even for the same time period:
-- 4h: "consolidation" volatility
-- 1h: "low_vol_drift_up" volatility
+The ground truth **differs** between 1h and 15m timeframes:
 
-More granular data → different pattern classifications
+| Field | 1h GT | 15m GT | Same? |
+|-------|-------|--------|-------|
+| uptrend_pullback_to_vwap | false | false | ✅ |
+| volatility_direction_combo | low_vol_drift_down | consolidation | ❌ |
+| tested_and_held_support | false | true | ❌ |
+| breakout_with_volume | false | false | ✅ |
+| potential_reversal_at_support | false | false | ✅ |
+| overall_bias | mildly_bearish | neutral | ❌ |
+
+**3 of 6 fields have different ground truth** when viewed at different granularity.
+
+---
+
+## Analysis
+
+### Why Memorization Works
+
+```
+Model sees:
+  1. Its own prediction (as assistant message)
+  2. Explicit feedback: "You said X, correct is Y"
+  3. Same chart image
+
+Result: Model directly copies the corrected values → 100%
+```
+
+This is essentially **in-context memorization**, not learning.
+
+### Why Abstraction Fails
+
+```
+Model learned: "For THIS chart, volatility = low_vol_drift_down"
+
+15m chart shows: Different candle patterns (97 candles vs 25)
+Model thinks: "I learned volatility is low_vol_drift_down, I'll stick with that"
+Reality: 15m ground truth is "consolidation"
+
+Result: Model applied memorized answer to different visual → WRONG
+```
+
+### The Core Problem
+
+| What We Hoped | What Actually Happened |
+|---------------|------------------------|
+| Model learns: "How to identify low volatility patterns" | Model memorized: "The answer is low_vol_drift_down" |
+| Model transfers understanding to new chart | Model copies memorized answer regardless of visual |
+
+---
+
+## Model Predictions Across Rounds
+
+### gemini-2.0-flash
+
+| Field | R1 | R2 | R3 | R3 GT |
+|-------|----|----|----|----|
+| uptrend_pullback_to_vwap | false | false | false | false ✅ |
+| volatility_direction_combo | high_vol_bearish | low_vol_drift_down | low_vol_drift_down | consolidation ❌ |
+| tested_and_held_support | false | false | false | true ❌ |
+| breakout_with_volume | false | false | false | false ✅ |
+| potential_reversal_at_support | true | false | false | false ✅ |
+| overall_bias | mildly_bearish | mildly_bearish | bearish | neutral ❌ |
+
+### claude-sonnet-4
+
+| Field | R1 | R2 | R3 | R3 GT |
+|-------|----|----|----|----|
+| uptrend_pullback_to_vwap | false | false | false | false ✅ |
+| volatility_direction_combo | high_vol_bearish | low_vol_drift_down | low_vol_drift_down | consolidation ❌ |
+| tested_and_held_support | false | false | false | true ❌ |
+| breakout_with_volume | false | false | false | false ✅ |
+| potential_reversal_at_support | true | false | false | false ✅ |
+| overall_bias | bearish | mildly_bearish | mildly_bearish | neutral ❌ |
+
+**Pattern**: Both models kept their Round 2 answers in Round 3, even when wrong.
 
 ---
 
 ## Implications
 
-1. **Memorization is unreliable**: Same model, same setup, different results
-2. **Abstraction is very hard**: Models can't transfer learning to different views
-3. **Visual-only feedback has limits**: Models need to learn patterns, not just answers
+### 1. Memorization ≠ Understanding
+
+Perfect memorization (100%) doesn't mean the model understands:
+- What makes volatility "high" vs "low"
+- What visual patterns indicate support
+- How bias is determined from price action
+
+### 2. Feedback Format Matters
+
+Using proper message array format with roles:
+- ✅ Model sees its response as `assistant` role
+- ✅ Model sees feedback as `user` role
+- ✅ Enables perfect memorization
+
+String concatenation would likely show worse memorization.
+
+### 3. Transfer Learning is Hard
+
+Even with full conversation history and explicit feedback:
+- Models don't transfer learning to different representations
+- Same time period, different timeframe = different answers needed
+- Models default to memorized values
 
 ---
 
-## Raw Results
+## Raw Data
 
-### Test 3: Model Predictions
-
-**Round 1 (4h Baseline)**:
-```json
-{
-  "uptrend_pullback_to_vwap": false,        // ✅
-  "volatility_direction_combo": "high_vol_bearish",  // ❌
-  "tested_and_held_support": false,         // ✅
-  "breakout_with_volume": false,            // ✅
-  "potential_reversal_at_support": false,   // ✅
-  "overall_bias": "bearish"                 // ❌
-}
-```
-
-**Round 2 (4h + Feedback)**: SAME as Round 1 (no learning)
-
-**Round 3 (1h + Feedback)**:
-```json
-{
-  "uptrend_pullback_to_vwap": false,        // ✅
-  "volatility_direction_combo": "high_vol_bearish",  // ❌
-  "tested_and_held_support": true,          // ❌ BROKE
-  "breakout_with_volume": false,            // ✅
-  "potential_reversal_at_support": true,    // ❌ BROKE
-  "overall_bias": "bearish"                 // ❌
-}
-```
-
----
-
-## ⚠️ Important: Conversation State Management
-
-Tests 1-3 used a **simplified feedback injection** approach where feedback was added to the prompt but the model didn't see its own previous response in the proper message array format.
-
-### The Problem
+### Chart Parameters
 
 ```
-# What we did (simplified):
-Turn 1: [user: analyze chart] → prediction
-Turn 2: [user: here's feedback + analyze again] → prediction
-
-# What we should do (proper stateful):
-Turn 1: [user: analyze chart]
-Turn 2: [assistant: prediction]  ← Model sees its OWN response
-Turn 3: [user: feedback + try again]
+Symbol: COINBASE_SPOT_BTC_USD
+Time: ~Dec 26, 2025 (14 days before test)
+1h chart: 25 candles
+15m chart: 97 candles
+Same 24-hour time period
 ```
 
-The API is stateless. If you don't include the model's previous response in the message array, it doesn't "remember" what it said.
+### API Configuration
 
-### Impact on Results
-
-- Test 3's 0% memorization may be partially due to missing conversation state
-- Proper stateful tests should show higher learning deltas
-- See `stateful-test.ts` for the correct implementation
+```
+AI Gateway: Vercel AI Gateway
+Conversation format: OpenAI-compatible messages array
+Temperature: 0
+Max tokens: 2000
+```
 
 ---
 
 ## Next Steps
 
-- [ ] Re-run tests with proper stateful conversation (see `stateful-test.ts`)
-- [ ] Compare learning delta: stateless vs stateful feedback
-- [ ] Try with Claude and GPT-4o
-- [ ] Test if more detailed feedback improves learning
-- [ ] Test if showing both timeframes together helps
+- [ ] Test with GPT-4o to compare learning behavior
+- [ ] Try multi-shot examples before feedback
+- [ ] Test if explaining WHY (not just WHAT) improves abstraction
+- [ ] Test longer feedback with reasoning
+- [ ] Test showing both 1h and 15m charts simultaneously
+
+---
+
+## Conclusion
+
+> **Models can memorize answers but cannot learn concepts.**
+>
+> 100% memorization + 0% abstraction = pattern matching, not understanding.
+
+The learning loop exposes a fundamental limitation: vision LLMs process feedback as "update the specific answer" rather than "update my understanding of how to analyze charts."
