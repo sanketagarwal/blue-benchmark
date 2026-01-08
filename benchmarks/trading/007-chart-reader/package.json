@@ -1,0 +1,36 @@
+{
+  "name": "@nullagent/bench-chart-reader",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'No dev server for this benchmark'",
+    "build": "tsc --build",
+    "benchmark": "node --env-file=.env.local --import tsx src/benchmark.ts",
+    "lint": "eslint src --ext .ts",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@nullagent/agent-core": "workspace:*",
+    "@nullagent/cli-utils": "workspace:*",
+    "@nullagent/scorers": "workspace:*",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@nullagent/eslint-config": "workspace:*",
+    "@nullagent/typescript-config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "dotenv": "^17.2.3",
+    "eslint": "^9.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.0.0"
+  }
+}
+
