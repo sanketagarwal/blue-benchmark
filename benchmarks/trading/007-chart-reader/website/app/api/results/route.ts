@@ -50,8 +50,11 @@ export async function GET() {
     const results: ModelResult[] = [];
 
     for (const model of DASHBOARD_MODELS) {
+      // Results folders use underscore instead of slash: google/gemini-2.0-flash -> google_gemini-2.0-flash
       const modelDir = model.id.replace('/', '_');
       const modelPath = path.join(resultsDir, modelDir);
+      
+      console.log(`[API] Looking for results in: ${modelPath}`);
 
       const frames: FrameResult[] = [];
       let totalAccuracy = 0;
@@ -65,9 +68,19 @@ export async function GET() {
         try {
           if (fs.existsSync(filePath)) {
             const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            const accuracy = data.score?.accuracy ?? data.accuracy ?? 0;
-            const exactMatches = data.score?.exactMatchCount ?? data.exactMatches ?? 0;
-            const duration = data.duration ?? 0;
+            // Handle different result formats:
+            // - Newer: score.accuracy (0-1), score.exactMatchCount
+            // - Older: score.multiStepAccuracy (0-1), score.overallScore (0-1)
+            // - Failed: score is null
+            let accuracy = 0;
+            let exactMatches = 0;
+            if (data.score) {
+              accuracy = data.score.accuracy ?? data.score.multiStepAccuracy ?? data.score.overallScore ?? 0;
+              exactMatches = data.score.exactMatchCount ?? data.score.fieldScores
+                ? Object.values(data.score.fieldScores as Record<string, number>).filter((v: number) => v === 1).length
+                : 0;
+            }
+            const duration = data.durationMs ?? data.duration ?? 0;
 
             frames.push({
               frameId: frame.id,

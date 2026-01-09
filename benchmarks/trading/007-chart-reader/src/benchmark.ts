@@ -53,7 +53,7 @@ function getConfig(): BenchmarkConfig {
   const singleModel = modelArg?.split('=')[1];
 
   const symbolId = process.env['SYMBOL_ID'] ?? 'COINBASE_SPOT_BTC_USD';
-  const startTimeStr = process.env['SIMULATION_START_TIME'] ?? '2025-12-20T12:00:00Z';
+  const startTimeStr = process.env['SIMULATION_START_TIME'] ?? '2025-12-30T12:00:00Z';
   const startTime = new Date(startTimeStr);
 
   const config: BenchmarkConfig = {
