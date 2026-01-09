@@ -40,21 +40,32 @@ jobs:
         working-directory: benchmarks/trading/007-chart-reader
         run: pnpm build
       
-      - name: Run benchmark
+      - name: Create env file
         working-directory: benchmarks/trading/007-chart-reader
         env:
           REPLAY_LAB_API_KEY: ${{ secrets.REPLAY_LAB_API_KEY }}
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
         run: |
+          echo "REPLAY_LAB_API_KEY=$REPLAY_LAB_API_KEY" > .env.local
+          echo "AI_GATEWAY_API_KEY=$AI_GATEWAY_API_KEY" >> .env.local
+          echo "✅ Created .env.local with API keys"
+      
+      - name: Run benchmark
+        working-directory: benchmarks/trading/007-chart-reader
+        run: |
+          # Clear any old results first
+          rm -rf results_all
+          
           # Run benchmark for dashboard models with quick mode
           pnpm benchmark --dashboard --quick 2>&1 | tee benchmark.log
           
-          # Check if results were generated
-          if [ -d "results_all" ]; then
+          # Check if NEW results were generated
+          if [ -d "results_all" ] && [ "$(ls -A results_all)" ]; then
             echo "✅ Benchmark completed successfully"
             ls -la results_all/
           else
             echo "❌ No results generated"
+            cat benchmark.log
             exit 1
           fi
       
