@@ -3,7 +3,7 @@
   "timeframe": "15m",
   "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767830495&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=IkX-XYzBSmHTZHDFLW9iV384LNlPblHc9UxAf-MzqlU",
   "timestamp": "2025-12-20T10:45:00.000Z",
-  "durationMs": 19672,
+  "durationMs": 20522,
   "error": null,
   "prediction": {
     "meta": {
@@ -12,16 +12,16 @@
       "timeframe": "15m"
     },
     "active_readout": {
-      "open": 88148,
-      "high": 88183,
-      "low": 88143,
-      "close": 88168
+      "open": 88,
+      "high": 88,
+      "low": 88,
+      "close": 88
     },
     "indicator_readout": {
       "vwap": 88202,
-      "bb_upper": 88110,
-      "bb_lower": 88375,
-      "bb_mid": 88202,
+      "bb_upper": 88375,
+      "bb_lower": 88110,
+      "bb_mid": 88242,
       "sma20": 88242,
       "ema20": 88219
     },
@@ -29,13 +29,13 @@
       "local_extrema_text_count": 5
     },
     "single_candle": {
-      "candle_direction": "bull",
-      "body": 20,
-      "upper_wick": 15,
+      "candle_direction": "doji",
+      "body": 0,
+      "upper_wick": 0,
       "lower_wick": 0,
-      "range": 40,
-      "candle_type": "regular",
-      "body_to_range_pct": 50
+      "range": 0,
+      "candle_type": "doji",
+      "body_to_range_pct": 0
     },
     "relative_position": {
       "close_vs_vwap": "below",
@@ -46,22 +46,22 @@
     },
     "ordinal_comparison": {
       "n": 10,
-      "idx_max_high": 1,
-      "idx_min_low": 6,
-      "idx_max_volume": 4,
+      "idx_max_high": 3,
+      "idx_min_low": 5,
+      "idx_max_volume": 2,
       "idx_max_range": 3,
-      "idx_max_body": 0
+      "idx_max_body": 3
     },
     "counting": {
-      "total_candles_visible": 10,
+      "total_candles_visible": 26,
       "bullish_count_last_10": 5,
       "bearish_count_last_10": 5,
       "doji_count_last_10": 0,
-      "marker_count_total": 0,
-      "marker_count_highs": 0,
-      "marker_count_lows": 0,
-      "volume_spike_count_last_10": 1,
-      "longest_bull_streak": 2,
+      "marker_count_total": 6,
+      "marker_count_highs": 3,
+      "marker_count_lows": 3,
+      "volume_spike_count_last_10": 2,
+      "longest_bull_streak": 3,
       "longest_bear_streak": 3
     },
     "sequence_pattern": {
@@ -69,48 +69,48 @@
       "overall_trend": "sideways",
       "higher_highs_last_5": false,
       "higher_lows_last_5": false,
-      "lower_highs_last_5": true,
-      "lower_lows_last_5": true,
-      "bb_lower_touches_last_10": 2,
+      "lower_highs_last_5": false,
+      "lower_lows_last_5": false,
+      "bb_lower_touches_last_10": 1,
       "bb_upper_touches_last_10": 1,
       "gaps_present": false,
       "gap_count": 0,
       "market_regime": "consolidating"
     },
     "temporal_spatial": {
-      "chart_time_span": "2 hours",
-      "chart_time_span_hours": 2,
-      "candles_since_lowest_point": 6,
+      "chart_time_span": "7 hours",
+      "chart_time_span_hours": 7,
+      "candles_since_lowest_point": 5,
       "candles_since_highest_point": 4,
       "most_recent_candle_idx": 0,
-      "price_range_low": 87800,
-      "price_range_high": 88200,
-      "price_range_span": 400,
-      "pct_change_first_to_last": -1.29,
-      "avg_candle_range_last_10": 23.5
+      "price_range_low": 88000,
+      "price_range_high": 88500,
+      "price_range_span": 500,
+      "pct_change_first_to_last": 0,
+      "avg_candle_range_last_10": 50
     },
     "indicator_comprehension": {
       "price_vs_vwap_trend": "mostly_below",
       "bb_width_assessment": "normal",
-      "bb_squeeze_forming": null,
+      "bb_squeeze_forming": false,
       "price_crossed_sma": null,
       "price_crossed_ema": null,
-      "volume_trend": "decreasing",
+      "volume_trend": "flat",
       "price_indicator_divergence": null
     },
     "edge_cases": {
       "has_nan_values": false,
       "missing_indicators": [],
       "has_doji_candles": false,
-      "has_tied_highs": false,
-      "has_tied_lows": false,
-      "chart_density": "normal",
+      "has_tied_highs": true,
+      "has_tied_lows": true,
+      "chart_density": "dense",
       "all_values_readable": true,
       "confidence_level": "high"
     },
     "multi_step": {
       "uptrend_pullback_to_vwap": null,
-      "volatility_direction_combo": "low_vol_drift_down",
+      "volatility_direction_combo": "consolidation",
       "tested_and_held_support": null,
       "breakout_with_volume": null,
       "potential_reversal_at_support": null
@@ -229,31 +229,31 @@
   },
   "score": {
     "metaAccuracy": 1,
-    "ohlcAccuracy": 0.5,
-    "indicatorAccuracy": 0.6666666666666666,
-    "singleCandleAccuracy": 0.2857142857142857,
+    "ohlcAccuracy": 0,
+    "indicatorAccuracy": 1,
+    "singleCandleAccuracy": 0,
     "relativePositionAccuracy": 0.4,
-    "ordinalAccuracy": 0.2,
-    "countingAccuracy": 0.6,
-    "sequenceAccuracy": 0.7818181818181817,
-    "temporalSpatialAccuracy": 0.1,
-    "indicatorComprehensionAccuracy": 0.35714285714285715,
-    "edgeCaseAccuracy": 1,
-    "multiStepAccuracy": 0.5,
-    "overallScore": 0.5122770562770563,
+    "ordinalAccuracy": 0,
+    "countingAccuracy": 0.3,
+    "sequenceAccuracy": 0.9636363636363636,
+    "temporalSpatialAccuracy": 0.55,
+    "indicatorComprehensionAccuracy": 0.42857142857142855,
+    "edgeCaseAccuracy": 0.625,
+    "multiStepAccuracy": 0.7,
+    "overallScore": 0.4235422077922078,
     "categoryScores": {
       "Text: Meta": 1,
-      "Text: OHLC": 0.5,
-      "Text: Indicators": 0.6666666666666666,
-      "Single Candle": 0.2857142857142857,
+      "Text: OHLC": 0,
+      "Text: Indicators": 1,
+      "Single Candle": 0,
       "Relative Position": 0.4,
-      "Ordinal": 0.2,
-      "Counting": 0.6,
-      "Sequence Pattern": 0.7818181818181817,
-      "Temporal Spatial": 0.1,
-      "Indicator Comprehension": 0.35714285714285715,
-      "Edge Cases": 1,
-      "Multi-Step": 0.5
+      "Ordinal": 0,
+      "Counting": 0.3,
+      "Sequence Pattern": 0.9636363636363636,
+      "Temporal Spatial": 0.55,
+      "Indicator Comprehension": 0.42857142857142855,
+      "Edge Cases": 0.625,
+      "Multi-Step": 0.7
     }
   }
 }

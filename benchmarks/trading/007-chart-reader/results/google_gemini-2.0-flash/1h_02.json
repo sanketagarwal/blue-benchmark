@@ -1,9 +1,9 @@
 {
   "frameId": "1h_02",
   "timeframe": "1h",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767976107&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=Ri7KS7qpMbgTdHpUMOyoRWLZmWqMvWtwPPmyNKgCVdk",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767872495&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=0xl23uXNMTwA0dQYAfQ0sIEQbMQH0kmR51TJDcYdMf4",
   "timestamp": "2025-12-20T07:00:00.000Z",
-  "durationMs": 2645,
+  "durationMs": 3096,
   "error": null,
   "prediction": {
     "meta": {
@@ -18,7 +18,7 @@
       "close": 88268
     },
     "multi_step": {
-      "uptrend_pullback_to_vwap": false,
+      "uptrend_pullback_to_vwap": true,
       "volatility_direction_combo": "consolidation",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
@@ -39,39 +39,25 @@
       "close": 85270.645
     },
     "multi_step": {
-      "uptrend_pullback_to_vwap": false,
-      "volatility_direction_combo": "consolidation",
+      "uptrend_pullback_to_vwap": null,
+      "volatility_direction_combo": "unknown",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
       "overall_bias": "mildly_bearish"
-    },
-    "_debug": {
-      "supportLevel": 87648.6,
-      "resistanceLevel": 87090,
-      "supportFromAnnotations": true,
-      "resistanceFromAnnotations": true,
-      "vwap": 87624.79400283417,
-      "bb": {
-        "upper": 89059.81728698473,
-        "lower": 85841.4672130153,
-        "mid": 87450.64225000002
-      },
-      "trendDir": "down",
-      "volLevel": "medium"
     }
   },
   "score": {
     "fieldScores": {
-      "uptrend_pullback_to_vwap": 1,
-      "volatility_direction_combo": 1,
+      "uptrend_pullback_to_vwap": 0,
+      "volatility_direction_combo": 0,
       "tested_and_held_support": 1,
       "breakout_with_volume": 1,
       "potential_reversal_at_support": 1,
       "overall_bias": 0.5
     },
-    "exactMatchCount": 5,
+    "exactMatchCount": 3,
     "totalFields": 6,
-    "accuracy": 0.9166666666666666
+    "accuracy": 0.5833333333333334
   }
 }

@@ -1,0 +1,259 @@
+{
+  "frameId": "1h_01",
+  "timeframe": "1h",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767830495&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=rxygTLO668yznGyIJWYGmBO7q9_TtE_b7t11kogJPRE",
+  "timestamp": "2025-12-20T12:00:00.000Z",
+  "durationMs": 21498,
+  "error": null,
+  "prediction": {
+    "meta": {
+      "base_quote": "Bitcoin / U.S. Dollar",
+      "venue": "Coinbase",
+      "timeframe": "1h"
+    },
+    "active_readout": {
+      "open": 88238,
+      "high": 88238,
+      "low": 88216,
+      "close": 88226
+    },
+    "indicator_readout": {
+      "vwap": 87296,
+      "bb_upper": 88793,
+      "bb_lower": 86266,
+      "bb_mid": 87530,
+      "sma20": 88013,
+      "ema20": 88044
+    },
+    "annotation_text": {
+      "local_extrema_text_count": 4
+    },
+    "single_candle": {
+      "candle_direction": "bear",
+      "body": 12,
+      "upper_wick": 0,
+      "lower_wick": 6,
+      "range": 22,
+      "candle_type": "regular",
+      "body_to_range_pct": 54.55
+    },
+    "relative_position": {
+      "close_vs_vwap": "above",
+      "close_vs_bb": "inside",
+      "close_within_bb": true,
+      "close_vs_sma": "below",
+      "close_vs_ema": "below"
+    },
+    "ordinal_comparison": {
+      "n": 10,
+      "idx_max_high": 5,
+      "idx_min_low": 0,
+      "idx_max_volume": 5,
+      "idx_max_range": 5,
+      "idx_max_body": 5
+    },
+    "counting": {
+      "total_candles_visible": 30,
+      "bullish_count_last_10": 6,
+      "bearish_count_last_10": 4,
+      "doji_count_last_10": 0,
+      "marker_count_total": 3,
+      "marker_count_highs": 2,
+      "marker_count_lows": 1,
+      "volume_spike_count_last_10": 3,
+      "longest_bull_streak": 3,
+      "longest_bear_streak": 2
+    },
+    "sequence_pattern": {
+      "bull_bear_sequence": "GGRRGGRRRG",
+      "overall_trend": "sideways",
+      "higher_highs_last_5": false,
+      "higher_lows_last_5": false,
+      "lower_highs_last_5": false,
+      "lower_lows_last_5": false,
+      "bb_lower_touches_last_10": 1,
+      "bb_upper_touches_last_10": 1,
+      "gaps_present": true,
+      "gap_count": 2,
+      "market_regime": "consolidating"
+    },
+    "temporal_spatial": {
+      "chart_time_span": "24 hours",
+      "chart_time_span_hours": 24,
+      "candles_since_lowest_point": 5,
+      "candles_since_highest_point": 5,
+      "most_recent_candle_idx": 0,
+      "price_range_low": 86216,
+      "price_range_high": 88238,
+      "price_range_span": 2022,
+      "pct_change_first_to_last": 0.01,
+      "avg_candle_range_last_10": 25.2
+    },
+    "indicator_comprehension": {
+      "price_vs_vwap_trend": "mostly_above",
+      "bb_width_assessment": "normal",
+      "bb_squeeze_forming": false,
+      "price_crossed_sma": null,
+      "price_crossed_ema": null,
+      "volume_trend": "decreasing",
+      "price_indicator_divergence": null
+    },
+    "edge_cases": {
+      "has_nan_values": false,
+      "missing_indicators": [],
+      "has_doji_candles": false,
+      "has_tied_highs": false,
+      "has_tied_lows": false,
+      "chart_density": "dense",
+      "all_values_readable": true,
+      "confidence_level": "high"
+    },
+    "multi_step": {
+      "uptrend_pullback_to_vwap": null,
+      "volatility_direction_combo": "consolidation",
+      "tested_and_held_support": null,
+      "breakout_with_volume": null,
+      "potential_reversal_at_support": null
+    }
+  },
+  "groundTruth": {
+    "meta": {
+      "base_quote": "Bitcoin / U.S. Dollar",
+      "venue": "Coinbase",
+      "timeframe": "1h"
+    },
+    "active_readout": {
+      "open": 87078.425,
+      "high": 87430.945,
+      "low": 86845.68,
+      "close": 87429.48
+    },
+    "indicator_readout": {
+      "vwap": 87924.29796276453,
+      "bb_upper": 88562.89168146682,
+      "bb_lower": 87176.00881853317,
+      "bb_mid": 87869.45025,
+      "sma20": 87869.45025,
+      "ema20": 87869.45025
+    },
+    "annotation_text": {
+      "local_extrema_text_count": null
+    },
+    "single_candle": {
+      "candle_direction": "bull",
+      "body": 351.054999999993,
+      "upper_wick": 1.4650000000110595,
+      "lower_wick": 232.7450000000099,
+      "range": 585.265000000014,
+      "candle_type": "regular",
+      "body_to_range_pct": 59.98223027175461
+    },
+    "relative_position": {
+      "close_vs_vwap": "below",
+      "close_vs_bb": "inside",
+      "close_within_bb": true,
+      "close_vs_sma": "below",
+      "close_vs_ema": "below"
+    },
+    "ordinal_comparison": {
+      "n": 10,
+      "idx_max_high": 9,
+      "idx_min_low": 0,
+      "idx_max_volume": 9,
+      "idx_max_range": 9,
+      "idx_max_body": 1
+    },
+    "counting": {
+      "total_candles_visible": 31,
+      "bullish_count_last_10": 7,
+      "bearish_count_last_10": 3,
+      "doji_count_last_10": 0,
+      "marker_count_total": 0,
+      "marker_count_highs": 0,
+      "marker_count_lows": 0,
+      "volume_spike_count_last_10": 2,
+      "longest_bull_streak": 5,
+      "longest_bear_streak": 2
+    },
+    "sequence_pattern": {
+      "bull_bear_sequence": "GGGGGRRGGR",
+      "overall_trend": "sideways",
+      "higher_highs_last_5": false,
+      "higher_lows_last_5": false,
+      "lower_highs_last_5": false,
+      "lower_lows_last_5": true,
+      "bb_lower_touches_last_10": 1,
+      "bb_upper_touches_last_10": 1,
+      "gaps_present": false,
+      "gap_count": 0,
+      "market_regime": "consolidating"
+    },
+    "temporal_spatial": {
+      "chart_time_span": "1 days",
+      "chart_time_span_hours": 31,
+      "candles_since_lowest_point": 12,
+      "candles_since_highest_point": 9,
+      "most_recent_candle_idx": 0,
+      "price_range_low": 86782.285,
+      "price_range_high": 89365.85,
+      "price_range_span": 2583.5650000000023,
+      "pct_change_first_to_last": -0.9028233795693329,
+      "avg_candle_range_last_10": 652.4495000000024
+    },
+    "indicator_comprehension": {
+      "price_vs_vwap_trend": "crossing",
+      "bb_width_assessment": "narrow",
+      "bb_squeeze_forming": false,
+      "price_crossed_sma": true,
+      "price_crossed_ema": true,
+      "volume_trend": "decreasing",
+      "price_indicator_divergence": null
+    },
+    "edge_cases": {
+      "has_nan_values": false,
+      "missing_indicators": [],
+      "has_doji_candles": false,
+      "has_tied_highs": false,
+      "has_tied_lows": false,
+      "chart_density": "normal",
+      "all_values_readable": true,
+      "confidence_level": "high"
+    },
+    "multi_step": {
+      "uptrend_pullback_to_vwap": null,
+      "volatility_direction_combo": "consolidation",
+      "tested_and_held_support": true,
+      "breakout_with_volume": false,
+      "potential_reversal_at_support": true
+    }
+  },
+  "score": {
+    "metaAccuracy": 1,
+    "ohlcAccuracy": 0,
+    "indicatorAccuracy": 0,
+    "singleCandleAccuracy": 0.14285714285714285,
+    "relativePositionAccuracy": 0.8,
+    "ordinalAccuracy": 0.2,
+    "countingAccuracy": 0.7,
+    "sequenceAccuracy": 0.6727272727272727,
+    "temporalSpatialAccuracy": 0.1,
+    "indicatorComprehensionAccuracy": 0.5714285714285714,
+    "edgeCaseAccuracy": 0.875,
+    "multiStepAccuracy": 0.7,
+    "overallScore": 0.4018798701298701,
+    "categoryScores": {
+      "Text: Meta": 1,
+      "Text: OHLC": 0,
+      "Text: Indicators": 0,
+      "Single Candle": 0.14285714285714285,
+      "Relative Position": 0.8,
+      "Ordinal": 0.2,
+      "Counting": 0.7,
+      "Sequence Pattern": 0.6727272727272727,
+      "Temporal Spatial": 0.1,
+      "Indicator Comprehension": 0.5714285714285714,
+      "Edge Cases": 0.875,
+      "Multi-Step": 0.7
+    }
+  }
+}
