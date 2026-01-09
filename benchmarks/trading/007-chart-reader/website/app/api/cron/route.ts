@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { spawn } from 'child_process';
+import path from 'path';
 
 // This endpoint is called by Vercel Cron every 2 hours
 // It triggers a re-run of the benchmark and updates results
@@ -6,50 +8,112 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max
 
+// The 6 dashboard models in order of cost
+const DASHBOARD_MODELS = [
+  'google/gemini-2.5-flash-lite',
+  'google/gemini-2.0-flash',
+  'openai/gpt-4o-mini',
+  'google/gemini-2.5-flash',
+  'openai/gpt-4o',
+  'anthropic/claude-opus-4-5',
+];
+
 export async function GET(request: Request) {
   // Verify cron secret to prevent unauthorized access
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const startTime = Date.now();
+  console.log('[CRON] Starting benchmark run at', new Date().toISOString());
+
   try {
-    console.log('[CRON] Starting benchmark run at', new Date().toISOString());
+    // Run the benchmark with --dashboard flag
+    const benchmarkDir = path.join(process.cwd(), '..');
+    
+    const result = await new Promise<{ success: boolean; output: string }>((resolve) => {
+      const proc = spawn('pnpm', ['benchmark', '--dashboard', '--quick'], {
+        cwd: benchmarkDir,
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 
-    // The models to test (6 models in increasing order of cost)
-    const models = [
-      'google/gemini-2.5-flash-lite',   // $0.375/M
-      'google/gemini-2.0-flash',         // $0.50/M
-      'openai/gpt-4o-mini',              // $0.75/M
-      'google/gemini-2.5-flash',         // $0.75/M
-      'openai/gpt-4o',                   // $12.50/M
-      'anthropic/claude-opus-4-5',       // $30.00/M
-    ];
+      let output = '';
+      
+      proc.stdout?.on('data', (data) => {
+        output += data.toString();
+        console.log('[BENCHMARK]', data.toString());
+      });
+      
+      proc.stderr?.on('data', (data) => {
+        output += data.toString();
+        console.error('[BENCHMARK ERROR]', data.toString());
+      });
 
-    // In production, this would call the benchmark script or an API
-    // For now, we log the intended action
-    console.log('[CRON] Would run benchmark for models:', models);
+      proc.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          output,
+        });
+      });
 
-    // TODO: Implement actual benchmark execution
-    // Options:
-    // 1. Call a separate API endpoint that runs the benchmark
-    // 2. Use a queue system (e.g., Vercel Queue, Inngest)
-    // 3. Trigger a GitHub Action workflow
+      proc.on('error', (err) => {
+        resolve({
+          success: false,
+          output: err.message,
+        });
+      });
 
-    // For now, return success
-    return NextResponse.json({
-      success: true,
-      message: 'Benchmark cron job triggered',
-      models,
-      timestamp: new Date().toISOString(),
+      // Timeout after 4 minutes (leave 1 min buffer)
+      setTimeout(() => {
+        proc.kill('SIGTERM');
+        resolve({
+          success: false,
+          output: 'Timeout after 4 minutes',
+        });
+      }, 240000);
     });
+
+    const duration = Date.now() - startTime;
+
+    if (result.success) {
+      console.log('[CRON] Benchmark completed successfully in', duration, 'ms');
+      return NextResponse.json({
+        success: true,
+        message: 'Benchmark completed successfully',
+        models: DASHBOARD_MODELS,
+        duration,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      console.error('[CRON] Benchmark failed:', result.output);
+      return NextResponse.json({
+        success: false,
+        message: 'Benchmark failed',
+        error: result.output.slice(-500), // Last 500 chars of output
+        duration,
+        timestamp: new Date().toISOString(),
+      }, { status: 500 });
+    }
 
   } catch (error) {
     console.error('[CRON] Error running benchmark:', error);
     return NextResponse.json(
-      { error: 'Failed to run benchmark', details: String(error) },
+      { 
+        error: 'Failed to run benchmark', 
+        details: String(error),
+        timestamp: new Date().toISOString(),
+      },
       { status: 500 }
     );
   }
 }
 
+// Also support POST for manual triggers
+export async function POST(request: Request) {
+  return GET(request);
+}
