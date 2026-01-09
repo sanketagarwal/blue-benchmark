@@ -246,12 +246,17 @@ async function runAnalysisRound(
     
     // Return a zero-score result on error
     const zeroScore: ChartReadingScore = {
-      totalAccuracy: 0,
-      categoryScores: {
-        meta: { accuracy: 0, breakdown: {} },
-        active_readout: { accuracy: 0, breakdown: {} },
-        multi_step: { accuracy: 0, breakdown: {} },
+      fieldScores: {
+        uptrend_pullback_to_vwap: 0,
+        volatility_direction_combo: 0,
+        tested_and_held_support: 0,
+        breakout_with_volume: 0,
+        potential_reversal_at_support: 0,
+        overall_bias: 0,
       },
+      exactMatchCount: 0,
+      totalFields: 6,
+      accuracy: 0,
     };
 
     return {
@@ -313,7 +318,7 @@ export async function runLearningLoop(
     verbose
   );
 
-  log(`     Accuracy: ${baseline.score.totalAccuracy.toFixed(1)}%`);
+  log(`     Accuracy: ${baseline.score.accuracy.toFixed(1)}%`);
 
   // ==========================================================================
   // GENERATE FEEDBACK
@@ -357,7 +362,7 @@ export async function runLearningLoop(
     verbose
   );
 
-  log(`     Accuracy: ${sameChart.score.totalAccuracy.toFixed(1)}%`);
+  log(`     Accuracy: ${sameChart.score.accuracy.toFixed(1)}%`);
 
   // ==========================================================================
   // ROUND 3: Different Timeframe (Abstraction)
@@ -402,14 +407,14 @@ export async function runLearningLoop(
     verbose
   );
 
-  log(`     Accuracy: ${differentTimeframe.score.totalAccuracy.toFixed(1)}%`);
+  log(`     Accuracy: ${differentTimeframe.score.accuracy.toFixed(1)}%`);
 
   // ==========================================================================
   // COMPUTE METRICS
   // ==========================================================================
-  const baselineAccuracy = baseline.score.totalAccuracy;
-  const sameChartAccuracy = sameChart.score.totalAccuracy;
-  const differentTimeframeAccuracy = differentTimeframe.score.totalAccuracy;
+  const baselineAccuracy = baseline.score.accuracy;
+  const sameChartAccuracy = sameChart.score.accuracy;
+  const differentTimeframeAccuracy = differentTimeframe.score.accuracy;
   
   const memorizationDelta = sameChartAccuracy - baselineAccuracy;
   const abstractionDelta = differentTimeframeAccuracy - baselineAccuracy;

@@ -204,7 +204,7 @@ async function main() {
   // Determine which models to test
   let models: ModelConfig[];
   if (config.singleModel) {
-    models = [{ id: config.singleModel, provider: 'unknown', cost: 'unknown', tier: 'unknown' }];
+    models = [{ id: config.singleModel, provider: 'custom', inputCostPerMillion: 0, outputCostPerMillion: 0, tier: 'budget' as const, vision: true, notes: 'Single model test' }];
   } else if (config.expensive) {
     models = loadExpensiveModels();
   } else {
