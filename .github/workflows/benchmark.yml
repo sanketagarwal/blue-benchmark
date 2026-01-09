@@ -48,7 +48,8 @@ jobs:
         run: |
           echo "REPLAY_LAB_API_KEY=$REPLAY_LAB_API_KEY" > .env.local
           echo "AI_GATEWAY_API_KEY=$AI_GATEWAY_API_KEY" >> .env.local
-          echo "✅ Created .env.local with API keys"
+          echo "REPLAY_LAB_BASE_URL=https://replay-lab-delta.preview.recall.network" >> .env.local
+          echo "✅ Created .env.local with API keys and base URL"
       
       - name: Run benchmark
         working-directory: benchmarks/trading/007-chart-reader
