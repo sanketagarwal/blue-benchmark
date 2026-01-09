@@ -1,9 +1,9 @@
 {
   "frameId": "15m_02",
   "timeframe": "15m",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767985550&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=Cf2qzfTeFlCntv9OpC3RcnZiWy2hesmUHFMRCaEpmH0",
   "timestamp": "2025-12-20T10:45:00.000Z",
-  "durationMs": 3060,
+  "durationMs": 3133,
   "error": null,
   "prediction": {
     "meta": {

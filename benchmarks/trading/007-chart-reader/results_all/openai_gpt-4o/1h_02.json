@@ -1,9 +1,9 @@
 {
   "frameId": "1h_02",
   "timeframe": "1h",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767985552&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=YgzEEYOxp__2am3-ZJsvnGAyQmi7iSCvZi76C5yo1Ak",
   "timestamp": "2025-12-20T07:00:00.000Z",
-  "durationMs": 8511,
+  "durationMs": 5271,
   "error": null,
   "prediction": {
     "meta": {
@@ -12,7 +12,7 @@
       "timeframe": "1h"
     },
     "active_readout": {
-      "open": 88258,
+      "open": 88236,
       "high": 88418,
       "low": 88236,
       "close": 88268
@@ -20,7 +20,7 @@
     "multi_step": {
       "uptrend_pullback_to_vwap": false,
       "volatility_direction_combo": "consolidation",
-      "tested_and_held_support": false,
+      "tested_and_held_support": true,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
       "overall_bias": "neutral"
@@ -65,13 +65,13 @@
     "fieldScores": {
       "uptrend_pullback_to_vwap": 1,
       "volatility_direction_combo": 1,
-      "tested_and_held_support": 1,
+      "tested_and_held_support": 0,
       "breakout_with_volume": 1,
       "potential_reversal_at_support": 1,
       "overall_bias": 0.5
     },
-    "exactMatchCount": 5,
+    "exactMatchCount": 4,
     "totalFields": 6,
-    "accuracy": 0.9166666666666666
+    "accuracy": 0.75
   }
 }

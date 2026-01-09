@@ -1,29 +1,29 @@
 {
   "frameId": "15m_01",
   "timeframe": "15m",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767985549&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=4oudWXbeK-7oLZiM1V-XJzNb4cWsb2jBSXVc5Xyl0Z8",
   "timestamp": "2025-12-20T12:00:00.000Z",
-  "durationMs": 2431,
+  "durationMs": 1980,
   "error": null,
   "prediction": {
     "meta": {
-      "base_quote": "BTC/USD",
+      "base_quote": "BTC / U.S. Dollar",
       "venue": "Coinbase",
       "timeframe": "15m"
     },
     "active_readout": {
-      "open": 88232,
+      "open": 88218,
       "high": 88266,
-      "low": 88204,
+      "low": 88135,
       "close": 88238
     },
     "multi_step": {
       "uptrend_pullback_to_vwap": false,
-      "volatility_direction_combo": "consolidation",
+      "volatility_direction_combo": "low_vol_drift_down",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
-      "overall_bias": "neutral"
+      "overall_bias": "mildly_bearish"
     }
   },
   "groundTruth": {
@@ -64,14 +64,14 @@
   "score": {
     "fieldScores": {
       "uptrend_pullback_to_vwap": 1,
-      "volatility_direction_combo": 1,
+      "volatility_direction_combo": 0,
       "tested_and_held_support": 0,
       "breakout_with_volume": 1,
       "potential_reversal_at_support": 1,
-      "overall_bias": 1
+      "overall_bias": 0.5
     },
-    "exactMatchCount": 5,
+    "exactMatchCount": 3,
     "totalFields": 6,
-    "accuracy": 0.8333333333333334
+    "accuracy": 0.5833333333333334
   }
 }

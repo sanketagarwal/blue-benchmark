@@ -1,9 +1,9 @@
 {
   "frameId": "1h_01",
   "timeframe": "1h",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767985551&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=yU3Oo5WLsXTpEv-s6abwQtPpuRN9cV6QC40bHtmIkZ8",
   "timestamp": "2025-12-20T12:00:00.000Z",
-  "durationMs": 1904,
+  "durationMs": 2015,
   "error": null,
   "prediction": {
     "meta": {
@@ -19,7 +19,7 @@
     },
     "multi_step": {
       "uptrend_pullback_to_vwap": false,
-      "volatility_direction_combo": "consolidation",
+      "volatility_direction_combo": "low_vol_drift_up",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,

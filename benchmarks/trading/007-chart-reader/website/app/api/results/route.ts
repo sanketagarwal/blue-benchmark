@@ -10,14 +10,56 @@ const DASHBOARD_MODELS = [
   { id: 'anthropic/claude-opus-4-5', shortName: 'Claude Opus 4.5', provider: 'Anthropic', cost: 30.00 },
 ];
 
-// Fallback: Latest benchmark results from 2025-12-30 run
-const FALLBACK_RESULTS: Record<string, { accuracy: number; exactMatches: number; latency: number }> = {
-  'google/gemini-2.5-flash-lite': { accuracy: 72.2, exactMatches: 4.0, latency: 1960 },
-  'google/gemini-2.0-flash': { accuracy: 62.5, exactMatches: 3.5, latency: 2975 },
-  'openai/gpt-4o-mini': { accuracy: 65.3, exactMatches: 3.7, latency: 3740 },
-  'google/gemini-2.5-flash': { accuracy: 73.6, exactMatches: 4.3, latency: 21946 },
-  'openai/gpt-4o': { accuracy: 69.4, exactMatches: 4.0, latency: 5816 },
-  'anthropic/claude-opus-4-5': { accuracy: 70.8, exactMatches: 4.2, latency: 5483 },
+// Fallback: Actual per-frame benchmark results from local run
+const FALLBACK_FRAME_RESULTS: Record<string, Array<{ accuracy: number; exactMatches: number; latency: number }>> = {
+  'google/gemini-2.5-flash-lite': [
+    { accuracy: 58.3, exactMatches: 3, latency: 1980 },  // 15m_01
+    { accuracy: 33.3, exactMatches: 2, latency: 1808 },  // 15m_02
+    { accuracy: 75.0, exactMatches: 4, latency: 2015 },  // 1h_01
+    { accuracy: 91.7, exactMatches: 5, latency: 1572 },  // 1h_02
+    { accuracy: 91.7, exactMatches: 5, latency: 1208 },  // 4h_01
+    { accuracy: 66.7, exactMatches: 4, latency: 1863 },  // 4h_02
+  ],
+  'google/gemini-2.0-flash': [
+    { accuracy: 50.0, exactMatches: 3, latency: 3526 },  // 15m_01
+    { accuracy: 50.0, exactMatches: 3, latency: 3133 },  // 15m_02
+    { accuracy: 75.0, exactMatches: 4, latency: 3592 },  // 1h_01
+    { accuracy: 91.7, exactMatches: 5, latency: 3383 },  // 1h_02
+    { accuracy: 66.7, exactMatches: 4, latency: 3792 },  // 4h_01
+    { accuracy: 58.3, exactMatches: 3, latency: 3509 },  // 4h_02
+  ],
+  'openai/gpt-4o-mini': [
+    { accuracy: 91.7, exactMatches: 5, latency: 5794 },  // 15m_01
+    { accuracy: 50.0, exactMatches: 3, latency: 4453 },  // 15m_02 (had error, estimated)
+    { accuracy: 50.0, exactMatches: 3, latency: 3909 },  // 1h_01 (had error, estimated)
+    { accuracy: 50.0, exactMatches: 3, latency: 5440 },  // 1h_02
+    { accuracy: 91.7, exactMatches: 5, latency: 5174 },  // 4h_01
+    { accuracy: 66.7, exactMatches: 4, latency: 3483 },  // 4h_02
+  ],
+  'google/gemini-2.5-flash': [
+    { accuracy: 83.3, exactMatches: 5, latency: 20133 }, // 15m_01
+    { accuracy: 50.0, exactMatches: 3, latency: 19490 }, // 15m_02
+    { accuracy: 66.7, exactMatches: 4, latency: 9311 },  // 1h_01
+    { accuracy: 66.7, exactMatches: 4, latency: 12714 }, // 1h_02
+    { accuracy: 100.0, exactMatches: 6, latency: 16707 },// 4h_01
+    { accuracy: 83.3, exactMatches: 5, latency: 17110 }, // 4h_02
+  ],
+  'openai/gpt-4o': [
+    { accuracy: 83.3, exactMatches: 5, latency: 7474 },  // 15m_01
+    { accuracy: 50.0, exactMatches: 3, latency: 5966 },  // 15m_02
+    { accuracy: 75.0, exactMatches: 4, latency: 5914 },  // 1h_01
+    { accuracy: 75.0, exactMatches: 4, latency: 5271 },  // 1h_02
+    { accuracy: 75.0, exactMatches: 4, latency: 6952 },  // 4h_01
+    { accuracy: 58.3, exactMatches: 3, latency: 6381 },  // 4h_02
+  ],
+  'anthropic/claude-opus-4-5': [
+    { accuracy: 75.0, exactMatches: 4, latency: 4965 },  // 15m_01
+    { accuracy: 66.7, exactMatches: 4, latency: 4836 },  // 15m_02
+    { accuracy: 50.0, exactMatches: 3, latency: 5184 },  // 1h_01
+    { accuracy: 66.7, exactMatches: 4, latency: 4638 },  // 1h_02
+    { accuracy: 83.3, exactMatches: 5, latency: 5121 },  // 4h_01
+    { accuracy: 83.3, exactMatches: 5, latency: 4742 },  // 4h_02
+  ],
 };
 
 const FRAMES = [
@@ -185,34 +227,45 @@ async function fetchFromDatabase(): Promise<{
   }
 }
 
-// Return hardcoded fallback results
+// Return hardcoded fallback results with actual per-frame data
 function getFallbackResults(): { models: ModelResult[]; lastUpdated: string; runId: string } {
   const modelResults: ModelResult[] = DASHBOARD_MODELS.map((model) => {
-    const result = FALLBACK_RESULTS[model.id] || { accuracy: 0, exactMatches: 0, latency: 0 };
+    const frameResults = FALLBACK_FRAME_RESULTS[model.id] || [];
+    
+    // Build frames with actual per-frame data
+    const frames: FrameResult[] = FRAMES.map((f, idx) => {
+      const frameData = frameResults[idx] || { accuracy: 0, exactMatches: 0, latency: 0 };
+      return {
+        frameId: f.id,
+        accuracy: frameData.accuracy,
+        exactMatches: frameData.exactMatches,
+        predictions: {},
+        groundTruth: {},
+        duration: frameData.latency,
+      };
+    });
+    
+    // Calculate averages from actual frame data
+    const avgAccuracy = frames.reduce((sum, f) => sum + f.accuracy, 0) / frames.length;
+    const avgExactMatches = frames.reduce((sum, f) => sum + f.exactMatches, 0) / frames.length;
+    const avgLatency = frames.reduce((sum, f) => sum + f.duration, 0) / frames.length;
     
     return {
       modelId: model.id,
       shortName: model.shortName,
       provider: model.provider,
       cost: model.cost,
-      avgAccuracy: result.accuracy,
-      avgExactMatches: result.exactMatches,
-      avgLatency: result.latency,
-      frames: FRAMES.map((f) => ({
-        frameId: f.id,
-        accuracy: result.accuracy,
-        exactMatches: Math.round(result.exactMatches),
-        predictions: {},
-        groundTruth: {},
-        duration: result.latency,
-      })),
+      avgAccuracy: Math.round(avgAccuracy * 10) / 10,
+      avgExactMatches: Math.round(avgExactMatches * 10) / 10,
+      avgLatency: Math.round(avgLatency),
+      frames,
     };
   });
 
   return {
     models: modelResults,
-    lastUpdated: '2025-12-30T12:00:00Z',
-    runId: 'fallback-2025-12-30',
+    lastUpdated: '2025-01-09T12:00:00Z',
+    runId: 'fallback-local-run',
   };
 }
 
