@@ -40,7 +40,20 @@ const EXPENSIVE_MODELS = [
 ];
 
 /**
- * Load models based on --cheap or --expensive flag
+ * 6 DASHBOARD models - for the website, ordered by cost
+ * Range from cheapest to most expensive
+ */
+const DASHBOARD_MODELS = [
+  'google/gemini-2.5-flash-lite',     // $0.375/M total - CHEAPEST
+  'google/gemini-2.0-flash',          // $0.50/M total
+  'openai/gpt-4o-mini',               // $0.75/M total
+  'google/gemini-2.5-flash',          // $0.75/M total
+  'openai/gpt-4o',                    // $12.50/M total
+  'anthropic/claude-opus-4-5',        // $30.00/M total - MOST EXPENSIVE
+];
+
+/**
+ * Load models based on --cheap, --expensive, or --dashboard flag
  * Default to cheap models if no flag specified
  */
 export function loadModelMatrix(): ModelConfig[] {
@@ -49,13 +62,29 @@ export function loadModelMatrix(): ModelConfig[] {
   
   const useExpensive = args.includes('--expensive');
   const useCheap = args.includes('--cheap');
+  const useDashboard = args.includes('--dashboard');
   
-  // Default to cheap if no flag specified
-  const selectedModels = useExpensive ? EXPENSIVE_MODELS 
-                       : useCheap || !useExpensive ? CHEAP_MODELS 
+  // Select models based on flag
+  const selectedModels = useDashboard ? DASHBOARD_MODELS
+                       : useExpensive ? EXPENSIVE_MODELS 
                        : CHEAP_MODELS;
   
   return data.models.filter((m) => selectedModels.includes(m.id));
+}
+
+/**
+ * Load the 6 dashboard models (for website cron job)
+ */
+export function loadDashboardModels(): ModelConfig[] {
+  const data = modelsData as ModelsJson;
+  return data.models
+    .filter((m) => DASHBOARD_MODELS.includes(m.id))
+    .sort((a, b) => {
+      // Sort by total cost (input + output)
+      const aCost = a.inputCostPerMillion + a.outputCostPerMillion;
+      const bCost = b.inputCostPerMillion + b.outputCostPerMillion;
+      return aCost - bCost;
+    });
 }
 
 /**

@@ -321,10 +321,25 @@ No explanations. Only JSON.`
   const feedback2 = generateFeedback(round2!, groundTruth);
   
   // Add user message with feedback + new timeframe chart
+  // IMPORTANT: Explicitly tell model we're changing the candle size and testing understanding, not memory
   const userMessage3: Message = {
     role: 'user',
     content: [
-      { type: 'text', text: `${feedback2}\n\nNow here's the SAME time period but with 15-minute candles (more granular view). Apply what you've learned and analyze this chart.` },
+      { type: 'text', text: `${feedback2}
+
+IMPORTANT: Now I'm showing you a DIFFERENT chart view.
+
+This is the SAME time period, but with 15-MINUTE CANDLES instead of 1-hour candles. This means:
+- You will see MORE candles (roughly 4x more)
+- Each candle represents a shorter time period
+- The visual patterns will look DIFFERENT
+- You need to RE-ANALYZE from scratch based on what you SEE
+
+DO NOT just copy your previous answers. The patterns may look different at this granularity.
+
+This tests whether you understand HOW to analyze charts, not whether you can remember specific answers.
+
+Analyze this 15-minute chart fresh:` },
       { type: 'image_url', image_url: { url: chartUrl15m } },
     ],
   };
