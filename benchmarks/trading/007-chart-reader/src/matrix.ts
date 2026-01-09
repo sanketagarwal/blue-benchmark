@@ -61,10 +61,9 @@ export function loadModelMatrix(): ModelConfig[] {
   const args = process.argv.slice(2);
   
   const useExpensive = args.includes('--expensive');
-  const useCheap = args.includes('--cheap');
   const useDashboard = args.includes('--dashboard');
   
-  // Select models based on flag
+  // Select models based on flag (--cheap or no flag defaults to CHEAP_MODELS)
   const selectedModels = useDashboard ? DASHBOARD_MODELS
                        : useExpensive ? EXPENSIVE_MODELS 
                        : CHEAP_MODELS;

@@ -98,28 +98,37 @@ export async function getIndicators(
     // Handle different response formats
     const data = response.indicators?.[0] ?? response;
     
-    return {
-      rsi: data.rsi,
-      macd: data.macd ? {
+    // Build result object, only including defined values
+    const result: ReplayLabIndicators = {};
+    
+    if (data.rsi !== undefined) result.rsi = data.rsi;
+    if (data.macd) {
+      result.macd = {
         macd: data.macd.macd,
         signal: data.macd.signal,
         histogram: data.macd.histogram,
-      } : undefined,
-      atr: data.atr,
-      bbw: data.bbw,
-      adx: data.adx,
-      supertrend: data.supertrend ? {
+      };
+    }
+    if (data.atr !== undefined) result.atr = data.atr;
+    if (data.bbw !== undefined) result.bbw = data.bbw;
+    if (data.adx !== undefined) result.adx = data.adx;
+    if (data.supertrend) {
+      result.supertrend = {
         value: data.supertrend.value,
         advice: data.supertrend.advice as 'long' | 'short' | 'neutral',
-      } : undefined,
-      stoch_rsi: data.stoch_rsi ? {
+      };
+    }
+    if (data.stoch_rsi) {
+      result.stoch_rsi = {
         k: data.stoch_rsi.k,
         d: data.stoch_rsi.d,
-      } : undefined,
-      cmf: data.cmf,
-      vwap: data.rolling_vwap?.vwap,
-      realized_vol: data.realized_vol,
-    };
+      };
+    }
+    if (data.cmf !== undefined) result.cmf = data.cmf;
+    if (data.rolling_vwap?.vwap !== undefined) result.vwap = data.rolling_vwap.vwap;
+    if (data.realized_vol !== undefined) result.realized_vol = data.realized_vol;
+    
+    return result;
   } catch (error) {
     // Indicators API may not be available for all symbols/timeframes
     console.warn(`Failed to fetch indicators: ${error instanceof Error ? error.message : String(error)}`);
