@@ -178,8 +178,8 @@ Return ONLY valid JSON. No commentary. Every boolean MUST be true or false.
 
 ```bash
 # Clone the repo (includes 007-chart-reader benchmark)
-git clone https://github.com/sanketagarwal/nullagent-benchmark.git
-cd nullagent-benchmark
+git clone https://github.com/sanketagarwal/blue-benchmark.git
+cd blue-benchmark
 
 # Install all dependencies
 pnpm install
@@ -253,6 +253,7 @@ pnpm benchmark --model=google/gemini-2.5-flash-lite --quick --debug
 |------|-------------|
 | `--cheap` | Use 3 budget-friendly models |
 | `--expensive` | Use 3 frontier models |
+| `--dashboard` | Use 6 models shown on the website (cheap → expensive) |
 | `--quick` | 2 samples per timeframe (default: 5) |
 | `--verbose` | Show accuracy scores for each frame |
 | `--debug` | Full input/output logging with chart URLs |
