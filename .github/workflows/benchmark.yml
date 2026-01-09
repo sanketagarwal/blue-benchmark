@@ -29,8 +29,8 @@ jobs:
       - name: Install dependencies (root)
         run: pnpm install
       
-      - name: Build monorepo
-        run: pnpm build
+      - name: Build monorepo (007 dependencies only)
+        run: pnpm build --filter=@nullagent/bench-007-chart-reader...
       
       - name: Install benchmark dependencies
         working-directory: benchmarks/trading/007-chart-reader
