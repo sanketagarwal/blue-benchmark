@@ -13,7 +13,7 @@ importers:
         version: 4.3.4(vite@5.4.21(@types/node@22.19.3))
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -22,7 +22,7 @@ importers:
         version: 9.1.7
       jsdom:
         specifier: ^25.0.0
-        version: 25.0.1
+        version: 25.0.1(bufferutil@4.1.0)
       lint-staged:
         specifier: ^16.0.0
         version: 16.2.7
@@ -43,10 +43,10 @@ importers:
         version: 5.4.21(@types/node@22.19.3)
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
       vitest-mock-extended:
         specifier: 2.0.2
-        version: 2.0.2(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.0.2(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
 
   benchmarks/trading/005-market-maker:
     dependencies:
@@ -98,7 +98,7 @@ importers:
         version: 19.2.3(@types/react@19.2.7)
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -113,7 +113,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/trading/006-bottom-caller:
     dependencies:
@@ -165,7 +165,7 @@ importers:
         version: 19.2.3(@types/react@19.2.7)
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -180,7 +180,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/trading/007-chart-reader:
     dependencies:
@@ -214,7 +214,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -229,10 +229,13 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/trading/007-chart-reader/website:
     dependencies:
+      '@vercel/postgres':
+        specifier: ^0.10.0
+        version: 0.10.0
       next:
         specifier: ^14.0.0
         version: 14.2.35(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -291,7 +294,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@20.19.27)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@20.19.27)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/trading/009-learning-loop:
     dependencies:
@@ -341,7 +344,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -356,7 +359,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/tutorials/001-crossword-v1:
     dependencies:
@@ -384,7 +387,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -399,7 +402,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/tutorials/002-crossword-v2:
     dependencies:
@@ -430,7 +433,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -445,7 +448,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/tutorials/003-price-predictor:
     dependencies:
@@ -476,7 +479,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -491,7 +494,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   benchmarks/tutorials/004-matrix-eval:
     dependencies:
@@ -522,7 +525,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.0.0
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
@@ -537,7 +540,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.0.0
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   packages/agent-core:
     dependencies:
@@ -552,7 +555,7 @@ importers:
         version: 5.0.116(zod@3.25.76)
       drizzle-orm:
         specifier: ^0.36.4
-        version: 0.36.4(@opentelemetry/api@1.9.0)(@types/react@19.2.7)(postgres@3.4.7)(react@19.2.3)
+        version: 0.36.4(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@types/react@19.2.7)(@vercel/postgres@0.10.0)(postgres@3.4.7)(react@19.2.3)
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -568,7 +571,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.1.8
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       eslint:
         specifier: ^9.18.0
         version: 9.39.2
@@ -580,7 +583,7 @@ importers:
         version: 8.50.0(eslint@9.39.2)(typescript@5.9.2)
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   packages/cli-utils:
     dependencies:
@@ -602,7 +605,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.1.8
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       eslint:
         specifier: ^9.18.0
         version: 9.39.2
@@ -614,13 +617,13 @@ importers:
         version: 8.50.0(eslint@9.39.2)(typescript@5.9.2)
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   packages/database:
     dependencies:
       drizzle-orm:
         specifier: ^0.36.4
-        version: 0.36.4(@opentelemetry/api@1.9.0)(@types/react@19.2.7)(postgres@3.4.7)(react@19.2.3)
+        version: 0.36.4(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@types/react@19.2.7)(@vercel/postgres@0.10.0)(postgres@3.4.7)(react@19.2.3)
       postgres:
         specifier: ^3.4.5
         version: 3.4.7
@@ -648,7 +651,7 @@ importers:
         version: 5.9.2
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   packages/eslint-config:
     dependencies:
@@ -717,7 +720,7 @@ importers:
         version: 56.0.1(eslint@9.39.2)
       eslint-plugin-vitest:
         specifier: ^0.5.0
-        version: 0.5.4(@typescript-eslint/eslint-plugin@8.50.0(@typescript-eslint/parser@8.50.0(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 0.5.4(@typescript-eslint/eslint-plugin@8.50.0(@typescript-eslint/parser@8.50.0(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       globals:
         specifier: ^15.0.0
         version: 15.15.0
@@ -745,7 +748,7 @@ importers:
         version: 22.19.3
       '@vitest/coverage-v8':
         specifier: ^2.1.8
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))
       eslint:
         specifier: ^9.18.0
         version: 9.39.2
@@ -757,7 +760,7 @@ importers:
         version: 8.50.0(eslint@9.39.2)(typescript@5.9.2)
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+        version: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
   packages/typescript-config: {}
 
@@ -1736,6 +1739,9 @@ packages:
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
 
+  '@neondatabase/serverless@0.9.5':
+    resolution: {integrity: sha512-siFas6gItqv6wD/pZnvdu34wEqgG3nSE6zWZdq5j2DEsa+VvX8i/5HXJOo06qrw5axPXn+lGCxeR+NLaSPIXug==}
+
   '@next/env@14.2.35':
     resolution: {integrity: sha512-DuhvCtj4t9Gwrx80dmz2F4t/zKQ4ktN8WrMwOuVzkJfBilwAwGr6v16M5eI8yCuZ63H9TTuEU09Iu2HqkzFPVQ==}
 
@@ -2046,6 +2052,9 @@ packages:
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
 
+  '@types/pg@8.11.6':
+    resolution: {integrity: sha512-/2WmmBXHLsfRqzfHW7BNZ8SbYzE8OSk7i3WjFYvfgRHj7S1xj+16Je5fUKv3lVdVzk/zn9TXOqf+avFCFIE0yQ==}
+
   '@types/prop-types@15.7.15':
     resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
 
@@ -2245,6 +2254,10 @@ packages:
     resolution: {integrity: sha512-fnYhv671l+eTTp48gB4zEsTW/YtRgRPnkI2nT7x6qw5rkI1Lq2hTmQIpHPgyThI0znLK+vX2n9XxKdXZ7BUbbw==}
     engines: {node: '>= 20'}
 
+  '@vercel/postgres@0.10.0':
+    resolution: {integrity: sha512-fSD23DxGND40IzSkXjcFcxr53t3Tiym59Is0jSYIFpG4/0f0KO9SGtcp1sXiebvPaGe7N/tU05cH4yt2S6/IPg==}
+    engines: {node: '>=18.14'}
+
   '@vitejs/plugin-react@4.3.4':
     resolution: {integrity: sha512-SCCPBJtYLdE8PX/7ZQAs1QAZ8Jqwih+0VBLum1EGqmCCQal+MIUqLCzj3ZUy8ufbC0cAM4LRlSTm7IQJwWT4ug==}
     engines: {node: ^14.18.0 || >=16.0.0}
@@ -2425,6 +2438,10 @@ packages:
 
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
+
+  bufferutil@4.1.0:
+    resolution: {integrity: sha512-ZMANVnAixE6AWWnPzlW2KpUrxhm9woycYvPOo67jWHyFowASTEd9s+QN1EIMsSDtwhIxN4sWE1jotpuDUIgyIw==}
+    engines: {node: '>=6.14.2'}
 
   builtin-modules@3.3.0:
     resolution: {integrity: sha512-zhaCDicdLuWN5UbN5IMnFqNMhNfo919sH85y2/ea+5Yg9TsTkeZxpL+JLbp6cgYFS4sRLp3YV4S6yDuqVWHYOw==}
@@ -3725,6 +3742,10 @@ packages:
       sass:
         optional: true
 
+  node-gyp-build@4.8.4:
+    resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
+    hasBin: true
+
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
 
@@ -3761,6 +3782,9 @@ packages:
   object.values@1.2.1:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
+
+  obuf@1.1.2:
+    resolution: {integrity: sha512-PX1wu0AmAdPqOL1mWhqmlOd8kOIZQwGZw6rh7uby9fTc5lhaOWFLX3I6R1hrF9k3zUY40e6igsLGkDXK92LJNg==}
 
   onetime@7.0.0:
     resolution: {integrity: sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==}
@@ -3844,6 +3868,21 @@ packages:
     resolution: {integrity: sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==}
     engines: {node: '>= 14.16'}
 
+  pg-int8@1.0.1:
+    resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
+    engines: {node: '>=4.0.0'}
+
+  pg-numeric@1.0.2:
+    resolution: {integrity: sha512-BM/Thnrw5jm2kKLE5uJkXqqExRUY/toLHda65XgFTBTFYZyopbKjBe29Ii3RbkvlsMoFwD+tHeGaCjjv0gHlyw==}
+    engines: {node: '>=4'}
+
+  pg-protocol@1.10.3:
+    resolution: {integrity: sha512-6DIBgBQaTKDJyxnXaLiLR8wBpQQcGWuAESkRBX/t6OwA8YsqP+iVSiond2EDy6Y/dsGk8rh/jtax3js5NeV7JQ==}
+
+  pg-types@4.1.0:
+    resolution: {integrity: sha512-o2XFanIMy/3+mThw69O8d4n1E5zsLhdO+OPqswezu7Z5ekP4hYDqlDjlmOpYMbzY2Br0ufCwJLdDIXeNVwcWFg==}
+    engines: {node: '>=10'}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -3875,6 +3914,25 @@ packages:
   postcss@8.5.6:
     resolution: {integrity: sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==}
     engines: {node: ^10 || ^12 || >=14}
+
+  postgres-array@3.0.4:
+    resolution: {integrity: sha512-nAUSGfSDGOaOAEGwqsRY27GPOea7CNipJPOA7lPbdEpx5Kg3qzdP0AaWC5MlhTWV9s4hFX39nomVZ+C4tnGOJQ==}
+    engines: {node: '>=12'}
+
+  postgres-bytea@3.0.0:
+    resolution: {integrity: sha512-CNd4jim9RFPkObHSjVHlVrxoVQXz7quwNFpz7RY1okNNme49+sVyiTvTRobiLV548Hx/hb1BG+iE7h9493WzFw==}
+    engines: {node: '>= 6'}
+
+  postgres-date@2.1.0:
+    resolution: {integrity: sha512-K7Juri8gtgXVcDfZttFKVmhglp7epKb1K4pgrkLxehjqkrgPhfG6OO8LHLkfaqkbpjNRnra018XwAr1yQFWGcA==}
+    engines: {node: '>=12'}
+
+  postgres-interval@3.0.0:
+    resolution: {integrity: sha512-BSNDnbyZCXSxgA+1f5UU2GmwhoI0aU5yMxRGO8CdFEcY2BQF9xm/7MqKnYoM1nJDk8nONNWDk9WeSmePFhQdlw==}
+    engines: {node: '>=12'}
+
+  postgres-range@1.1.4:
+    resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
   postgres@3.4.7:
     resolution: {integrity: sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw==}
@@ -5327,6 +5385,10 @@ snapshots:
       '@tybys/wasm-util': 0.10.1
     optional: true
 
+  '@neondatabase/serverless@0.9.5':
+    dependencies:
+      '@types/pg': 8.11.6
+
   '@next/env@14.2.35': {}
 
   '@next/env@15.5.9': {}
@@ -5546,6 +5608,12 @@ snapshots:
 
   '@types/normalize-package-data@2.4.4': {}
 
+  '@types/pg@8.11.6':
+    dependencies:
+      '@types/node': 22.19.3
+      pg-protocol: 1.10.3
+      pg-types: 4.1.0
+
   '@types/prop-types@15.7.15': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.7)':
@@ -5751,6 +5819,14 @@ snapshots:
 
   '@vercel/oidc@3.0.5': {}
 
+  '@vercel/postgres@0.10.0':
+    dependencies:
+      '@neondatabase/serverless': 0.9.5
+      bufferutil: 4.1.0
+      ws: 8.18.3(bufferutil@4.1.0)
+    transitivePeerDependencies:
+      - utf-8-validate
+
   '@vitejs/plugin-react@4.3.4(vite@5.4.21(@types/node@22.19.3))':
     dependencies:
       '@babel/core': 7.28.5
@@ -5762,7 +5838,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1))':
+  '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)))':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@bcoe/v8-coverage': 0.2.3
@@ -5776,7 +5852,7 @@ snapshots:
       std-env: 3.10.0
       test-exclude: 7.0.1
       tinyrainbow: 1.2.0
-      vitest: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+      vitest: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -5964,6 +6040,10 @@ snapshots:
       update-browserslist-db: 1.2.3(browserslist@4.28.1)
 
   buffer-from@1.1.2: {}
+
+  bufferutil@4.1.0:
+    dependencies:
+      node-gyp-build: 4.8.4
 
   builtin-modules@3.3.0: {}
 
@@ -6201,10 +6281,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.36.4(@opentelemetry/api@1.9.0)(@types/react@19.2.7)(postgres@3.4.7)(react@19.2.3):
+  drizzle-orm@0.36.4(@opentelemetry/api@1.9.0)(@types/pg@8.11.6)(@types/react@19.2.7)(@vercel/postgres@0.10.0)(postgres@3.4.7)(react@19.2.3):
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
+      '@types/pg': 8.11.6
       '@types/react': 19.2.7
+      '@vercel/postgres': 0.10.0
       postgres: 3.4.7
       react: 19.2.3
 
@@ -6660,13 +6742,13 @@ snapshots:
       semver: 7.7.3
       strip-indent: 3.0.0
 
-  eslint-plugin-vitest@0.5.4(@typescript-eslint/eslint-plugin@8.50.0(@typescript-eslint/parser@8.50.0(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1)):
+  eslint-plugin-vitest@0.5.4(@typescript-eslint/eslint-plugin@8.50.0(@typescript-eslint/parser@8.50.0(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))):
     dependencies:
       '@typescript-eslint/utils': 7.18.0(eslint@9.39.2)(typescript@5.9.2)
       eslint: 9.39.2
     optionalDependencies:
       '@typescript-eslint/eslint-plugin': 8.50.0(@typescript-eslint/parser@8.50.0(eslint@9.39.2)(typescript@5.9.2))(eslint@9.39.2)(typescript@5.9.2)
-      vitest: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+      vitest: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -7174,7 +7256,7 @@ snapshots:
 
   jsdoc-type-pratt-parser@4.1.0: {}
 
-  jsdom@25.0.1:
+  jsdom@25.0.1(bufferutil@4.1.0):
     dependencies:
       cssstyle: 4.6.0
       data-urls: 5.0.0
@@ -7195,7 +7277,7 @@ snapshots:
       whatwg-encoding: 3.1.1
       whatwg-mimetype: 4.0.0
       whatwg-url: 14.2.0
-      ws: 8.18.3
+      ws: 8.18.3(bufferutil@4.1.0)
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - bufferutil
@@ -7411,6 +7493,8 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
+  node-gyp-build@4.8.4: {}
+
   node-releases@2.0.27: {}
 
   normalize-package-data@2.5.0:
@@ -7457,6 +7541,8 @@ snapshots:
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
+
+  obuf@1.1.2: {}
 
   onetime@7.0.0:
     dependencies:
@@ -7547,6 +7633,22 @@ snapshots:
 
   pathval@2.0.1: {}
 
+  pg-int8@1.0.1: {}
+
+  pg-numeric@1.0.2: {}
+
+  pg-protocol@1.10.3: {}
+
+  pg-types@4.1.0:
+    dependencies:
+      pg-int8: 1.0.1
+      pg-numeric: 1.0.2
+      postgres-array: 3.0.4
+      postgres-bytea: 3.0.0
+      postgres-date: 2.1.0
+      postgres-interval: 3.0.0
+      postgres-range: 1.1.4
+
   picocolors@1.1.1: {}
 
   picomatch@2.3.1: {}
@@ -7570,6 +7672,18 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  postgres-array@3.0.4: {}
+
+  postgres-bytea@3.0.0:
+    dependencies:
+      obuf: 1.1.2
+
+  postgres-date@2.1.0: {}
+
+  postgres-interval@3.0.0: {}
+
+  postgres-range@1.1.4: {}
 
   postgres@3.4.7: {}
 
@@ -8320,13 +8434,13 @@ snapshots:
       '@types/node': 22.19.3
       fsevents: 2.3.3
 
-  vitest-mock-extended@2.0.2(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1)):
+  vitest-mock-extended@2.0.2(typescript@5.9.2)(vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))):
     dependencies:
       ts-essentials: 10.1.1(typescript@5.9.2)
       typescript: 5.9.2
-      vitest: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1)
+      vitest: 2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0))
 
-  vitest@2.1.9(@types/node@20.19.27)(jsdom@25.0.1):
+  vitest@2.1.9(@types/node@20.19.27)(jsdom@25.0.1(bufferutil@4.1.0)):
     dependencies:
       '@vitest/expect': 2.1.9
       '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@22.19.3))
@@ -8350,7 +8464,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 20.19.27
-      jsdom: 25.0.1
+      jsdom: 25.0.1(bufferutil@4.1.0)
     transitivePeerDependencies:
       - less
       - lightningcss
@@ -8362,7 +8476,7 @@ snapshots:
       - supports-color
       - terser
 
-  vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1):
+  vitest@2.1.9(@types/node@22.19.3)(jsdom@25.0.1(bufferutil@4.1.0)):
     dependencies:
       '@vitest/expect': 2.1.9
       '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@22.19.3))
@@ -8386,7 +8500,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.3
-      jsdom: 25.0.1
+      jsdom: 25.0.1(bufferutil@4.1.0)
     transitivePeerDependencies:
       - less
       - lightningcss
@@ -8487,7 +8601,9 @@ snapshots:
       string-width: 7.2.0
       strip-ansi: 7.1.2
 
-  ws@8.18.3: {}
+  ws@8.18.3(bufferutil@4.1.0):
+    optionalDependencies:
+      bufferutil: 4.1.0
 
   xml-name-validator@5.0.0: {}
 

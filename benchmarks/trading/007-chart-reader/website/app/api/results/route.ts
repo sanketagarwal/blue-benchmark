@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-export const runtime = 'nodejs';
 
 // The 6 dashboard models in order of cost
 const DASHBOARD_MODELS = [
@@ -14,7 +10,16 @@ const DASHBOARD_MODELS = [
   { id: 'anthropic/claude-opus-4-5', shortName: 'Claude Opus 4.5', provider: 'Anthropic', cost: 30.00 },
 ];
 
-// Frame definitions
+// Fallback: Latest benchmark results from 2025-12-30 run
+const FALLBACK_RESULTS: Record<string, { accuracy: number; exactMatches: number; latency: number }> = {
+  'google/gemini-2.5-flash-lite': { accuracy: 72.2, exactMatches: 4.0, latency: 1960 },
+  'google/gemini-2.0-flash': { accuracy: 62.5, exactMatches: 3.5, latency: 2975 },
+  'openai/gpt-4o-mini': { accuracy: 65.3, exactMatches: 3.7, latency: 3740 },
+  'google/gemini-2.5-flash': { accuracy: 73.6, exactMatches: 4.3, latency: 21946 },
+  'openai/gpt-4o': { accuracy: 69.4, exactMatches: 4.0, latency: 5816 },
+  'anthropic/claude-opus-4-5': { accuracy: 70.8, exactMatches: 4.2, latency: 5483 },
+};
+
 const FRAMES = [
   { id: '15m_01', timeframe: '15m', label: '15m #1' },
   { id: '15m_02', timeframe: '15m', label: '15m #2' },
@@ -44,57 +49,86 @@ interface ModelResult {
   frames: FrameResult[];
 }
 
-export async function GET() {
+// Try to fetch from database
+async function fetchFromDatabase(): Promise<{
+  models: ModelResult[];
+  lastUpdated: string;
+  runId: string;
+} | null> {
+  // Only try database if POSTGRES_URL is configured
+  if (!process.env.POSTGRES_URL) {
+    return null;
+  }
+
   try {
-    const resultsDir = path.join(process.cwd(), '..', 'results');
-    const results: ModelResult[] = [];
+    const { sql } = await import('@vercel/postgres');
+    
+    // Get the latest run_id
+    const latestRun = await sql`
+      SELECT run_id, MAX(created_at) as latest 
+      FROM benchmark_results 
+      GROUP BY run_id 
+      ORDER BY latest DESC 
+      LIMIT 1
+    `;
+
+    if (latestRun.rows.length === 0) {
+      return null;
+    }
+
+    const runId = latestRun.rows[0].run_id as string;
+
+    // Get all results for the latest run
+    const results = await sql`
+      SELECT 
+        model_id, frame_id, timeframe,
+        accuracy, exact_matches, latency_ms,
+        prediction, ground_truth, error, created_at
+      FROM benchmark_results 
+      WHERE run_id = ${runId}
+      ORDER BY model_id, frame_id
+    `;
+
+    if (results.rows.length === 0) {
+      return null;
+    }
+
+    // Group results by model
+    const resultsByModel: Record<string, typeof results.rows> = {};
+    for (const row of results.rows) {
+      const modelId = row.model_id as string;
+      if (!resultsByModel[modelId]) {
+        resultsByModel[modelId] = [];
+      }
+      resultsByModel[modelId].push(row);
+    }
+
+    // Build response
+    const modelResults: ModelResult[] = [];
 
     for (const model of DASHBOARD_MODELS) {
-      const modelDir = model.id.replace('/', '_');
-      const modelPath = path.join(resultsDir, modelDir);
-
+      const modelRows = resultsByModel[model.id] || [];
       const frames: FrameResult[] = [];
       let totalAccuracy = 0;
       let totalExactMatches = 0;
       let totalLatency = 0;
-      let frameCount = 0;
 
       for (const frame of FRAMES) {
-        const filePath = path.join(modelPath, `${frame.id}.json`);
-        
-        try {
-          if (fs.existsSync(filePath)) {
-            const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-            const accuracy = data.score?.accuracy ?? data.accuracy ?? 0;
-            const exactMatches = data.score?.exactMatchCount ?? data.exactMatches ?? 0;
-            const duration = data.duration ?? 0;
-
-            frames.push({
-              frameId: frame.id,
-              accuracy: accuracy * 100,
-              exactMatches,
-              predictions: data.prediction?.multi_step ?? {},
-              groundTruth: data.groundTruth?.multi_step ?? {},
-              duration,
-            });
-
-            totalAccuracy += accuracy * 100;
-            totalExactMatches += exactMatches;
-            totalLatency += duration;
-            frameCount++;
-          } else {
-            // No data for this frame
-            frames.push({
-              frameId: frame.id,
-              accuracy: 0,
-              exactMatches: 0,
-              predictions: {},
-              groundTruth: {},
-              duration: 0,
-            });
-          }
-        } catch {
-          // Error reading frame
+        const row = modelRows.find((r) => r.frame_id === frame.id);
+        if (row) {
+          const accuracy = Number(row.accuracy) * 100;
+          frames.push({
+            frameId: frame.id,
+            accuracy,
+            exactMatches: Number(row.exact_matches),
+            predictions: (row.prediction as Record<string, unknown>) || {},
+            groundTruth: (row.ground_truth as Record<string, unknown>) || {},
+            duration: Number(row.latency_ms),
+          });
+          totalAccuracy += accuracy;
+          totalExactMatches += Number(row.exact_matches);
+          totalLatency += Number(row.latency_ms);
+        } else {
           frames.push({
             frameId: frame.id,
             accuracy: 0,
@@ -106,47 +140,81 @@ export async function GET() {
         }
       }
 
-      results.push({
+      const frameCount = modelRows.length || 1;
+      modelResults.push({
         modelId: model.id,
         shortName: model.shortName,
         provider: model.provider,
         cost: model.cost,
-        avgAccuracy: frameCount > 0 ? totalAccuracy / frameCount : 0,
-        avgExactMatches: frameCount > 0 ? totalExactMatches / frameCount : 0,
-        avgLatency: frameCount > 0 ? totalLatency / frameCount : 0,
+        avgAccuracy: totalAccuracy / frameCount,
+        avgExactMatches: totalExactMatches / frameCount,
+        avgLatency: totalLatency / frameCount,
         frames,
       });
     }
 
-    return NextResponse.json({
-      models: results,
-      frames: FRAMES,
-      lastUpdated: new Date().toISOString(),
-    });
+    // Get last update time
+    const lastUpdated = results.rows[0]?.created_at 
+      ? new Date(results.rows[0].created_at as string).toISOString()
+      : new Date().toISOString();
 
+    return { models: modelResults, lastUpdated, runId };
   } catch (error) {
-    console.error('Error loading results:', error);
-    
-    // Return mock data if no results exist
-    return NextResponse.json({
-      models: DASHBOARD_MODELS.map((m) => ({
-        ...m,
-        modelId: m.id,
-        avgAccuracy: 45 + Math.random() * 15,
-        avgExactMatches: 2 + Math.random() * 2,
-        avgLatency: 2000 + Math.random() * 5000,
-        frames: FRAMES.map((f) => ({
-          frameId: f.id,
-          accuracy: 30 + Math.random() * 50,
-          exactMatches: Math.floor(2 + Math.random() * 4),
-          predictions: {},
-          groundTruth: {},
-          duration: 1500 + Math.random() * 3000,
-        })),
-      })),
-      frames: FRAMES,
-      lastUpdated: new Date().toISOString(),
-    });
+    console.error('Database fetch error (falling back to hardcoded):', error);
+    return null;
   }
 }
 
+// Return hardcoded fallback results
+function getFallbackResults(): { models: ModelResult[]; lastUpdated: string; runId: string } {
+  const modelResults: ModelResult[] = DASHBOARD_MODELS.map((model) => {
+    const result = FALLBACK_RESULTS[model.id] || { accuracy: 0, exactMatches: 0, latency: 0 };
+    
+    return {
+      modelId: model.id,
+      shortName: model.shortName,
+      provider: model.provider,
+      cost: model.cost,
+      avgAccuracy: result.accuracy,
+      avgExactMatches: result.exactMatches,
+      avgLatency: result.latency,
+      frames: FRAMES.map((f) => ({
+        frameId: f.id,
+        accuracy: result.accuracy,
+        exactMatches: Math.round(result.exactMatches),
+        predictions: {},
+        groundTruth: {},
+        duration: result.latency,
+      })),
+    };
+  });
+
+  return {
+    models: modelResults,
+    lastUpdated: '2025-12-30T12:00:00Z',
+    runId: 'fallback-2025-12-30',
+  };
+}
+
+export async function GET() {
+  // Try database first
+  const dbResults = await fetchFromDatabase();
+  
+  if (dbResults) {
+    return NextResponse.json({
+      ...dbResults,
+      frames: FRAMES,
+      hasData: true,
+      source: 'database',
+    });
+  }
+
+  // Fallback to hardcoded results
+  const fallback = getFallbackResults();
+  return NextResponse.json({
+    ...fallback,
+    frames: FRAMES,
+    hasData: true,
+    source: 'fallback',
+  });
+}

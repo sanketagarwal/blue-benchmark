@@ -1,0 +1,147 @@
+name: Run 007 Chart Reader Benchmark
+
+on:
+  # Run daily at midnight UTC
+  schedule:
+    - cron: '0 0 * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Install dependencies (root)
+        run: pnpm install
+      
+      - name: Build monorepo
+        run: pnpm build
+      
+      - name: Install benchmark dependencies
+        working-directory: benchmarks/trading/007-chart-reader
+        run: pnpm install
+      
+      - name: Build benchmark
+        working-directory: benchmarks/trading/007-chart-reader
+        run: pnpm build
+      
+      - name: Run benchmark
+        working-directory: benchmarks/trading/007-chart-reader
+        env:
+          REPLAY_LAB_API_KEY: ${{ secrets.REPLAY_LAB_API_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          # Run benchmark for dashboard models with quick mode
+          pnpm benchmark --dashboard --quick 2>&1 | tee benchmark.log
+          
+          # Check if results were generated
+          if [ -d "results_all" ]; then
+            echo "✅ Benchmark completed successfully"
+            ls -la results_all/
+          else
+            echo "❌ No results generated"
+            exit 1
+          fi
+      
+      - name: Push results to database
+        working-directory: benchmarks/trading/007-chart-reader
+        env:
+          WEBSITE_URL: ${{ secrets.WEBSITE_URL }}
+          BENCHMARK_API_KEY: ${{ secrets.BENCHMARK_API_KEY }}
+        run: |
+          # Create a script to aggregate and push results
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          
+          const WEBSITE_URL = process.env.WEBSITE_URL || 'https://website-jet-delta-92.vercel.app';
+          const API_KEY = process.env.BENCHMARK_API_KEY;
+          
+          if (!API_KEY) {
+            console.error('❌ BENCHMARK_API_KEY not set');
+            process.exit(1);
+          }
+          
+          const resultsDir = './results_all';
+          const runId = 'gh-' + new Date().toISOString().split('T')[0];
+          const results = [];
+          
+          // Read all result files
+          const modelDirs = fs.readdirSync(resultsDir);
+          for (const modelDir of modelDirs) {
+            const modelPath = path.join(resultsDir, modelDir);
+            if (!fs.statSync(modelPath).isDirectory()) continue;
+            
+            const modelId = modelDir.replace(/_/g, '/');
+            const files = fs.readdirSync(modelPath).filter(f => f.endsWith('.json'));
+            
+            for (const file of files) {
+              const data = JSON.parse(fs.readFileSync(path.join(modelPath, file), 'utf-8'));
+              const frameId = file.replace('.json', '');
+              const timeframe = frameId.split('_')[0];
+              
+              results.push({
+                runId,
+                modelId,
+                frameId,
+                timeframe,
+                accuracy: data.score?.accuracy ?? data.score?.multiStepAccuracy ?? 0,
+                exactMatches: data.score?.exactMatchCount ?? 0,
+                latencyMs: data.durationMs ?? 0,
+                prediction: data.prediction,
+                groundTruth: data.groundTruth,
+                error: data.error
+              });
+            }
+          }
+          
+          console.log('📊 Pushing ' + results.length + ' results to database...');
+          
+          fetch(WEBSITE_URL + '/api/db/write', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + API_KEY
+            },
+            body: JSON.stringify(results)
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.error) {
+              console.error('❌ Error:', data.error);
+              process.exit(1);
+            }
+            console.log('✅ Results pushed successfully:', data);
+          })
+          .catch(err => {
+            console.error('❌ Failed to push results:', err);
+            process.exit(1);
+          });
+          "
+      
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            benchmarks/trading/007-chart-reader/results_all/
+            benchmarks/trading/007-chart-reader/benchmark.log
+            benchmarks/trading/007-chart-reader/BENCHMARK_RESULTS.md
+          retention-days: 30
+
