@@ -49,11 +49,12 @@ interface ModelResult {
   frames: FrameResult[];
 }
 
-// Try to fetch from database
+// Try to fetch from database - averages across ALL runs
 async function fetchFromDatabase(): Promise<{
   models: ModelResult[];
   lastUpdated: string;
   runId: string;
+  totalRuns: number;
 } | null> {
   // Only try database if POSTGRES_URL is configured
   if (!process.env.POSTGRES_URL) {
@@ -63,102 +64,121 @@ async function fetchFromDatabase(): Promise<{
   try {
     const { sql } = await import('@vercel/postgres');
     
-    // Get the latest run_id
-    const latestRun = await sql`
-      SELECT run_id, MAX(created_at) as latest 
+    // Get average accuracy across ALL runs for each model
+    const avgResults = await sql`
+      SELECT 
+        model_id,
+        AVG(accuracy) as avg_accuracy,
+        AVG(exact_matches) as avg_exact_matches,
+        AVG(latency_ms) as avg_latency,
+        COUNT(DISTINCT run_id) as run_count,
+        MAX(created_at) as last_run
       FROM benchmark_results 
-      GROUP BY run_id 
-      ORDER BY latest DESC 
-      LIMIT 1
+      GROUP BY model_id
+      ORDER BY model_id
     `;
 
-    if (latestRun.rows.length === 0) {
+    if (avgResults.rows.length === 0) {
       return null;
     }
 
-    const runId = latestRun.rows[0].run_id as string;
-
-    // Get all results for the latest run
-    const results = await sql`
+    // Get per-frame averages for each model (across all runs)
+    const frameAvgResults = await sql`
       SELECT 
-        model_id, frame_id, timeframe,
-        accuracy, exact_matches, latency_ms,
-        prediction, ground_truth, error, created_at
+        model_id,
+        frame_id,
+        AVG(accuracy) as avg_accuracy,
+        AVG(exact_matches) as avg_exact_matches,
+        AVG(latency_ms) as avg_latency,
+        COUNT(*) as sample_count
       FROM benchmark_results 
-      WHERE run_id = ${runId}
+      GROUP BY model_id, frame_id
       ORDER BY model_id, frame_id
     `;
 
-    if (results.rows.length === 0) {
-      return null;
+    // Group frame results by model
+    const framesByModel: Record<string, typeof frameAvgResults.rows> = {};
+    for (const row of frameAvgResults.rows) {
+      const modelId = row.model_id as string;
+      if (!framesByModel[modelId]) {
+        framesByModel[modelId] = [];
+      }
+      framesByModel[modelId].push(row);
     }
 
-    // Group results by model
-    const resultsByModel: Record<string, typeof results.rows> = {};
-    for (const row of results.rows) {
-      const modelId = row.model_id as string;
-      if (!resultsByModel[modelId]) {
-        resultsByModel[modelId] = [];
-      }
-      resultsByModel[modelId].push(row);
-    }
+    // Get total unique runs
+    const runCountResult = await sql`
+      SELECT COUNT(DISTINCT run_id) as total_runs FROM benchmark_results
+    `;
+    const totalRuns = Number(runCountResult.rows[0]?.total_runs || 0);
 
     // Build response
     const modelResults: ModelResult[] = [];
+    let lastUpdated = new Date(0);
 
     for (const model of DASHBOARD_MODELS) {
-      const modelRows = resultsByModel[model.id] || [];
-      const frames: FrameResult[] = [];
-      let totalAccuracy = 0;
-      let totalExactMatches = 0;
-      let totalLatency = 0;
-
-      for (const frame of FRAMES) {
-        const row = modelRows.find((r) => r.frame_id === frame.id);
-        if (row) {
-          const accuracy = Number(row.accuracy) * 100;
-          frames.push({
+      const avgRow = avgResults.rows.find((r) => r.model_id === model.id);
+      const modelFrames = framesByModel[model.id] || [];
+      
+      const frames: FrameResult[] = FRAMES.map((frame) => {
+        const frameRow = modelFrames.find((r) => r.frame_id === frame.id);
+        if (frameRow) {
+          return {
             frameId: frame.id,
-            accuracy,
-            exactMatches: Number(row.exact_matches),
-            predictions: (row.prediction as Record<string, unknown>) || {},
-            groundTruth: (row.ground_truth as Record<string, unknown>) || {},
-            duration: Number(row.latency_ms),
-          });
-          totalAccuracy += accuracy;
-          totalExactMatches += Number(row.exact_matches);
-          totalLatency += Number(row.latency_ms);
-        } else {
-          frames.push({
-            frameId: frame.id,
-            accuracy: 0,
-            exactMatches: 0,
+            accuracy: Number(frameRow.avg_accuracy) * 100,
+            exactMatches: Number(frameRow.avg_exact_matches),
             predictions: {},
             groundTruth: {},
-            duration: 0,
-          });
+            duration: Number(frameRow.avg_latency),
+          };
         }
-      }
-
-      const frameCount = modelRows.length || 1;
-      modelResults.push({
-        modelId: model.id,
-        shortName: model.shortName,
-        provider: model.provider,
-        cost: model.cost,
-        avgAccuracy: totalAccuracy / frameCount,
-        avgExactMatches: totalExactMatches / frameCount,
-        avgLatency: totalLatency / frameCount,
-        frames,
+        return {
+          frameId: frame.id,
+          accuracy: 0,
+          exactMatches: 0,
+          predictions: {},
+          groundTruth: {},
+          duration: 0,
+        };
       });
+
+      if (avgRow) {
+        const rowLastRun = new Date(avgRow.last_run as string);
+        if (rowLastRun > lastUpdated) {
+          lastUpdated = rowLastRun;
+        }
+        
+        modelResults.push({
+          modelId: model.id,
+          shortName: model.shortName,
+          provider: model.provider,
+          cost: model.cost,
+          avgAccuracy: Number(avgRow.avg_accuracy) * 100,
+          avgExactMatches: Number(avgRow.avg_exact_matches),
+          avgLatency: Number(avgRow.avg_latency),
+          frames,
+        });
+      } else {
+        // Model not in database yet
+        modelResults.push({
+          modelId: model.id,
+          shortName: model.shortName,
+          provider: model.provider,
+          cost: model.cost,
+          avgAccuracy: 0,
+          avgExactMatches: 0,
+          avgLatency: 0,
+          frames,
+        });
+      }
     }
 
-    // Get last update time
-    const lastUpdated = results.rows[0]?.created_at 
-      ? new Date(results.rows[0].created_at as string).toISOString()
-      : new Date().toISOString();
-
-    return { models: modelResults, lastUpdated, runId };
+    return { 
+      models: modelResults, 
+      lastUpdated: lastUpdated.toISOString(), 
+      runId: `avg-${totalRuns}-runs`,
+      totalRuns,
+    };
   } catch (error) {
     console.error('Database fetch error (falling back to hardcoded):', error);
     return null;
@@ -216,5 +236,6 @@ export async function GET() {
     frames: FRAMES,
     hasData: true,
     source: 'fallback',
+    totalRuns: 1,
   });
 }

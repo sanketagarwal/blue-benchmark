@@ -100,7 +100,7 @@ Also provide:
 Return ONLY valid JSON. No commentary. Every boolean MUST be true or false.`;
 
 export default function Home() {
-  const [data, setData] = useState<{ models: ModelResult[]; lastUpdated: string } | null>(null);
+  const [data, setData] = useState<{ models: ModelResult[]; lastUpdated: string; totalRuns?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
@@ -129,7 +129,10 @@ export default function Home() {
           Testing vision LLMs&apos; ability to read and interpret candlestick charts
         </p>
         <p style={{ color: '#999', fontSize: 14, marginTop: 8 }}>
-          Last updated: {new Date(lastUpdated).toLocaleString()} • Auto-updates every 2 hours
+          {data?.totalRuns && data.totalRuns > 1 
+            ? `Average across ${data.totalRuns} benchmark runs`
+            : `Last updated: ${new Date(lastUpdated).toLocaleString()}`
+          } • Auto-updates daily
         </p>
       </header>
 
