@@ -437,27 +437,27 @@ pnpm benchmark --expensive       # 3 frontier models`}</pre>
       <Section title="7. Key Insights">
         <div style={{ display: 'grid', gap: 16 }}>
           <InsightCard
-            title="Cost ≠ Performance"
-            description="Gemini 2.5 Flash Lite ($0.38) achieves 72% accuracy, while Claude Opus 4.5 ($30) only reaches 71%. 80x cost increase yields NO accuracy improvement - cheaper models win!"
-            verdict="✅ Hypothesis confirmed: Cost doesn't predict accuracy"
+            title="Cost ≠ Performance (Non-Linear)"
+            description="Gemini 2.5 Flash ($0.75/M) leads at 75.0% accuracy. Claude Opus 4.5 ($30/M) at 70.8% - 40x more expensive for 5% less accuracy!"
+            verdict="✅ Mid-tier models outperform premium"
           />
           
           <InsightCard
-            title="All Models Achieve 60-74% on Multi-Step Reasoning"
-            description="Models successfully combine multiple chart signals (VWAP, Bollinger Bands, trend) to reach trading conclusions. Gemini 2.5 Flash leads at 74%."
+            title="All Models Achieve 65-75% on Multi-Step Reasoning"
+            description="Models successfully combine VWAP, Bollinger Bands, and trend signals to reach trading conclusions. Top 4 models cluster between 69-75%."
             verdict="✅ Vision LLMs can read charts"
           />
           
           <InsightCard
-            title="Cheapest Model Outperforms Most Expensive"
-            description="Gemini 2.5 Flash Lite ($0.38/M) at 72% beats Claude Opus 4.5 ($30/M) at 71%. Budget models are not just viable - they're competitive!"
-            verdict="✅ Budget models win on value"
+            title="Budget Models Are Highly Competitive"
+            description="Gemini 2.5 Flash Lite ($0.38/M) at 69.5% achieves 93% of the best model's accuracy. Excellent cost-efficiency for production use."
+            verdict="✅ Budget models are viable"
           />
           
           <InsightCard
-            title="Latency Varies by Model Version"
-            description="Gemini 2.5 Flash (~22s avg) is 10x slower than Gemini 2.5 Flash Lite (~2s). Gemini 2.0 Flash at ~3s offers good balance."
-            verdict="⚠️ Pick model based on latency needs"
+            title="Latency Varies 10x Between Models"
+            description="Gemini 2.5 Flash Lite (~1.7s) is fastest. Gemini 2.5 Flash (~16s avg) is slowest - 10x difference! Gemini 2.0 Flash (~3.5s) offers good balance."
+            verdict="⚠️ Factor in latency requirements"
           />
         </div>
 
@@ -474,22 +474,22 @@ pnpm benchmark --expensive       # 3 frontier models`}</pre>
             <tr>
               <td>Highest Accuracy</td>
               <td>Gemini 2.5 Flash</td>
-              <td>~74% accuracy (best overall)</td>
+              <td>75.0% accuracy (best overall)</td>
             </tr>
             <tr>
               <td>Best Value</td>
               <td>Gemini 2.5 Flash Lite</td>
-              <td>~72% at $0.38/M (98% of best at 1% cost)</td>
+              <td>69.5% at $0.38/M (93% of best at 0.5x cost)</td>
             </tr>
             <tr>
               <td>Fastest Response</td>
               <td>Gemini 2.5 Flash Lite</td>
-              <td>~2s average latency</td>
+              <td>~1.7s average latency</td>
             </tr>
             <tr>
               <td>Balanced</td>
-              <td>Gemini 2.0 Flash</td>
-              <td>~63% accuracy, ~3s latency, low cost</td>
+              <td>GPT-4o</td>
+              <td>69.4% accuracy, ~6s latency, reliable</td>
             </tr>
           </tbody>
         </table>
