@@ -295,7 +295,7 @@ async function evaluateModel(
       });
 
       // Run the agent
-      const result = await runRound(agent, '');
+      const result = await runRound(agent);
       const prediction = result.output as ChartPredictionOutput;
 
       // Score the prediction against next period's ground truth

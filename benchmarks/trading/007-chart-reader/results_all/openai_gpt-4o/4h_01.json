@@ -1,9 +1,9 @@
 {
-  "frameId": "4h_02",
+  "frameId": "4h_01",
   "timeframe": "4h",
-  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
-  "timestamp": "2025-12-19T16:00:00.000Z",
-  "durationMs": 5605,
+  "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+  "timestamp": "2025-12-20T12:00:00.000Z",
+  "durationMs": 6270,
   "error": null,
   "prediction": {
     "meta": {
@@ -12,18 +12,18 @@
       "timeframe": "4h"
     },
     "active_readout": {
-      "open": 88153,
-      "high": 89366,
-      "low": 87478,
-      "close": 87900
+      "open": 88244,
+      "high": 88399,
+      "low": 88063,
+      "close": 88238
     },
     "multi_step": {
       "uptrend_pullback_to_vwap": false,
-      "volatility_direction_combo": "high_vol_bullish",
+      "volatility_direction_combo": "consolidation",
       "tested_and_held_support": false,
       "breakout_with_volume": false,
       "potential_reversal_at_support": false,
-      "overall_bias": "mildly_bullish"
+      "overall_bias": "neutral"
     }
   },
   "groundTruth": {
@@ -47,15 +47,15 @@
       "overall_bias": "mildly_bullish"
     },
     "_debug": {
-      "supportLevel": 87648.6,
-      "resistanceLevel": 87962.74,
+      "supportLevel": 88204,
+      "resistanceLevel": 88265.7,
       "supportFromAnnotations": true,
       "resistanceFromAnnotations": true,
-      "vwap": 87058.69413761853,
+      "vwap": 87192.22244167695,
       "bb": {
-        "upper": 89934.0538888889,
-        "lower": 84029.8938888889,
-        "mid": 86981.9738888889
+        "upper": 89014.63748194999,
+        "lower": 85140.10901805002,
+        "mid": 87077.37325
       },
       "trendDir": "up",
       "volLevel": "medium"
@@ -64,14 +64,14 @@
   "score": {
     "fieldScores": {
       "uptrend_pullback_to_vwap": 1,
-      "volatility_direction_combo": 0,
+      "volatility_direction_combo": 1,
       "tested_and_held_support": 1,
       "breakout_with_volume": 1,
       "potential_reversal_at_support": 1,
-      "overall_bias": 1
+      "overall_bias": 0.5
     },
     "exactMatchCount": 5,
     "totalFields": 6,
-    "accuracy": 0.8333333333333334
+    "accuracy": 0.9166666666666666
   }
 }

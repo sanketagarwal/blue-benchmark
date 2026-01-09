@@ -229,7 +229,7 @@ async function runAnalysisRound(
   const agent = createChartReader(modelId);
 
   try {
-    const result = await runRound(agent, '');
+    const result = await runRound(agent);
     const prediction = result.output as ChartReadingOutput;
     const score = scoreChartReading(prediction, groundTruth);
 

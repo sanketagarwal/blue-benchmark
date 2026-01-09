@@ -213,7 +213,7 @@ async function main() {
   
   let baseline: ChartReadingOutput;
   try {
-    const result = await runRound(agent, '');
+    const result = await runRound(agent);
     baseline = result.output as ChartReadingOutput;
     console.log('Model prediction:');
     console.log(JSON.stringify(baseline.multi_step, null, 2));
@@ -240,7 +240,7 @@ async function main() {
   
   let round2: ChartReadingOutput;
   try {
-    const result2 = await runRound(agent, '');
+    const result2 = await runRound(agent);
     round2 = result2.output as ChartReadingOutput;
     console.log('Model prediction:');
     console.log(JSON.stringify(round2.multi_step, null, 2));
@@ -267,7 +267,7 @@ async function main() {
   
   let round3: ChartReadingOutput;
   try {
-    const result3 = await runRound(agent, '');
+    const result3 = await runRound(agent);
     round3 = result3.output as ChartReadingOutput;
     console.log('Model prediction:');
     console.log(JSON.stringify(round3.multi_step, null, 2));

@@ -1,0 +1,2833 @@
+{
+  "config": {
+    "symbolId": "COINBASE_SPOT_BTC_USD",
+    "timeframes": [
+      "15m",
+      "1h",
+      "4h"
+    ],
+    "samplesPerTimeframe": 2,
+    "startTime": "2025-12-20T12:00:00.000Z",
+    "quickMode": true,
+    "totalFrames": 6,
+    "modelsEvaluated": 6
+  },
+  "results": [
+    {
+      "modelId": "anthropic/claude-opus-4-5",
+      "successCount": 6,
+      "failures": 0,
+      "frames": [
+        {
+          "frameId": "15m_01",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 5542,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88232,
+              "high": 88266,
+              "low": 88204,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88178.345,
+              "high": 88275,
+              "low": 88170.025,
+              "close": 88239.45
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88271.67537121575,
+              "bb": {
+                "upper": 88419.4036787709,
+                "lower": 88148.8463212291,
+                "mid": 88284.125
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "15m_02",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+          "timestamp": "2025-12-20T10:45:00.000Z",
+          "durationMs": 5341,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88121,
+              "high": 88162,
+              "low": 88097,
+              "close": 88148
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bearish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88147.965,
+              "high": 88282.03,
+              "low": 88143.01,
+              "close": 88274.63
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "bullish"
+            },
+            "_debug": {
+              "supportLevel": 88082.01,
+              "resistanceLevel": 88182.65,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88265.10516519292,
+              "bb": {
+                "upper": 88429.1212624922,
+                "lower": 88100.04173750774,
+                "mid": 88264.58149999997
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        },
+        {
+          "frameId": "1h_01",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 6325,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88128,
+              "high": 88278,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 87078.425,
+              "high": 87430.945,
+              "low": 86845.68,
+              "close": 87429.48
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87924.25921744344,
+              "bb": {
+                "upper": 88562.89168146682,
+                "lower": 87176.00881853317,
+                "mid": 87869.45025
+              },
+              "trendDir": "down",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5
+          }
+        },
+        {
+          "frameId": "1h_02",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+          "timestamp": "2025-12-20T07:00:00.000Z",
+          "durationMs": 5947,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88258,
+              "high": 88418,
+              "low": 88236,
+              "close": 88268
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 85562.01,
+              "high": 85562.7,
+              "low": 85107.54,
+              "close": 85270.645
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87090,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87624.79400283417,
+              "bb": {
+                "upper": 89059.81728698473,
+                "lower": 85841.4672130153,
+                "mid": 87450.64225000002
+              },
+              "trendDir": "down",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        },
+        {
+          "frameId": "4h_01",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 7226,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88244,
+              "high": 88399,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87192.22244167695,
+              "bb": {
+                "upper": 89014.63748194999,
+                "lower": 85140.10901805002,
+                "mid": 87077.37325
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.8333333333333334
+          }
+        },
+        {
+          "frameId": "4h_02",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
+          "timestamp": "2025-12-19T16:00:00.000Z",
+          "durationMs": 5605,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88153,
+              "high": 89366,
+              "low": 87478,
+              "close": 87900
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "high_vol_bullish",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87962.74,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87058.69413761853,
+              "bb": {
+                "upper": 89934.0538888889,
+                "lower": 84029.8938888889,
+                "mid": 86981.9738888889
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.8333333333333334
+          }
+        }
+      ]
+    },
+    {
+      "modelId": "openai/gpt-4o",
+      "successCount": 6,
+      "failures": 0,
+      "frames": [
+        {
+          "frameId": "15m_01",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 6893,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88232,
+              "high": 88266,
+              "low": 88204,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88178.345,
+              "high": 88275,
+              "low": 88170.025,
+              "close": 88239.45
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88271.67537121575,
+              "bb": {
+                "upper": 88419.4036787709,
+                "lower": 88148.8463212291,
+                "mid": 88284.125
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "15m_02",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+          "timestamp": "2025-12-20T10:45:00.000Z",
+          "durationMs": 5264,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88121,
+              "high": 88162,
+              "low": 88097,
+              "close": 88148
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88147.965,
+              "high": 88282.03,
+              "low": 88143.01,
+              "close": 88274.63
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "bullish"
+            },
+            "_debug": {
+              "supportLevel": 88082.01,
+              "resistanceLevel": 88182.65,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88265.10516519292,
+              "bb": {
+                "upper": 88429.1212624922,
+                "lower": 88100.04173750774,
+                "mid": 88264.58149999997
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5
+          }
+        },
+        {
+          "frameId": "1h_01",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 5692,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88.128,
+              "high": 88.278,
+              "low": 88.063,
+              "close": 88.238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": true,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 87078.425,
+              "high": 87430.945,
+              "low": 86845.68,
+              "close": 87429.48
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87924.25921744344,
+              "bb": {
+                "upper": 88562.89168146682,
+                "lower": 87176.00881853317,
+                "mid": 87869.45025
+              },
+              "trendDir": "down",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 0,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5
+          }
+        },
+        {
+          "frameId": "1h_02",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+          "timestamp": "2025-12-20T07:00:00.000Z",
+          "durationMs": 8511,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88258,
+              "high": 88418,
+              "low": 88236,
+              "close": 88268
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 85562.01,
+              "high": 85562.7,
+              "low": 85107.54,
+              "close": 85270.645
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87090,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87624.79400283417,
+              "bb": {
+                "upper": 89059.81728698473,
+                "lower": 85841.4672130153,
+                "mid": 87450.64225000002
+              },
+              "trendDir": "down",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.9166666666666666
+          }
+        },
+        {
+          "frameId": "4h_01",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 6270,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88244,
+              "high": 88399,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87192.22244167695,
+              "bb": {
+                "upper": 89014.63748194999,
+                "lower": 85140.10901805002,
+                "mid": 87077.37325
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.9166666666666666
+          }
+        },
+        {
+          "frameId": "4h_02",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
+          "timestamp": "2025-12-19T16:00:00.000Z",
+          "durationMs": 6608,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88.153,
+              "high": 89.366,
+              "low": 87.478,
+              "close": 87.9
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87962.74,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87058.69413761853,
+              "bb": {
+                "upper": 89934.0538888889,
+                "lower": 84029.8938888889,
+                "mid": 86981.9738888889
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        }
+      ]
+    },
+    {
+      "modelId": "openai/gpt-4o-mini",
+      "successCount": 6,
+      "failures": 0,
+      "frames": [
+        {
+          "frameId": "15m_01",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 3537,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88232,
+              "high": 88266,
+              "low": 88204,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88178.345,
+              "high": 88275,
+              "low": 88170.025,
+              "close": 88239.45
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88271.67537121575,
+              "bb": {
+                "upper": 88419.4036787709,
+                "lower": 88148.8463212291,
+                "mid": 88284.125
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5833333333333334
+          }
+        },
+        {
+          "frameId": "15m_02",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+          "timestamp": "2025-12-20T10:45:00.000Z",
+          "durationMs": 5582,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88201,
+              "high": 88262,
+              "low": 88097,
+              "close": 88148
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": true,
+              "volatility_direction_combo": "high_vol_bullish",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88147.965,
+              "high": 88282.03,
+              "low": 88143.01,
+              "close": 88274.63
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "bullish"
+            },
+            "_debug": {
+              "supportLevel": 88082.01,
+              "resistanceLevel": 88182.65,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88265.10516519292,
+              "bb": {
+                "upper": 88429.1212624922,
+                "lower": 88100.04173750774,
+                "mid": 88264.58149999997
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 0,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 2,
+            "totalFields": 6,
+            "accuracy": 0.4166666666666667
+          }
+        },
+        {
+          "frameId": "1h_01",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 3727,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88128,
+              "high": 88278,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 87078.425,
+              "high": 87430.945,
+              "low": 86845.68,
+              "close": 87429.48
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87924.25921744344,
+              "bb": {
+                "upper": 88562.89168146682,
+                "lower": 87176.00881853317,
+                "mid": 87869.45025
+              },
+              "trendDir": "down",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5
+          }
+        },
+        {
+          "frameId": "1h_02",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+          "timestamp": "2025-12-20T07:00:00.000Z",
+          "durationMs": 4612,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88258,
+              "high": 88418,
+              "low": 88236,
+              "close": 88268
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": true,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 85562.01,
+              "high": 85562.7,
+              "low": 85107.54,
+              "close": 85270.645
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87090,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87624.79400283417,
+              "bb": {
+                "upper": 89059.81728698473,
+                "lower": 85841.4672130153,
+                "mid": 87450.64225000002
+              },
+              "trendDir": "down",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 0,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 2,
+            "totalFields": 6,
+            "accuracy": 0.3333333333333333
+          }
+        },
+        {
+          "frameId": "4h_01",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 6483,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88244,
+              "high": 88399,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87192.22244167695,
+              "bb": {
+                "upper": 89014.63748194999,
+                "lower": 85140.10901805002,
+                "mid": 87077.37325
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.9166666666666666
+          }
+        },
+        {
+          "frameId": "4h_02",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
+          "timestamp": "2025-12-19T16:00:00.000Z",
+          "durationMs": 3571,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88700,
+              "high": 89366,
+              "low": 86748,
+              "close": 87800
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "high_vol_bearish",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "bearish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87962.74,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87058.69413761853,
+              "bb": {
+                "upper": 89934.0538888889,
+                "lower": 84029.8938888889,
+                "mid": 86981.9738888889
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        }
+      ]
+    },
+    {
+      "modelId": "google/gemini-2.0-flash",
+      "successCount": 6,
+      "failures": 0,
+      "frames": [
+        {
+          "frameId": "15m_01",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 4070,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88232,
+              "high": 88266,
+              "low": 88204,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": true,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88178.345,
+              "high": 88275,
+              "low": 88170.025,
+              "close": 88239.45
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88271.67537121575,
+              "bb": {
+                "upper": 88419.4036787709,
+                "lower": 88148.8463212291,
+                "mid": 88284.125
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 0,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 1,
+            "totalFields": 6,
+            "accuracy": 0.25
+          }
+        },
+        {
+          "frameId": "15m_02",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+          "timestamp": "2025-12-20T10:45:00.000Z",
+          "durationMs": 3060,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88121,
+              "high": 88162,
+              "low": 88097,
+              "close": 88148
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88147.965,
+              "high": 88282.03,
+              "low": 88143.01,
+              "close": 88274.63
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "bullish"
+            },
+            "_debug": {
+              "supportLevel": 88082.01,
+              "resistanceLevel": 88182.65,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88265.10516519292,
+              "bb": {
+                "upper": 88429.1212624922,
+                "lower": 88100.04173750774,
+                "mid": 88264.58149999997
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5
+          }
+        },
+        {
+          "frameId": "1h_01",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 3423,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88128,
+              "high": 88278,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 87078.425,
+              "high": 87430.945,
+              "low": 86845.68,
+              "close": 87429.48
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87924.25921744344,
+              "bb": {
+                "upper": 88562.89168146682,
+                "lower": 87176.00881853317,
+                "mid": 87869.45025
+              },
+              "trendDir": "down",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "1h_02",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+          "timestamp": "2025-12-20T07:00:00.000Z",
+          "durationMs": 2846,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88258,
+              "high": 88418,
+              "low": 88236,
+              "close": 88268
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 85562.01,
+              "high": 85562.7,
+              "low": 85107.54,
+              "close": 85270.645
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87090,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87624.79400283417,
+              "bb": {
+                "upper": 89059.81728698473,
+                "lower": 85841.4672130153,
+                "mid": 87450.64225000002
+              },
+              "trendDir": "down",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.9166666666666666
+          }
+        },
+        {
+          "frameId": "4h_01",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 4336,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88244,
+              "high": 88399,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": true,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87192.22244167695,
+              "bb": {
+                "upper": 89014.63748194999,
+                "lower": 85140.10901805002,
+                "mid": 87077.37325
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 0,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        },
+        {
+          "frameId": "4h_02",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
+          "timestamp": "2025-12-19T16:00:00.000Z",
+          "durationMs": 2928,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88153,
+              "high": 89366,
+              "low": 87478,
+              "close": 87900
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": true,
+              "volatility_direction_combo": "high_vol_bearish",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87962.74,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87058.69413761853,
+              "bb": {
+                "upper": 89934.0538888889,
+                "lower": 84029.8938888889,
+                "mid": 86981.9738888889
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 0,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 3,
+            "totalFields": 6,
+            "accuracy": 0.5833333333333334
+          }
+        }
+      ]
+    },
+    {
+      "modelId": "google/gemini-2.5-flash",
+      "successCount": 6,
+      "failures": 0,
+      "frames": [
+        {
+          "frameId": "15m_01",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 13153,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88232,
+              "high": 88266,
+              "low": 88204,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88178.345,
+              "high": 88275,
+              "low": 88170.025,
+              "close": 88239.45
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88271.67537121575,
+              "bb": {
+                "upper": 88419.4036787709,
+                "lower": 88148.8463212291,
+                "mid": 88284.125
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "15m_02",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+          "timestamp": "2025-12-20T10:45:00.000Z",
+          "durationMs": 14040,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88121,
+              "high": 88162,
+              "low": 88097,
+              "close": 88148
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "mildly_bearish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88147.965,
+              "high": 88282.03,
+              "low": 88143.01,
+              "close": 88274.63
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "bullish"
+            },
+            "_debug": {
+              "supportLevel": 88082.01,
+              "resistanceLevel": 88182.65,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88265.10516519292,
+              "bb": {
+                "upper": 88429.1212624922,
+                "lower": 88100.04173750774,
+                "mid": 88264.58149999997
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        },
+        {
+          "frameId": "1h_01",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 9119,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88128,
+              "high": 88278,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 87078.425,
+              "high": 87430.945,
+              "low": 86845.68,
+              "close": 87429.48
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87924.25921744344,
+              "bb": {
+                "upper": 88562.89168146682,
+                "lower": 87176.00881853317,
+                "mid": 87869.45025
+              },
+              "trendDir": "down",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "1h_02",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+          "timestamp": "2025-12-20T07:00:00.000Z",
+          "durationMs": 13404,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88258,
+              "high": 88418,
+              "low": 88236,
+              "close": 88268
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 85562.01,
+              "high": 85562.7,
+              "low": 85107.54,
+              "close": 85270.645
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87090,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87624.79400283417,
+              "bb": {
+                "upper": 89059.81728698473,
+                "lower": 85841.4672130153,
+                "mid": 87450.64225000002
+              },
+              "trendDir": "down",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.8333333333333334
+          }
+        },
+        {
+          "frameId": "4h_01",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 18439,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88244,
+              "high": 88399,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87192.22244167695,
+              "bb": {
+                "upper": 89014.63748194999,
+                "lower": 85140.10901805002,
+                "mid": 87077.37325
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        },
+        {
+          "frameId": "4h_02",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
+          "timestamp": "2025-12-19T16:00:00.000Z",
+          "durationMs": 32376,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88153,
+              "high": 89366,
+              "low": 87478,
+              "close": 87900
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "high_vol_bullish",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87962.74,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87058.69413761853,
+              "bb": {
+                "upper": 89934.0538888889,
+                "lower": 84029.8938888889,
+                "mid": 86981.9738888889
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.8333333333333334
+          }
+        }
+      ]
+    },
+    {
+      "modelId": "google/gemini-2.5-flash-lite",
+      "successCount": 6,
+      "failures": 0,
+      "frames": [
+        {
+          "frameId": "15m_01",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T04%3A30%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981666&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=1k384gVs55EJMc9M1tCHDVl2gbTG4Fc5s4Fw7wo79Jk",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 2431,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "BTC/USD",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88232,
+              "high": 88266,
+              "low": 88204,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88178.345,
+              "high": 88275,
+              "low": 88170.025,
+              "close": 88239.45
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88271.67537121575,
+              "bb": {
+                "upper": 88419.4036787709,
+                "lower": 88148.8463212291,
+                "mid": 88284.125
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 1
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.8333333333333334
+          }
+        },
+        {
+          "frameId": "15m_02",
+          "timeframe": "15m",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-20T03%3A15%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=15m&to=2025-12-20T10%3A45%3A00.000Z&width=900&expires=1767981667&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=a-65Tq2nE4xbpPWfEqHLY2kmPhDboHwVp_Y8eIxrOI4",
+          "timestamp": "2025-12-20T10:45:00.000Z",
+          "durationMs": 2588,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88162,
+              "high": 88207,
+              "low": 88097,
+              "close": 88148
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "15m"
+            },
+            "active_readout": {
+              "open": 88147.965,
+              "high": 88282.03,
+              "low": 88143.01,
+              "close": 88274.63
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": true,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": true,
+              "overall_bias": "bullish"
+            },
+            "_debug": {
+              "supportLevel": 88082.01,
+              "resistanceLevel": 88182.65,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 88265.10516519292,
+              "bb": {
+                "upper": 88429.1212624922,
+                "lower": 88100.04173750774,
+                "mid": 88264.58149999997
+              },
+              "trendDir": "flat",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 0,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 0,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 2,
+            "totalFields": 6,
+            "accuracy": 0.3333333333333333
+          }
+        },
+        {
+          "frameId": "1h_01",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T06%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981668&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=C3OYvYuZAFgkjp8oFXZ59DdcUkxbNLY95wFuC5T7FNA",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 1904,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88128,
+              "high": 88278,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 87078.425,
+              "high": 87430.945,
+              "low": 86845.68,
+              "close": 87429.48
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_down",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87924.25921744344,
+              "bb": {
+                "upper": 88562.89168146682,
+                "lower": 87176.00881853317,
+                "mid": 87869.45025
+              },
+              "trendDir": "down",
+              "volLevel": "low"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "1h_02",
+          "timeframe": "1h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-19T01%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=1h&to=2025-12-20T07%3A00%3A00.000Z&width=900&expires=1767981669&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bO1uBXBkfvzHy1kzhluwuwuDoOZDRxee5BT_kopVAKw",
+          "timestamp": "2025-12-20T07:00:00.000Z",
+          "durationMs": 3059,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 88638,
+              "high": 88976,
+              "low": 88526,
+              "close": 88898
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "low_vol_drift_up",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "1h"
+            },
+            "active_readout": {
+              "open": 85562.01,
+              "high": 85562.7,
+              "low": 85107.54,
+              "close": 85270.645
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bearish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87090,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87624.79400283417,
+              "bb": {
+                "upper": 89059.81728698473,
+                "lower": 85841.4672130153,
+                "mid": 87450.64225000002
+              },
+              "trendDir": "down",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.75
+          }
+        },
+        {
+          "frameId": "4h_01",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-15T12%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-20T12%3A00%3A00.000Z&width=900&expires=1767981670&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=pX6e0DVndayasSe5pd6_8j-jGRRBLibsDzsmvo_ruvs",
+          "timestamp": "2025-12-20T12:00:00.000Z",
+          "durationMs": 1752,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "BTC / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88244,
+              "high": 88399,
+              "low": 88063,
+              "close": 88238
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "neutral"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 88204,
+              "resistanceLevel": 88265.7,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87192.22244167695,
+              "bb": {
+                "upper": 89014.63748194999,
+                "lower": 85140.10901805002,
+                "mid": 87077.37325
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 1,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0.5
+            },
+            "exactMatchCount": 5,
+            "totalFields": 6,
+            "accuracy": 0.9166666666666666
+          }
+        },
+        {
+          "frameId": "4h_02",
+          "timeframe": "4h",
+          "chartUrl": "https://replay-lab-delta.preview.recall.network/api/charts/COINBASE_SPOT_BTC_USD/image?from=2025-12-14T16%3A00%3A00.000Z&height=600&layers=candles%2Csma%3A20%2Cema%3A20%2Cbb%3A20%3A2%2Cvwap%2Cvolume&timeframe=4h&to=2025-12-19T16%3A00%3A00.000Z&width=900&expires=1767981671&userId=KIDrm8SnTO13hlBidALo0BYvNW2iZjOn&sig=bg-nqn5DDE7daI89uFklxIBBqH95qNUjC-G17JuHju8",
+          "timestamp": "2025-12-19T16:00:00.000Z",
+          "durationMs": 1308,
+          "error": null,
+          "prediction": {
+            "meta": {
+              "base_quote": "BTC/USD",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 88153,
+              "high": 89366,
+              "low": 87478,
+              "close": 87900
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "high_vol_bearish",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "bearish"
+            }
+          },
+          "groundTruth": {
+            "meta": {
+              "base_quote": "Bitcoin / U.S. Dollar",
+              "venue": "Coinbase",
+              "timeframe": "4h"
+            },
+            "active_readout": {
+              "open": 87569.995,
+              "high": 88005.62,
+              "low": 87041.855,
+              "close": 87565.115
+            },
+            "multi_step": {
+              "uptrend_pullback_to_vwap": false,
+              "volatility_direction_combo": "consolidation",
+              "tested_and_held_support": false,
+              "breakout_with_volume": false,
+              "potential_reversal_at_support": false,
+              "overall_bias": "mildly_bullish"
+            },
+            "_debug": {
+              "supportLevel": 87648.6,
+              "resistanceLevel": 87962.74,
+              "supportFromAnnotations": true,
+              "resistanceFromAnnotations": true,
+              "vwap": 87058.69413761853,
+              "bb": {
+                "upper": 89934.0538888889,
+                "lower": 84029.8938888889,
+                "mid": 86981.9738888889
+              },
+              "trendDir": "up",
+              "volLevel": "medium"
+            }
+          },
+          "score": {
+            "fieldScores": {
+              "uptrend_pullback_to_vwap": 1,
+              "volatility_direction_combo": 0,
+              "tested_and_held_support": 1,
+              "breakout_with_volume": 1,
+              "potential_reversal_at_support": 1,
+              "overall_bias": 0
+            },
+            "exactMatchCount": 4,
+            "totalFields": 6,
+            "accuracy": 0.6666666666666666
+          }
+        }
+      ]
+    }
+  ],
+  "startedAt": "2026-01-09T17:01:05.923Z",
+  "completedAt": "2026-01-09T17:05:09.273Z"
+}
