@@ -2,7 +2,10 @@
  * Similar Chart Finder
  * 
  * Finds charts with matching pattern conditions for transfer learning tests.
- * Uses ground truth field values to match charts with similar characteristics.
+ * 
+ * Two approaches:
+ * 1. Ground Truth Matching: Uses full ground truth computation (slower, more accurate)
+ * 2. Fingerprint Matching: Uses indicator fingerprints (faster, more matches)
  */
 
 import { getSignedChartUrl, STANDARD_CHART_LAYERS } from './replay-lab/charts.js';
@@ -10,6 +13,12 @@ import { getCandles, type CandleTimeframe, type Candle } from './replay-lab/ohlc
 import { getLocalExtrema } from './replay-lab/annotations.js';
 import { computeGroundTruth, type GroundTruthInput, type ChartMeta, type IndicatorValues } from './ground-truth/index.js';
 import type { ChartReadingOutput } from './output-schema.js';
+import { 
+  createFingerprint, 
+  findSimilarByFingerprint, 
+  describeFingerprint,
+  type ChartFingerprint 
+} from './fingerprint.js';
 
 export interface ChartConditions {
   uptrendPullbackToVwap: boolean;
@@ -252,3 +261,137 @@ export async function findExactMatchChart(
   
   return filtered[0] ?? null;
 }
+
+// ============================================================================
+// FINGERPRINT-BASED SIMILARITY (Method 2 - Faster)
+// ============================================================================
+
+export interface FingerprintSimilarChartResult {
+  chartUrl: string;
+  timeframe: CandleTimeframe;
+  from: Date;
+  to: Date;
+  fingerprint: ChartFingerprint;
+  groundTruth: ChartReadingOutput;
+  candles: Candle[];
+  matchScore: number;
+  matchedFields: string[];
+  description: string;
+}
+
+/**
+ * Find similar charts using indicator fingerprints (faster than ground truth matching)
+ * 
+ * This method:
+ * 1. Creates a fingerprint for the baseline chart
+ * 2. Searches historical data for charts with similar fingerprints
+ * 3. Only computes full ground truth for matching charts
+ */
+export async function findSimilarChartsByFingerprint(
+  baselineFrom: Date,
+  baselineTo: Date,
+  symbolId: string,
+  timeframe: CandleTimeframe,
+  searchRange: { startDate: Date; endDate: Date },
+  minMatchScore = 6,
+  maxResults = 3
+): Promise<FingerprintSimilarChartResult[]> {
+  console.log(`  🔬 Using fingerprint-based similarity search...`);
+  
+  // Step 1: Create fingerprint for baseline chart
+  console.log(`    Creating baseline fingerprint...`);
+  const baselineFingerprint = await createFingerprint(symbolId, timeframe, baselineFrom, baselineTo);
+  console.log(`    Baseline: ${describeFingerprint(baselineFingerprint)}`);
+  
+  // Step 2: Find charts with similar fingerprints
+  const similarFingerprints = await findSimilarByFingerprint(
+    baselineFingerprint,
+    symbolId,
+    timeframe,
+    searchRange,
+    minMatchScore,
+    maxResults * 2 // Get extras in case some fail ground truth computation
+  );
+  
+  if (similarFingerprints.length === 0) {
+    console.log(`    ❌ No similar fingerprints found with score >= ${minMatchScore}`);
+    return [];
+  }
+  
+  console.log(`    Found ${similarFingerprints.length} fingerprint matches, computing ground truth...`);
+  
+  // Step 3: Compute ground truth for matching charts
+  const results: FingerprintSimilarChartResult[] = [];
+  const tfMinutes = timeframeToMinutes(timeframe);
+  
+  for (const match of similarFingerprints) {
+    if (results.length >= maxResults) break;
+    
+    try {
+      // Get candles
+      const candles = await getCandles(symbolId, timeframe, match.from, match.to, 40);
+      if (candles.length < 20) continue;
+      
+      // Get annotations
+      let localExtrema: Awaited<ReturnType<typeof getLocalExtrema>> = [];
+      try {
+        localExtrema = await getLocalExtrema(symbolId, match.from, match.to);
+      } catch {
+        // Annotations are optional
+      }
+      
+      // Compute ground truth
+      const meta: ChartMeta = {
+        base_quote: 'Bitcoin / U.S. Dollar',
+        venue: 'Coinbase',
+        timeframe,
+      };
+      
+      const indicators = computeIndicators(candles);
+      
+      const groundTruthInput: GroundTruthInput = {
+        candles,
+        meta,
+        indicators,
+        timeframeMinutes: tfMinutes,
+        localExtrema,
+      };
+      
+      const groundTruth = computeGroundTruth(groundTruthInput);
+      
+      // Get chart URL
+      const chartUrl = await getSignedChartUrl({
+        symbolId,
+        timeframe,
+        from: match.from,
+        to: match.to,
+        layers: STANDARD_CHART_LAYERS,
+      });
+      
+      results.push({
+        chartUrl,
+        timeframe,
+        from: match.from,
+        to: match.to,
+        fingerprint: match.fingerprint,
+        groundTruth,
+        candles,
+        matchScore: match.matchScore,
+        matchedFields: match.matchedFields,
+        description: describeFingerprint(match.fingerprint),
+      });
+      
+      console.log(`    ✅ Added similar chart from ${match.from.toISOString().slice(0, 10)} (score: ${match.matchScore}/10)`);
+    } catch (error) {
+      console.log(`    ⚠️ Skipping chart: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Re-export fingerprint utilities for external use
+ */
+export { createFingerprint, describeFingerprint, type ChartFingerprint } from './fingerprint.js';

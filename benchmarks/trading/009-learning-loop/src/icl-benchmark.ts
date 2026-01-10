@@ -26,7 +26,7 @@ import { getSignedChartUrl, STANDARD_CHART_LAYERS } from './replay-lab/charts.js
 import { getCandles, type CandleTimeframe } from './replay-lab/ohlcv.js';
 import { getLocalExtrema } from './replay-lab/annotations.js';
 import { computeGroundTruth, type GroundTruthInput, type ChartMeta, type IndicatorValues } from './ground-truth/index.js';
-import { findSimilarCharts, extractConditions } from './similar-charts.js';
+import { findSimilarCharts, extractConditions, findSimilarChartsByFingerprint } from './similar-charts.js';
 import { runICLSession, type ICLRoundInput, type ICLSessionResult } from './icl-loop.js';
 import { initLangfuse, shutdownLangfuse } from './tracing.js';
 import { getDatabase } from './db/client.js';
@@ -72,7 +72,7 @@ function getConfig(): BenchmarkConfig {
     samplesPerTimeframe: quickMode ? 1 : 2,
     startTime,
     similarChartsPerFrame: quickMode ? 1 : 2,
-    searchRangeDays: 30,
+    searchRangeDays: 90, // Extended to find more similar charts
     verbose,
     quickMode,
     singleModel,
@@ -210,13 +210,15 @@ async function generateICLFrames(
           symbolId,
         };
 
-        // Find similar charts
+        // Find similar charts using BOTH approaches
         console.log(`    🔍 Searching for similar charts...`);
         const targetConditions = extractConditions(groundTruth);
         const searchStart = new Date(fromTime.getTime() - searchRangeDays * 24 * 60 * 60 * 1000);
         const searchEnd = new Date(fromTime.getTime() - chartDurationMs); // Don't include the baseline chart
 
-        const similarChartResults = await findSimilarCharts(
+        // Approach 1: Ground Truth Matching (original)
+        console.log(`    📊 Method 1: Ground Truth Matching...`);
+        const groundTruthMatches = await findSimilarCharts(
           targetConditions,
           symbolId,
           timeframe,
@@ -224,8 +226,48 @@ async function generateICLFrames(
           3, // Minimum 3 fields must match
           similarChartsPerFrame
         );
+        console.log(`    ✓ Ground Truth: Found ${groundTruthMatches.length} matches (min 3/6 fields)`);
 
-        console.log(`    ✓ Found ${similarChartResults.length} similar charts (min 3-field match)`);
+        // Approach 2: Fingerprint Matching (new - faster)
+        console.log(`    🔬 Method 2: Fingerprint Matching...`);
+        const fingerprintMatches = await findSimilarChartsByFingerprint(
+          fromTime,
+          toTime,
+          symbolId,
+          timeframe,
+          { startDate: searchStart, endDate: searchEnd },
+          4, // Minimum 4/10 fingerprint fields must match (lowered for better matches)
+          similarChartsPerFrame
+        );
+        console.log(`    ✓ Fingerprint: Found ${fingerprintMatches.length} matches (min 6/10 fields)`);
+
+        // Combine results (prefer fingerprint matches, deduplicate by time)
+        const allMatches = [
+          ...groundTruthMatches.map(m => ({ ...m, method: 'ground_truth' as const })),
+          ...fingerprintMatches.map(m => ({ 
+            chartUrl: m.chartUrl,
+            timeframe: m.timeframe,
+            from: m.from,
+            to: m.to,
+            groundTruth: m.groundTruth,
+            candles: m.candles,
+            matchScore: m.matchScore,
+            matchedFields: m.matchedFields,
+            method: 'fingerprint' as const,
+            fingerprintDescription: m.description,
+          })),
+        ];
+
+        // Deduplicate by time range (keep first occurrence)
+        const seenTimes = new Set<string>();
+        const similarChartResults = allMatches.filter(m => {
+          const key = `${m.from.toISOString()}-${m.to.toISOString()}`;
+          if (seenTimes.has(key)) return false;
+          seenTimes.add(key);
+          return true;
+        }).slice(0, similarChartsPerFrame);
+
+        console.log(`    ✓ Combined: ${similarChartResults.length} unique similar charts`);
 
         const similarCharts: ICLRoundInput[] = similarChartResults.map(sc => ({
           chartUrl: sc.chartUrl,
