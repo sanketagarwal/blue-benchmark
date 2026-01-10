@@ -25,6 +25,8 @@ import {
   flushLangfuse,
   registerPrompts,
   getPromptVersion,
+  createICLDataset,
+  addChartToDataset,
 } from './tracing.js';
 import type { Candle } from './replay-lab/ohlcv.js';
 
@@ -292,6 +294,32 @@ export async function runICLSession(
   const log = (msg: string) => verbose && console.log(msg);
   
   const client = createAIClient();
+  
+  // Create Langfuse dataset for this session
+  const datasetName = await createICLDataset(sessionId);
+  
+  // Add baseline chart to dataset
+  await addChartToDataset(datasetName, {
+    chartUrl: baselineInput.chartUrl,
+    timeframe: baselineInput.timeframe,
+    symbolId: baselineInput.symbolId,
+    candleCount: baselineInput.candles.length,
+    groundTruth: baselineInput.groundTruth,
+    chartType: 'baseline',
+  });
+  
+  // Add similar charts to dataset
+  for (let i = 0; i < similarInputs.length; i++) {
+    const input = similarInputs[i]!;
+    await addChartToDataset(datasetName, {
+      chartUrl: input.chartUrl,
+      timeframe: input.timeframe,
+      symbolId: input.symbolId,
+      candleCount: input.candles.length,
+      groundTruth: input.groundTruth,
+      chartType: 'similar',
+    });
+  }
   
   // Conversation state - accumulates across rounds
   const conversationHistory: Message[] = [];

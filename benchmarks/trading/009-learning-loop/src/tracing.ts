@@ -287,6 +287,72 @@ export function trackAccuracy(
 }
 
 /**
+ * Create or get a dataset for ICL experiments
+ */
+export async function createICLDataset(sessionId: string): Promise<string> {
+  const langfuse = initLangfuse();
+  const datasetName = `icl-benchmark/${sessionId}`;
+  
+  try {
+    await langfuse.createDataset({
+      name: datasetName,
+      description: `ICL benchmark charts for session ${sessionId}`,
+      metadata: {
+        promptVersion: PROMPT_VERSION,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    console.log(`📊 Created dataset: ${datasetName}`);
+  } catch {
+    // Dataset might already exist
+    console.log(`📊 Using existing dataset: ${datasetName}`);
+  }
+  
+  return datasetName;
+}
+
+/**
+ * Add a chart to the ICL dataset
+ */
+export async function addChartToDataset(
+  datasetName: string,
+  chartData: {
+    chartUrl: string;
+    timeframe: string;
+    symbolId: string;
+    candleCount: number;
+    groundTruth: unknown;
+    chartType: 'baseline' | 'similar';
+    fingerprint?: unknown;
+    similarityScore?: number;
+  }
+): Promise<void> {
+  const langfuse = initLangfuse();
+  
+  try {
+    await langfuse.createDatasetItem({
+      datasetName,
+      input: {
+        chartUrl: chartData.chartUrl,
+        timeframe: chartData.timeframe,
+        symbolId: chartData.symbolId,
+        candleCount: chartData.candleCount,
+      },
+      expectedOutput: chartData.groundTruth,
+      metadata: {
+        chartType: chartData.chartType,
+        fingerprint: chartData.fingerprint,
+        similarityScore: chartData.similarityScore,
+        promptVersion: PROMPT_VERSION,
+      },
+    });
+    console.log(`   📝 Added ${chartData.chartType} chart to dataset`);
+  } catch (error) {
+    console.warn(`   ⚠️ Failed to add chart to dataset: ${error}`);
+  }
+}
+
+/**
  * Flush all pending events to Langfuse
  */
 export async function flushLangfuse() {
