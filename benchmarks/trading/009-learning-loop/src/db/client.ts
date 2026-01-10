@@ -1,9 +1,10 @@
 /**
  * Database client for 009 Learning Loop
+ * Uses Neon serverless driver for Vercel Postgres
  */
 
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
 import * as schema from './schema.js';
 
 let db: ReturnType<typeof drizzle<typeof schema>> | undefined;
@@ -16,8 +17,8 @@ export function getDatabase() {
     throw new Error('DATABASE_URL environment variable is required');
   }
   
-  const client = postgres(databaseUrl);
-  db = drizzle(client, { schema });
+  const sql = neon(databaseUrl);
+  db = drizzle(sql, { schema });
   return db;
 }
 

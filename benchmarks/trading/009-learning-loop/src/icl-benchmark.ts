@@ -68,11 +68,13 @@ function getConfig(): BenchmarkConfig {
 
   return {
     symbolId,
-    timeframes: quickMode ? ['4h'] as CandleTimeframe[] : ['1h', '4h'] as CandleTimeframe[],
+    // Use 1m timeframe - most complete data in Replay Labs cache
+    // 30 candles at 1m = 30 minute chart (good for pattern recognition)
+    timeframes: quickMode ? ['1m'] as CandleTimeframe[] : ['1m', '5m'] as CandleTimeframe[],
     samplesPerTimeframe: quickMode ? 1 : 2,
     startTime,
-    similarChartsPerFrame: quickMode ? 1 : 2,
-    searchRangeDays: 90, // Extended to find more similar charts
+    similarChartsPerFrame: quickMode ? 2 : 3,
+    searchRangeDays: 7, // 1m data available for past week
     verbose,
     quickMode,
     singleModel,

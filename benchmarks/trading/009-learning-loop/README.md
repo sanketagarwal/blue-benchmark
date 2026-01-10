@@ -6,8 +6,8 @@ Tests whether vision LLMs can **learn from feedback** and improve their chart an
 
 Extends **007 (Chart Reader)** with:
 - Multi-round feedback loops
-- Similar chart matching for transfer learning tests
-- PostgreSQL logging for analysis
+- Fingerprint-based similar chart matching for transfer learning
+- PostgreSQL logging (Vercel Postgres / Neon)
 - Langfuse tracing for LLM observability
 
 ---
@@ -17,8 +17,30 @@ Extends **007 (Chart Reader)** with:
 After showing a model its mistakes on a chart analysis, can it:
 
 1. **Memorization Test**: Get it right when shown the *exact same chart* again
-2. **Transfer Test**: Get it right on *similar charts* with the same pattern conditions
+2. **Transfer Test**: Get it right on *similar charts* with matching indicator fingerprints
 3. **Learning Curve**: Improve accuracy over multiple rounds
+
+---
+
+## Experimental Results (10 Runs)
+
+Using `google/gemini-2.0-flash` with varied start times:
+
+| Metric | Average | Min | Max |
+|--------|---------|-----|-----|
+| **Baseline Accuracy** | 52.5% | 33.3% | 83.3% |
+| **Memorization Delta** | **+47.5%** | +16.7% | +66.7% |
+| **Transfer Delta** | **+7.9%** | -41.7% | +33.3% |
+
+### Key Findings
+
+1. ✅ **Strong Memorization**: All runs show positive memorization (+47.5% avg). Models consistently improve when re-shown the same chart after feedback.
+
+2. 🔶 **Variable Transfer**: Transfer ranges from -41.7% to +33.3%:
+   - When baseline is **low** (33-50%), transfer is **positive**
+   - When baseline is **high** (83%), transfer can be **negative** (ceiling effect)
+
+3. 📉 **Ceiling Effect**: High initial accuracy leaves less room to improve; feedback may cause "overthinking" on similar charts.
 
 ---
 
@@ -31,8 +53,8 @@ After showing a model its mistakes on a chart analysis, can it:
 │                                                                             │
 │  ROUND 1: Baseline Analysis (No Context)                                    │
 │  ┌─────────────────┐                                                        │
-│  │ Chart A (4h)    │  → Model analyzes → Score vs Ground Truth              │
-│  │ Pattern: X      │     (6 fields)      (Baseline Accuracy)                │
+│  │ Chart A (1m)    │  → Model analyzes → Score vs Ground Truth              │
+│  │ 30 candles      │     (6 fields)      (Baseline Accuracy)                │
 │  └─────────────────┘                                                        │
 │                                                                             │
 │  FEEDBACK: Detailed explanation of mistakes                                 │
@@ -46,14 +68,14 @@ After showing a model its mistakes on a chart analysis, can it:
 │                                                                             │
 │  ROUND 2: Same Chart (Memorization Test)                                    │
 │  ┌─────────────────┐                                                        │
-│  │ Chart A (4h)    │  → Model analyzes with feedback context                │
+│  │ Chart A (1m)    │  → Model analyzes with feedback context                │
 │  │ EXACT SAME      │     Question: Did model learn specific corrections?    │
 │  └─────────────────┘                                                        │
 │                                                                             │
 │  ROUND 3+: Similar Charts (Transfer Test)                                   │
 │  ┌─────────────────┐                                                        │
-│  │ Chart B (4h)    │  → Model analyzes → Compare to Baseline                │
-│  │ Same Pattern: X │     Question: Can model generalize the learning?       │
+│  │ Chart B (1m)    │  → Model analyzes → Compare to Baseline                │
+│  │ Same Fingerprint│     Question: Can model generalize the learning?       │
 │  └─────────────────┘                                                        │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -61,18 +83,24 @@ After showing a model its mistakes on a chart analysis, can it:
 
 ---
 
-## Key Innovation: Similar Chart Matching
+## Similar Chart Matching: Indicator Fingerprinting
 
-Instead of just testing on the same chart or a different timeframe, we find **structurally similar charts** from different time periods:
+We use a **10-field fingerprint** to find charts with similar market conditions:
 
-| Field | Original Chart | Similar Chart |
-|-------|----------------|---------------|
-| uptrend_pullback_to_vwap | true | true |
-| volatility_direction_combo | high_vol_bullish | high_vol_bullish |
-| tested_and_held_support | false | false |
-| overall_bias | mildly_bullish | mildly_bullish |
+| Field | Values | Source |
+|-------|--------|--------|
+| `rsi` | oversold / neutral / overbought | Replay Labs RSI |
+| `trend` | bullish / bearish / neutral | SuperTrend or price action |
+| `volatility` | compressed / normal / expanded | BBW indicator |
+| `momentum` | bullish / bearish / neutral | MACD histogram |
+| `priceVsVwap` | above / at / below | VWAP comparison |
+| `regime` | trending_up / trending_down / ranging / volatile | Replay Labs annotations |
+| `hasRecentSupport` | boolean | Local extrema (bottoms) |
+| `hasRecentResistance` | boolean | Local extrema (tops) |
+| `priceNearHigh` | boolean | Within 2% of chart high |
+| `priceNearLow` | boolean | Within 2% of chart low |
 
-This tests whether the model learned the **concept** or just memorized the visual.
+**Similarity Score**: Charts with ≥6 matching fields are considered "similar".
 
 ---
 
@@ -83,16 +111,15 @@ This tests whether the model learned the **concept** or just memorized the visua
 | `baseline_accuracy` | Round 1 score | Initial capability |
 | `memorization_delta` | Round 2 - Round 1 | Can apply specific feedback? |
 | `transfer_delta` | Avg(Similar) - Round 1 | Can generalize learning? |
-| `learning_curve` | Accuracy over rounds | Learning trajectory |
 
 ### Interpretation
 
 | Scenario | Memorization | Transfer | Interpretation |
 |----------|--------------|----------|----------------|
-| ✅ Strong ICL | +15%+ | +10%+ | Model learns and generalizes |
-| ⚠️ Memorization only | +15%+ | <5% | Model pattern-matches visually |
-| ⚠️ Weak ICL | +5-15% | +3-8% | Limited learning capacity |
-| ❌ No ICL | <5% | <3% | Feedback is ignored |
+| ✅ Strong ICL | +30%+ | +10%+ | Model learns and generalizes |
+| ⚠️ Memorization only | +30%+ | <5% | Model pattern-matches visually |
+| ⚠️ Weak ICL | +10-30% | +3-8% | Limited learning capacity |
+| ❌ No ICL | <10% | <3% | Feedback is ignored |
 
 ---
 
@@ -102,11 +129,11 @@ This tests whether the model learned the **concept** or just memorized the visua
 
 - Node.js 18+
 - pnpm
-- PostgreSQL running locally
 - API keys for:
   - [Vercel AI Gateway](https://vercel.com/ai-gateway)
   - [Replay Labs](https://replay-lab-delta.preview.recall.network)
   - [Langfuse](https://langfuse.com) (optional, for tracing)
+  - PostgreSQL (Vercel Postgres / Neon recommended)
 
 ### Installation
 
@@ -121,24 +148,45 @@ cp env.example .env.local
 # Edit .env.local with your API keys
 ```
 
+### Environment Variables
+
+```bash
+# Required: Vercel AI Gateway
+AI_GATEWAY_BASE_URL=https://ai-gateway.vercel.sh/v1
+AI_GATEWAY_API_KEY=vck_your_key_here
+
+# Required: Replay Labs (chart data)
+REPLAY_LAB_BASE_URL=https://replay-lab-delta.preview.recall.network
+REPLAY_LAB_API_KEY=rn_your_key_here
+
+# Required: Database (Vercel Postgres / Neon)
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+
+# Optional: Langfuse (tracing)
+LANGFUSE_SECRET_KEY=sk-lf-your_key
+LANGFUSE_PUBLIC_KEY=pk-lf-your_key
+LANGFUSE_BASE_URL=https://cloud.langfuse.com
+
+# Optional: Symbol and time
+SYMBOL_ID=COINBASE_SPOT_BTC_USD
+SIMULATION_START_TIME=2025-12-20T12:00:00Z
+```
+
 ### Database Setup
 
 ```bash
-# Create the database
-createdb icl_benchmark_009
-
-# Push schema
+# Push schema to database
 pnpm db:push
 ```
 
 ### Running the Benchmark
 
 ```bash
-# Quick test (1 model, 1 frame)
+# Quick test (1 model, 1 timeframe, 2 similar charts)
 pnpm icl:quick
 
-# Single model test
-pnpm icl --model=google/gemini-2.0-flash
+# Single model with specific model
+pnpm icl --quick --model=google/gemini-2.0-flash
 
 # Test cheap models (3 budget-friendly models)
 pnpm icl --cheap
@@ -153,51 +201,32 @@ pnpm icl --quick --skip-db
 pnpm icl --quick --verbose
 ```
 
----
+### Running Multiple Iterations
 
-## Configuration
+Run the benchmark multiple times with different start times to measure average learning:
 
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `AI_GATEWAY_BASE_URL` | Vercel AI Gateway endpoint | Yes |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key | Yes |
-| `REPLAY_LAB_BASE_URL` | Replay Labs API endpoint | Yes |
-| `REPLAY_LAB_API_KEY` | Replay Labs API key | Yes |
-| `DATABASE_URL` | PostgreSQL connection string | Yes* |
-| `LANGFUSE_SECRET_KEY` | Langfuse secret key | No |
-| `LANGFUSE_PUBLIC_KEY` | Langfuse public key | No |
-| `SYMBOL_ID` | Trading symbol (default: COINBASE_SPOT_BTC_USD) | No |
-
-*Use `--skip-db` to run without database
-
-### Models
-
-**Cheap models** (fast, ~$0.10-0.15/M tokens):
-- `google/gemini-2.5-flash-lite`
-- `google/gemini-2.0-flash`
-- `openai/gpt-4o-mini`
-
-**Expensive models** (slower, ~$5-25/M tokens):
-- `anthropic/claude-opus-4-5`
-- `openai/gpt-5`
-- `google/gemini-3-pro-preview`
+```bash
+# Run with different SIMULATION_START_TIME values
+SIMULATION_START_TIME=2025-12-20T12:00:00Z pnpm icl:quick
+SIMULATION_START_TIME=2025-12-19T09:15:00Z pnpm icl:quick
+SIMULATION_START_TIME=2025-12-18T22:45:00Z pnpm icl:quick
+# ... etc
+```
 
 ---
 
 ## Output Files
 
 ```
-BENCHMARK_ICL_<models>_<date>.md     # Human-readable results
-BENCHMARK_ICL_<models>_<date>.json   # Machine-readable results
+BENCHMARK_ICL_<model>_<date>.md     # Human-readable results
+BENCHMARK_ICL_<model>_<date>.json   # Machine-readable results
 ```
 
 ### Database Tables
 
 - `learning_sessions` - Session-level metrics
 - `learning_rounds` - Per-round results
-- `similar_charts` - Cached chart conditions (for future use)
+- `similar_charts` - Cached chart conditions
 - `learning_curves` - Aggregated learning progression
 
 ---
@@ -208,18 +237,21 @@ BENCHMARK_ICL_<models>_<date>.json   # Machine-readable results
 src/
 ├── icl-benchmark.ts      # Main entry point
 ├── icl-loop.ts           # Core ICL loop with conversation management
-├── similar-charts.ts     # Find charts with matching conditions
+├── similar-charts.ts     # Fingerprint-based chart matching
+├── fingerprint.ts        # Chart fingerprint creation & comparison
 ├── tracing.ts            # Langfuse integration
-├── feedback.ts           # Generate detailed feedback
 ├── db/
-│   ├── client.ts         # PostgreSQL client
-│   └── schema.ts         # Drizzle schema
+│   ├── client.ts         # Neon/Postgres client (Drizzle ORM)
+│   └── schema.ts         # Database schema
 ├── ground-truth/         # From 007 - compute ground truth
 ├── scorers/              # From 007 - score predictions
 ├── replay-lab/           # Replay Labs API integration
+│   ├── charts.ts         # Chart image URLs
+│   ├── ohlcv.ts          # Candle data
+│   ├── indicators.ts     # RSI, MACD, BBW, etc.
+│   └── annotations.ts    # Local extrema, regimes
 ├── output-schema.ts      # Zod schema for model output
-├── matrix.ts             # Model configuration
-└── models.json           # Full model catalog
+└── models.json           # Model catalog
 ```
 
 ---
@@ -250,28 +282,18 @@ const prompt = `Previous: ${response}\nFeedback: ${feedback}\nNow analyze...`;
 
 ---
 
-## Expected Results
+## Data Availability (Replay Labs)
 
-Based on preliminary testing:
+| Timeframe | Data Range | Notes |
+|-----------|------------|-------|
+| **1m** | ✅ Full (weeks) | Best for benchmark |
+| 5m | ✅ Full | Good alternative |
+| 15m | ⚠️ Limited | ~2 hours cached |
+| 1h | ⚠️ Limited | ~2 hours cached |
+| 4h | ⚠️ Very limited | Recent days only |
+| 1d | ❌ None | JIT budget exceeded |
 
-| Model | Baseline | Memorization Δ | Transfer Δ |
-|-------|----------|----------------|------------|
-| gemini-2.0-flash | ~65% | +10-15% | +5-8% |
-| gpt-4o-mini | ~60% | +8-12% | +3-5% |
-| claude-opus-4-5 | ~75% | +15-20% | +10-12% |
-
-*Results vary by chart conditions and may improve with model updates.*
-
----
-
-## Langfuse Dashboard
-
-View traces at: https://cloud.langfuse.com
-
-Each session creates:
-- **Trace per round**: `icl_baseline`, `icl_same_chart`, `icl_similar_chart`
-- **Generation spans**: Model calls with latency, tokens, accuracy
-- **Accuracy spans**: Field-by-field scoring
+**Recommendation**: Use **1m timeframe** for most complete data coverage.
 
 ---
 
@@ -281,7 +303,8 @@ Each session creates:
 2. **Memorization vs Understanding**: High memorization + low transfer = visual pattern matching
 3. **Which fields are easiest to learn?** Simple booleans vs complex enums
 4. **Model size vs learning capacity**: Do larger models learn better?
-5. **Feedback quality**: Does more detailed feedback improve learning?
+5. **Ceiling effects**: Does high baseline accuracy limit improvement?
+6. **Fingerprint sensitivity**: How many fields should match for "similar" charts?
 
 ---
 
