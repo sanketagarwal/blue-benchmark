@@ -8,7 +8,43 @@ Built on the [NullAgent](https://github.com/recallnet/nullagent-tutorial) minima
 
 ## Benchmarks
 
-### 008 Chart Predictor ⭐ NEW
+### 009 In-Context Learning ⭐ NEW
+
+**Test whether vision LLMs can LEARN from feedback and improve accuracy.**
+
+Models receive feedback on their mistakes and are re-tested to measure learning:
+
+```
+Round 1: Baseline  →  Model analyzes chart  →  Score accuracy
+                            ↓
+                      FEEDBACK PROVIDED
+                            ↓
+Round 2: Same Chart  →  Re-analyze with feedback  →  Memorization test
+Round 3: Similar Chart  →  New chart, same conditions  →  Transfer test
+```
+
+Tests in-context learning capabilities:
+- **Memorization**: Can model apply specific feedback to the same chart?
+- **Transfer**: Can model generalize learning to similar charts?
+
+📁 Location: `benchmarks/trading/009-learning-loop/`
+📖 [Full Documentation](benchmarks/trading/009-learning-loop/README.md)
+
+**Quick Run:**
+```bash
+cd benchmarks/trading/009-learning-loop
+cp env.example .env.local  # Add your API keys
+pnpm icl --quick --model=google/gemini-2.0-flash
+```
+
+**Sample Results:**
+| Model | Baseline | After Feedback | Learning Gain |
+|-------|----------|----------------|---------------|
+| gemini-2.0-flash | 58.3% | 100% | **+41.7%** |
+
+---
+
+### 008 Chart Predictor
 
 **Test vision LLMs' ability to PREDICT future chart patterns.**
 
@@ -56,28 +92,6 @@ cd benchmarks/trading/007-chart-reader
 cp env.example .env.local  # Add your API keys
 pnpm benchmark --cheap --quick
 ```
-
----
-
-### 006 Bottom Caller
-
-**Multi-phase elimination tournament testing vision LLMs on predicting market bottoms.**
-
-Tests models across 4 phases:
-1. Sanity Check - Basic market regime classification
-2. Relative Performance - Head-to-head comparisons
-3. Stability & Regret - Consistency under noisy conditions
-4. Final Ranking - Tournament-style elimination
-
-📁 Location: `benchmarks/trading/006-bottom-caller/`
-
----
-
-### 005 Market Maker
-
-**Test LLM agents on market making strategies.**
-
-📁 Location: `benchmarks/trading/005-market-maker/`
 
 ---
 
@@ -144,10 +158,9 @@ blue-benchmark/
 │   └── eslint-config/   # Shared linting rules
 ├── benchmarks/
 │   └── trading/
-│       ├── 005-market-maker/
-│       ├── 006-bottom-caller/
 │       ├── 007-chart-reader/     ← Chart reading (observation)
-│       └── 008-chart-predictor/  ← Chart prediction (forecasting)
+│       ├── 008-chart-predictor/  ← Chart prediction (forecasting)
+│       └── 009-learning-loop/    ← In-context learning (NEW)
 └── apps/                # Example agent apps
 ```
 

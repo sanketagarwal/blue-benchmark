@@ -1,21 +1,32 @@
 {
   "name": "009-learning-loop",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
+  "description": "In-Context Learning Benchmark - Tests whether vision LLMs can learn from feedback",
   "scripts": {
     "build": "tsc",
     "start": "npx tsx src/benchmark.ts",
     "quick": "npx tsx src/benchmark.ts --quick",
     "cheap": "npx tsx src/benchmark.ts --cheap",
-    "expensive": "npx tsx src/benchmark.ts --expensive"
+    "expensive": "npx tsx src/benchmark.ts --expensive",
+    "icl": "npx tsx src/icl-benchmark.ts",
+    "icl:quick": "npx tsx src/icl-benchmark.ts --quick",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^1.0.0",
     "@nullagent/agent-core": "workspace:*",
     "@nullagent/cli-utils": "workspace:*",
+    "ai": "^4.0.0",
     "dotenv": "^16.3.1",
+    "drizzle-orm": "^0.38.0",
+    "langfuse": "^3.30.0",
+    "postgres": "^3.4.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "drizzle-kit": "^0.30.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

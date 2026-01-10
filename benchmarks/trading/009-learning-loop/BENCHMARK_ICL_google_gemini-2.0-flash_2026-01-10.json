@@ -1,0 +1,112 @@
+[
+  {
+    "frameId": "4h_01",
+    "session": {
+      "sessionId": "icl_google_gemini-2.0-flash_1768071171960",
+      "modelId": "google/gemini-2.0-flash",
+      "baseline": {
+        "prediction": {
+          "meta": {
+            "base_quote": "Bitcoin / U.S. Dollar",
+            "venue": "Coinbase",
+            "timeframe": "4h"
+          },
+          "active_readout": {
+            "open": 88244,
+            "high": 88399,
+            "low": 88063,
+            "close": 88238
+          },
+          "multi_step": {
+            "uptrend_pullback_to_vwap": false,
+            "volatility_direction_combo": "low_vol_drift_up",
+            "tested_and_held_support": false,
+            "breakout_with_volume": false,
+            "potential_reversal_at_support": false,
+            "overall_bias": "mildly_bullish"
+          }
+        },
+        "score": {
+          "fieldScores": {
+            "uptrend_pullback_to_vwap": 1,
+            "volatility_direction_combo": 0,
+            "tested_and_held_support": 1,
+            "breakout_with_volume": 0,
+            "potential_reversal_at_support": 1,
+            "overall_bias": 0.5
+          },
+          "exactMatchCount": 3,
+          "totalFields": 6,
+          "accuracy": 0.5833333333333334
+        },
+        "latencyMs": 3093,
+        "tokensUsed": {
+          "prompt": 2819,
+          "completion": 90,
+          "total": 2909
+        }
+      },
+      "sameChart": {
+        "prediction": {
+          "meta": {
+            "base_quote": "Bitcoin / U.S. Dollar",
+            "venue": "Coinbase",
+            "timeframe": "4h"
+          },
+          "active_readout": {
+            "open": 88244,
+            "high": 88399,
+            "low": 88063,
+            "close": 88238
+          },
+          "multi_step": {
+            "uptrend_pullback_to_vwap": false,
+            "volatility_direction_combo": "consolidation",
+            "tested_and_held_support": false,
+            "breakout_with_volume": true,
+            "potential_reversal_at_support": false,
+            "overall_bias": "neutral"
+          }
+        },
+        "score": {
+          "fieldScores": {
+            "uptrend_pullback_to_vwap": 1,
+            "volatility_direction_combo": 1,
+            "tested_and_held_support": 1,
+            "breakout_with_volume": 1,
+            "potential_reversal_at_support": 1,
+            "overall_bias": 1
+          },
+          "exactMatchCount": 6,
+          "totalFields": 6,
+          "accuracy": 1
+        },
+        "latencyMs": 2302,
+        "tokensUsed": {
+          "prompt": 2615,
+          "completion": 81,
+          "total": 2696
+        }
+      },
+      "similarCharts": [],
+      "feedbackProvided": "═══════════════════════════════════════════════════════════════\n                    FEEDBACK ON YOUR ANALYSIS\n═══════════════════════════════════════════════════════════════\n\nYou got 3/6 fields correct.\n\nHere's where you went wrong and why:\n\n❌ volatility_direction_combo\n   Your prediction: low_vol_drift_up\n   Correct answer:  consolidation\n   Why: Volatility: 1.69% (HIGH). Direction: -0.18% (FLAT). Combined, this gives: \"consolidation\".\n\n❌ breakout_with_volume\n   Your prediction: false\n   Correct answer:  true\n   Why: This requires: (1) price breaking above resistance, AND (2) volume > 1.2x average. Volume ratio: 1.82x (HIGH). \n\n❌ overall_bias\n   Your prediction: mildly_bullish\n   Correct answer:  neutral\n   Why: Bullish signals: none. Bearish signals: below VWAP. Net signal count determines bias: \"neutral\".\n\n───────────────────────────────────────────────────────────────\nCONTEXT DATA (for reference):\n  - VWAP: $87040.51\n  - Last Close: $87027.98\n  - Price Change: -0.18%\n  - Volatility: 1.69%\n  - Volume Ratio: 1.82x average\n───────────────────────────────────────────────────────────────\n\nNow analyze the next chart carefully, applying what you've learned.\n",
+      "baselineAccuracy": 0.5833333333333334,
+      "memorizationAccuracy": 1,
+      "transferAccuracies": [],
+      "memorizationDelta": 0.41666666666666663,
+      "avgTransferDelta": 0,
+      "learningCurve": [
+        {
+          "round": 1,
+          "accuracy": 0.5833333333333334,
+          "delta": 0
+        },
+        {
+          "round": 2,
+          "accuracy": 1,
+          "delta": 0.41666666666666663
+        }
+      ]
+    }
+  }
+]
