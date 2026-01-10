@@ -28,7 +28,7 @@ import { getLocalExtrema } from './replay-lab/annotations.js';
 import { computeGroundTruth, type GroundTruthInput, type ChartMeta, type IndicatorValues } from './ground-truth/index.js';
 import { findSimilarCharts, extractConditions, findSimilarChartsByFingerprint } from './similar-charts.js';
 import { runICLSession, type ICLRoundInput, type ICLSessionResult } from './icl-loop.js';
-import { initLangfuse, shutdownLangfuse } from './tracing.js';
+import { initLangfuse, shutdownLangfuse, registerPrompts, getPromptVersion } from './tracing.js';
 import { getDatabase } from './db/client.js';
 import { learningSessions, learningRounds } from './db/schema.js';
 import * as fs from 'fs';
@@ -508,8 +508,10 @@ async function main() {
   }
   console.log('');
 
-  // Initialize Langfuse
+  // Initialize Langfuse and register prompts
   initLangfuse();
+  await registerPrompts();
+  console.log(`📋 Prompt version: ${getPromptVersion()}`);
 
   // Determine which models to test
   let models: ModelConfig[];

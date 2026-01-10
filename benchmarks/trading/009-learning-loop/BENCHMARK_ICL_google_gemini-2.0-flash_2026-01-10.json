@@ -2,7 +2,7 @@
   {
     "frameId": "1m_01",
     "session": {
-      "sessionId": "icl_google_gemini-2.0-flash_1768073274470",
+      "sessionId": "icl_google_gemini-2.0-flash_1768076390714",
       "modelId": "google/gemini-2.0-flash",
       "baseline": {
         "prediction": {
@@ -12,10 +12,10 @@
             "timeframe": "1m"
           },
           "active_readout": {
-            "open": 88056,
-            "high": 88072,
-            "low": 88054,
-            "close": 88065
+            "open": 88254,
+            "high": 88254,
+            "low": 88230,
+            "close": 88238
           },
           "multi_step": {
             "uptrend_pullback_to_vwap": false,
@@ -32,14 +32,14 @@
             "volatility_direction_combo": 1,
             "tested_and_held_support": 0,
             "breakout_with_volume": 1,
-            "potential_reversal_at_support": 1,
-            "overall_bias": 0.5
+            "potential_reversal_at_support": 0,
+            "overall_bias": 0
           },
-          "exactMatchCount": 4,
+          "exactMatchCount": 3,
           "totalFields": 6,
-          "accuracy": 0.75
+          "accuracy": 0.5
         },
-        "latencyMs": 3088,
+        "latencyMs": 3101,
         "tokensUsed": {
           "prompt": 2819,
           "completion": 81,
@@ -54,18 +54,18 @@
             "timeframe": "1m"
           },
           "active_readout": {
-            "open": 88056,
-            "high": 88072,
-            "low": 88054,
-            "close": 88065
+            "open": 88254,
+            "high": 88254,
+            "low": 88230,
+            "close": 88238
           },
           "multi_step": {
             "uptrend_pullback_to_vwap": false,
             "volatility_direction_combo": "consolidation",
             "tested_and_held_support": true,
             "breakout_with_volume": false,
-            "potential_reversal_at_support": false,
-            "overall_bias": "mildly_bullish"
+            "potential_reversal_at_support": true,
+            "overall_bias": "bullish"
           }
         },
         "score": {
@@ -81,11 +81,11 @@
           "totalFields": 6,
           "accuracy": 1
         },
-        "latencyMs": 1996,
+        "latencyMs": 2395,
         "tokensUsed": {
-          "prompt": 2547,
-          "completion": 85,
-          "total": 2632
+          "prompt": 2668,
+          "completion": 82,
+          "total": 2750
         }
       },
       "similarCharts": [
@@ -97,14 +97,14 @@
               "timeframe": "1m"
             },
             "active_readout": {
-              "open": 87978,
-              "high": 88000,
-              "low": 87969,
-              "close": 87979
+              "open": 88119,
+              "high": 88131,
+              "low": 88110,
+              "close": 88128
             },
             "multi_step": {
               "uptrend_pullback_to_vwap": false,
-              "volatility_direction_combo": "low_vol_drift_down",
+              "volatility_direction_combo": "consolidation",
               "tested_and_held_support": true,
               "breakout_with_volume": false,
               "potential_reversal_at_support": false,
@@ -114,21 +114,21 @@
           "score": {
             "fieldScores": {
               "uptrend_pullback_to_vwap": 1,
-              "volatility_direction_combo": 0,
+              "volatility_direction_combo": 1,
               "tested_and_held_support": 1,
-              "breakout_with_volume": 1,
-              "potential_reversal_at_support": 1,
+              "breakout_with_volume": 0,
+              "potential_reversal_at_support": 0,
               "overall_bias": 0
             },
-            "exactMatchCount": 4,
+            "exactMatchCount": 3,
             "totalFields": 6,
-            "accuracy": 0.6666666666666666
+            "accuracy": 0.5
           },
-          "latencyMs": 2880,
+          "latencyMs": 2799,
           "tokensUsed": {
-            "prompt": 3551,
-            "completion": 90,
-            "total": 3641
+            "prompt": 3860,
+            "completion": 85,
+            "total": 3945
           }
         },
         {
@@ -139,10 +139,10 @@
               "timeframe": "1m"
             },
             "active_readout": {
-              "open": 88171,
-              "high": 88174,
-              "low": 88159,
-              "close": 88170
+              "open": 88186,
+              "high": 88194,
+              "low": 88180,
+              "close": 88186
             },
             "multi_step": {
               "uptrend_pullback_to_vwap": false,
@@ -166,43 +166,43 @@
             "totalFields": 6,
             "accuracy": 0.5
           },
-          "latencyMs": 3320,
+          "latencyMs": 2850,
           "tokensUsed": {
-            "prompt": 4558,
+            "prompt": 5053,
             "completion": 87,
-            "total": 4645
+            "total": 5140
           }
         }
       ],
-      "feedbackProvided": "═══════════════════════════════════════════════════════════════\n                    FEEDBACK ON YOUR ANALYSIS\n═══════════════════════════════════════════════════════════════\n\nYou got 4/6 fields correct.\n\nHere's where you went wrong and why:\n\n❌ tested_and_held_support\n   Your prediction: false\n   Correct answer:  true\n   Why: This requires price to: (1) touch a known support level, AND (2) bounce back up. The chart DID show this pattern - price tested support and held.\n\n❌ overall_bias\n   Your prediction: neutral\n   Correct answer:  mildly_bullish\n   Why: Bullish signals: above VWAP. Bearish signals: none. Net signal count determines bias: \"mildly_bullish\".\n\n───────────────────────────────────────────────────────────────\nCONTEXT DATA (for reference):\n  - VWAP: $88068.73\n  - Last Close: $88203.41\n  - Price Change: 0.18%\n  - Volatility: 0.07%\n  - Volume Ratio: 0.70x average\n───────────────────────────────────────────────────────────────\n\nNow analyze the next chart carefully, applying what you've learned.\n",
-      "baselineAccuracy": 0.75,
+      "feedbackProvided": "═══════════════════════════════════════════════════════════════\n                    FEEDBACK ON YOUR ANALYSIS\n═══════════════════════════════════════════════════════════════\n\nYou got 3/6 fields correct (50% accuracy).\n\n📋 FIELD-SPECIFIC CORRECTIONS:\n\nFocus ONLY on fixing these 3 specific fields:\n\n❌ tested_and_held_support\n   Your prediction: false\n   Correct answer:  true\n   How to identify: This requires price to: (1) touch a known support level, AND (2) bounce back up. The chart DID show this pattern - price tested support and held.\n\n❌ potential_reversal_at_support\n   Your prediction: false\n   Correct answer:  true\n   How to identify: This requires: (1) price near support, AND (2) bullish reversal candle pattern (hammer, engulfing, etc.). The chart showed a reversal forming at support.\n\n❌ overall_bias\n   Your prediction: neutral\n   Correct answer:  bullish\n   How to identify: Bullish signals: above VWAP. Bearish signals: none. Net signal count determines bias: \"bullish\".\n\n✅ These fields were CORRECT (keep using same methodology):\n   • uptrend_pullback_to_vwap: \"false\" ✓\n   • volatility_direction_combo: \"consolidation\" ✓\n   • breakout_with_volume: \"false\" ✓\n\n───────────────────────────────────────────────────────────────\nREFERENCE DATA (from this specific chart):\n  • VWAP: $88231.54\n  • Last Close: $88233.98\n  • Price Change: -0.03%\n  • Volatility: 0.03%\n  • Volume Ratio: 1.17x average\n───────────────────────────────────────────────────────────────\n",
+      "baselineAccuracy": 0.5,
       "memorizationAccuracy": 1,
       "transferAccuracies": [
-        0.6666666666666666,
+        0.5,
         0.5
       ],
-      "memorizationDelta": 0.25,
-      "avgTransferDelta": -0.16666666666666674,
+      "memorizationDelta": 0.5,
+      "avgTransferDelta": 0,
       "learningCurve": [
         {
           "round": 1,
-          "accuracy": 0.75,
+          "accuracy": 0.5,
           "delta": 0
         },
         {
           "round": 2,
           "accuracy": 1,
-          "delta": 0.25
+          "delta": 0.5
         },
         {
           "round": 3,
-          "accuracy": 0.6666666666666666,
-          "delta": -0.08333333333333337
+          "accuracy": 0.5,
+          "delta": 0
         },
         {
           "round": 4,
           "accuracy": 0.5,
-          "delta": -0.25
+          "delta": 0
         }
       ]
     }

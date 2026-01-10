@@ -2,11 +2,15 @@
  * Langfuse Integration for LLM Observability
  * 
  * Provides tracing for all LLM calls in the ICL benchmark.
+ * Also manages prompt versioning for tracking prompt experiments.
  */
 
 import { Langfuse } from 'langfuse';
 
 let langfuseInstance: Langfuse | undefined;
+
+// Current prompt version - increment when prompts change
+const PROMPT_VERSION = 'v4-reset-high-baseline';
 
 export interface TraceMetadata {
   sessionId: string;
@@ -15,6 +19,13 @@ export interface TraceMetadata {
   roundType: 'baseline' | 'same_chart' | 'similar_chart' | 'transfer';
   chartUrl?: string;
   timeframe?: string;
+}
+
+export interface PromptConfig {
+  name: string;
+  prompt: string;
+  labels?: string[];
+  config?: Record<string, unknown>;
 }
 
 /**
@@ -53,6 +64,113 @@ export function initLangfuse(): Langfuse {
 }
 
 /**
+ * Create or update a prompt in Langfuse
+ */
+export async function createOrUpdatePrompt(config: PromptConfig): Promise<void> {
+  const langfuse = initLangfuse();
+  
+  try {
+    await langfuse.createPrompt({
+      name: config.name,
+      prompt: config.prompt,
+      labels: config.labels ?? [PROMPT_VERSION],
+      config: config.config,
+    });
+    console.log(`📝 Prompt "${config.name}" created/updated with version ${PROMPT_VERSION}`);
+  } catch (error) {
+    // Prompt might already exist, which is fine
+    console.log(`📝 Prompt "${config.name}" already exists or error: ${error}`);
+  }
+}
+
+/**
+ * Get a prompt from Langfuse
+ */
+export async function getPrompt(name: string, label?: string) {
+  const langfuse = initLangfuse();
+  
+  try {
+    return await langfuse.getPrompt(name, undefined, { label: label ?? PROMPT_VERSION });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Register all ICL benchmark prompts
+ */
+export async function registerPrompts(): Promise<void> {
+  const prompts: PromptConfig[] = [
+    {
+      name: 'icl-baseline',
+      prompt: `Analyze this candlestick chart and identify patterns.
+You will receive a chart image with OHLCV data.
+Evaluate each field based on what you SEE in this specific chart.`,
+      config: { type: 'baseline', version: PROMPT_VERSION },
+    },
+    {
+      name: 'icl-same-chart-feedback',
+      prompt: `Review your previous analysis with the feedback provided.
+Now re-analyze the SAME chart with the corrections in mind.
+Focus on the fields you got wrong and apply the feedback.`,
+      config: { type: 'same_chart', version: PROMPT_VERSION },
+    },
+    {
+      name: 'icl-similar-chart-low-baseline',
+      prompt: `📋 FIELD-SPECIFIC FOCUS MODE
+
+This is a NEW, DIFFERENT chart. Analyze it FRESH.
+
+🎯 FOCUS AREAS (fields you got wrong before):
+{{wrongFields}}
+
+✅ KEEP DOING (fields you got right):
+{{correctFields}}
+
+⚠️ CRITICAL REMINDERS:
+- This chart has DIFFERENT data than before
+- The correct answers may be DIFFERENT
+- Analyze what you SEE, don't copy previous answers
+- Each field must be evaluated based on THIS chart`,
+      config: { 
+        type: 'similar_chart', 
+        mode: 'low_baseline',
+        version: PROMPT_VERSION,
+        threshold: 0.7,
+      },
+    },
+    {
+      name: 'icl-similar-chart-high-baseline',
+      prompt: `🎯 FRESH ANALYSIS MODE (High Confidence)
+
+You have strong chart analysis skills. Your methodology is sound.
+
+📌 ANALYZE THIS CHART INDEPENDENTLY:
+- Look at THIS specific chart image
+- Evaluate each field based on what you SEE
+- Do NOT assume any answers - analyze fresh
+
+{{tipForWrongFields}}
+
+This is a standalone analysis. Trust your methodology.`,
+      config: { 
+        type: 'similar_chart', 
+        mode: 'high_baseline_reset',
+        version: PROMPT_VERSION,
+        threshold: 0.7,
+        resetConversation: true,
+      },
+    },
+  ];
+
+  for (const prompt of prompts) {
+    await createOrUpdatePrompt(prompt);
+  }
+  
+  console.log(`\n📋 Registered ${prompts.length} prompts with version: ${PROMPT_VERSION}`);
+}
+
+/**
  * Create a trace for an ICL session
  */
 export function createSessionTrace(metadata: TraceMetadata) {
@@ -82,8 +200,10 @@ export function trackGeneration(
   trace: ReturnType<typeof createSessionTrace>,
   input: {
     prompt: string;
+    promptName?: string;  // Langfuse prompt name for linking
     imageCount: number;
     feedbackIncluded: boolean;
+    resetConversation?: boolean;
   },
   output: {
     response: unknown;
@@ -103,8 +223,11 @@ export function trackGeneration(
     model: modelId,
     input: {
       promptLength: input.prompt.length,
+      promptName: input.promptName,
+      promptVersion: PROMPT_VERSION,
       imageCount: input.imageCount,
       feedbackIncluded: input.feedbackIncluded,
+      resetConversation: input.resetConversation,
     },
     output: output.response,
     usage: output.tokensUsed ? {
@@ -116,11 +239,19 @@ export function trackGeneration(
       accuracy: output.accuracy,
       exactMatches: output.exactMatches,
       latencyMs: output.latencyMs,
+      promptVersion: PROMPT_VERSION,
     },
   });
   
   generation.end();
   return generation;
+}
+
+/**
+ * Get current prompt version
+ */
+export function getPromptVersion(): string {
+  return PROMPT_VERSION;
 }
 
 /**

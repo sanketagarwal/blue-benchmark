@@ -18,7 +18,14 @@ import { ChartReadingOutputSchema, type ChartReadingOutput } from './output-sche
 import { scoreChartReading, type ChartReadingScore } from './scorers/index.js';
 import { generateFeedback } from './feedback.js';
 import { computeVWAP } from './ground-truth/index.js';
-import { createSessionTrace, trackGeneration, trackAccuracy, flushLangfuse } from './tracing.js';
+import { 
+  createSessionTrace, 
+  trackGeneration, 
+  trackAccuracy, 
+  flushLangfuse,
+  registerPrompts,
+  getPromptVersion,
+} from './tracing.js';
 import type { Candle } from './replay-lab/ohlcv.js';
 
 // Types for message content
@@ -321,6 +328,7 @@ export async function runICLSession(
   if (baselineResult.prediction) {
     trackGeneration(baselineTrace, {
       prompt: buildAnalysisPrompt(baselineInput.timeframe, baselineInput.symbolId, baselineInput.candles.length),
+      promptName: 'icl-baseline',
       imageCount: 1,
       feedbackIncluded: false,
     }, {
@@ -408,6 +416,7 @@ export async function runICLSession(
   if (sameChartResult.prediction) {
     trackGeneration(sameChartTrace, {
       prompt: feedbackText + '\n\n' + buildAnalysisPrompt(baselineInput.timeframe, baselineInput.symbolId, baselineInput.candles.length),
+      promptName: 'icl-same-chart-feedback',
       imageCount: 1,
       feedbackIncluded: true,
     }, {
@@ -472,32 +481,76 @@ export async function runICLSession(
       timeframe: input.timeframe,
     });
     
-    // CRITICAL: Make it very clear this is a DIFFERENT chart
-    const transferPrompt = `
-⚠️ IMPORTANT: This is a COMPLETELY DIFFERENT chart from before.
+    // Build transfer prompt based on baseline accuracy
+    // High accuracy = confidence retention, Low accuracy = field-specific focus
+    const baselineWrongFields = Object.entries(baselineScore.fieldScores)
+      .filter(([_, score]) => score === 0)
+      .map(([field]) => field);
+    
+    const baselineCorrectFields = Object.entries(baselineScore.fieldScores)
+      .filter(([_, score]) => score === 1)
+      .map(([field]) => field);
+    
+    let transferPrompt: string;
+    
+    // For HIGH BASELINE (≥70%): Reset conversation to avoid contamination
+    // The model seeing its previous predictions causes it to introduce NEW errors
+    const useResetConversation = baselineScore.accuracy >= 0.7;
+    
+    if (useResetConversation) {
+      // HIGH ACCURACY: Reset conversation + confidence retention
+      log(`     🔄 Using RESET conversation (high baseline ${(baselineScore.accuracy * 100).toFixed(0)}%)`);
+      transferPrompt = `
+🎯 FRESH ANALYSIS MODE (High Confidence)
 
-This is NOT a memory test. The correct answers for THIS chart may be DIFFERENT from the previous chart.
+You have strong chart analysis skills. Your methodology is sound.
 
-What you should apply from the feedback:
-- The METHODOLOGY for analyzing charts (how to identify support, how to measure volatility, etc.)
-- The REASONING process (check VWAP distance, count bullish/bearish signals, etc.)
-- The DEFINITIONS of each field
+📌 ANALYZE THIS CHART INDEPENDENTLY:
+- Look at THIS specific chart image
+- Evaluate each field based on what you SEE
+- Do NOT assume any answers - analyze fresh
 
-What you should NOT do:
-- Copy your previous answers
-- Assume this chart has the same conditions
-- Default to what was correct before
+${baselineWrongFields.length > 0 ? `
+💡 TIP: Pay attention to how you identify: ${baselineWrongFields.join(', ')}
+` : ''}
 
-Analyze THIS chart FRESH based on what you actually SEE in the image.
-The ground truth for this chart is likely DIFFERENT from the previous one.
+This is a standalone analysis. Trust your methodology.
 
 ---
 
 `;
+    } else {
+      // LOW/MEDIUM ACCURACY: Field-specific focus
+      transferPrompt = `
+📋 FIELD-SPECIFIC FOCUS MODE
+
+This is a NEW, DIFFERENT chart. Analyze it FRESH.
+
+🎯 FOCUS AREAS (fields you got wrong before):
+${baselineWrongFields.map(f => `   • ${f} - Review the feedback for how to identify this correctly`).join('\n')}
+
+✅ KEEP DOING (fields you got right):
+${baselineCorrectFields.map(f => `   • ${f} - Your methodology worked, use the same approach`).join('\n')}
+
+⚠️ CRITICAL REMINDERS:
+- This chart has DIFFERENT data than before
+- The correct answers may be DIFFERENT
+- Analyze what you SEE, don't copy previous answers
+- Each field must be evaluated based on THIS chart
+
+---
+
+`;
+    }
+
+    // For high baseline: use EMPTY conversation (reset)
+    // For low/mid baseline: use full conversation history
+    const messagesForTransfer = useResetConversation ? [] : conversationHistory;
+    
     const transferResult = await runAnalysisRound(
       client,
       modelId,
-      conversationHistory,
+      messagesForTransfer,
       input.chartUrl,
       input.timeframe,
       input.symbolId,
@@ -513,8 +566,10 @@ The ground truth for this chart is likely DIFFERENT from the previous one.
     if (transferResult.prediction) {
       trackGeneration(transferTrace, {
         prompt: transferPrompt,
+        promptName: useResetConversation ? 'icl-similar-chart-high-baseline' : 'icl-similar-chart-low-baseline',
         imageCount: 1,
         feedbackIncluded: true,
+        resetConversation: useResetConversation,
       }, {
         response: transferResult.prediction,
         accuracy: transferScore.accuracy,

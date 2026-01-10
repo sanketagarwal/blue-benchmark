@@ -133,6 +133,10 @@ function generateFieldFeedback(
 
 /**
  * Generate complete feedback message for all fields.
+ * 
+ * IMPROVEMENTS:
+ * 1. High accuracy (>=80%): Confidence retention - reinforce that methodology is correct
+ * 2. Field-specific only: Only provide feedback on WRONG fields, not general analysis
  */
 export function generateFeedback(input: FeedbackContext): string {
   const multiStepFields: Array<keyof ChartReadingOutput['multi_step']> = [
@@ -155,36 +159,71 @@ export function generateFeedback(input: FeedbackContext): string {
 
   const correctCount = fieldFeedbacks.filter(f => f.correct).length;
   const wrongFields = fieldFeedbacks.filter(f => !f.correct);
+  const correctFields = fieldFeedbacks.filter(f => f.correct);
+  const accuracy = correctCount / 6;
 
   let feedback = `═══════════════════════════════════════════════════════════════\n`;
   feedback += `                    FEEDBACK ON YOUR ANALYSIS\n`;
   feedback += `═══════════════════════════════════════════════════════════════\n\n`;
   
-  feedback += `You got ${correctCount}/6 fields correct.\n\n`;
+  feedback += `You got ${correctCount}/6 fields correct (${(accuracy * 100).toFixed(0)}% accuracy).\n\n`;
 
-  if (wrongFields.length === 0) {
-    feedback += `✅ All predictions were correct! No corrections needed.\n`;
-  } else {
-    feedback += `Here's where you went wrong and why:\n\n`;
+  // HIGH ACCURACY PATH: Confidence retention
+  if (accuracy >= 0.8) {
+    feedback += `🎯 EXCELLENT ANALYSIS! Your methodology is working well.\n\n`;
+    feedback += `✅ TRUST YOUR APPROACH for these fields (you got them RIGHT):\n`;
+    for (const f of correctFields) {
+      feedback += `   • ${f.field}: Your answer "${String(f.predicted)}" was CORRECT\n`;
+    }
+    feedback += `\n`;
+    
+    if (wrongFields.length > 0) {
+      feedback += `⚠️ MINOR CORRECTION needed for ${wrongFields.length} field(s) only:\n\n`;
+      for (const f of wrongFields) {
+        feedback += `   ${f.field}:\n`;
+        feedback += `      You said: ${String(f.predicted)}\n`;
+        feedback += `      Should be: ${String(f.actual)}\n`;
+        feedback += `      Tip: ${f.explanation}\n\n`;
+      }
+    }
+    
+    feedback += `📌 KEY REMINDER: Your overall methodology is CORRECT.\n`;
+    feedback += `   On future charts, continue using the SAME analytical approach.\n`;
+    feedback += `   Only adjust the specific field(s) mentioned above.\n`;
+  }
+  // MEDIUM/LOW ACCURACY PATH: Field-specific corrections only
+  else if (wrongFields.length > 0) {
+    feedback += `📋 FIELD-SPECIFIC CORRECTIONS:\n\n`;
+    feedback += `Focus ONLY on fixing these ${wrongFields.length} specific fields:\n\n`;
     
     for (const f of wrongFields) {
       feedback += `❌ ${f.field}\n`;
       feedback += `   Your prediction: ${String(f.predicted)}\n`;
       feedback += `   Correct answer:  ${String(f.actual)}\n`;
-      feedback += `   Why: ${f.explanation}\n\n`;
+      feedback += `   How to identify: ${f.explanation}\n\n`;
     }
+    
+    feedback += `✅ These fields were CORRECT (keep using same methodology):\n`;
+    for (const f of correctFields) {
+      feedback += `   • ${f.field}: "${String(f.predicted)}" ✓\n`;
+    }
+    feedback += `\n`;
+  }
+  // PERFECT ACCURACY
+  else {
+    feedback += `✅ PERFECT! All predictions were correct.\n`;
+    feedback += `Your analytical methodology is working excellently.\n`;
+    feedback += `Continue using the SAME approach on future charts.\n`;
   }
 
   feedback += `───────────────────────────────────────────────────────────────\n`;
-  feedback += `CONTEXT DATA (for reference):\n`;
-  feedback += `  - VWAP: $${input.context.vwap.toFixed(2)}\n`;
-  feedback += `  - Last Close: $${input.context.lastClose.toFixed(2)}\n`;
-  feedback += `  - Price Change: ${input.context.priceChangePct.toFixed(2)}%\n`;
-  feedback += `  - Volatility: ${input.context.volatilityPct.toFixed(2)}%\n`;
-  feedback += `  - Volume Ratio: ${(input.context.lastVolume / input.context.avgVolume).toFixed(2)}x average\n`;
-  feedback += `───────────────────────────────────────────────────────────────\n\n`;
-
-  feedback += `Now analyze the next chart carefully, applying what you've learned.\n`;
+  feedback += `REFERENCE DATA (from this specific chart):\n`;
+  feedback += `  • VWAP: $${input.context.vwap.toFixed(2)}\n`;
+  feedback += `  • Last Close: $${input.context.lastClose.toFixed(2)}\n`;
+  feedback += `  • Price Change: ${input.context.priceChangePct.toFixed(2)}%\n`;
+  feedback += `  • Volatility: ${input.context.volatilityPct.toFixed(2)}%\n`;
+  feedback += `  • Volume Ratio: ${(input.context.lastVolume / input.context.avgVolume).toFixed(2)}x average\n`;
+  feedback += `───────────────────────────────────────────────────────────────\n`;
 
   return feedback;
 }
