@@ -22,25 +22,39 @@ After showing a model its mistakes on a chart analysis, can it:
 
 ---
 
-## Experimental Results (10 Runs)
+## Experimental Results (40+ Runs)
 
-Using `google/gemini-2.0-flash` with varied start times:
+Using `google/gemini-2.0-flash` with varied start times and prompt strategies:
 
-| Metric | Average | Min | Max |
-|--------|---------|-----|-----|
-| **Baseline Accuracy** | 52.5% | 33.3% | 83.3% |
-| **Memorization Delta** | **+47.5%** | +16.7% | +66.7% |
-| **Transfer Delta** | **+7.9%** | -41.7% | +33.3% |
+### Final Results (Prompt v4-reset-high-baseline)
+
+| Baseline Level | Count | Avg Memorization | Avg Transfer |
+|----------------|-------|------------------|--------------|
+| **Low (<60%)** | 7 | **+40.0%** | **+18.3%** |
+| **High (≥70%)** | 3 | **+19.4%** | **-27.8%** |
 
 ### Key Findings
 
-1. ✅ **Strong Memorization**: All runs show positive memorization (+47.5% avg). Models consistently improve when re-shown the same chart after feedback.
+1. ✅ **Strong Memorization**: All runs show positive memorization. Models consistently improve when re-shown the same chart after feedback.
 
-2. 🔶 **Variable Transfer**: Transfer ranges from -41.7% to +33.3%:
-   - When baseline is **low** (33-50%), transfer is **positive**
-   - When baseline is **high** (83%), transfer can be **negative** (ceiling effect)
+2. 🔶 **Variable Transfer by Baseline**:
+   - **Low baseline (33-60%)**: Strong positive transfer (+18.3% avg)
+   - **High baseline (70%+)**: Negative transfer (-27.8% avg) - ceiling effect
 
-3. 📉 **Ceiling Effect**: High initial accuracy leaves less room to improve; feedback may cause "overthinking" on similar charts.
+3. 📉 **Ceiling Effect**: High initial accuracy means less room to improve. Feedback can cause "overthinking" and introduce **new errors** on similar charts.
+
+4. 🔄 **Reset Conversation Doesn't Help**: Even with fresh conversation history (no prior context), high-baseline models still introduce new errors. The problem isn't memory contamination - it's inherent model variance across charts.
+
+### Prompt Experiments
+
+| Version | Strategy | High Baseline Transfer | Low Baseline Transfer |
+|---------|----------|------------------------|----------------------|
+| v1 | Original | -32% | +18% |
+| v2 | "Different chart" warning | -22% | +17% |
+| v3 | Confidence retention | -20.8% | +19.5% |
+| **v4** | **Reset conversation (≥70%)** | **-27.8%** | **+18.3%** |
+
+**Insight**: The problem isn't the prompt or conversation history. "Similar" charts by fingerprint may have genuinely different correct answers. Transfer learning on similar charts measures **chart similarity**, not learning capacity.
 
 ---
 
@@ -228,6 +242,22 @@ BENCHMARK_ICL_<model>_<date>.json   # Machine-readable results
 - `learning_rounds` - Per-round results
 - `similar_charts` - Cached chart conditions
 - `learning_curves` - Aggregated learning progression
+
+### Langfuse Prompt Tracking
+
+Prompts are versioned and tracked in Langfuse for experiment comparison:
+
+| Prompt Name | Description |
+|-------------|-------------|
+| `icl-baseline` | Initial chart analysis prompt |
+| `icl-same-chart-feedback` | Re-analysis with feedback |
+| `icl-similar-chart-low-baseline` | Field-specific focus for low accuracy |
+| `icl-similar-chart-high-baseline` | Fresh analysis mode for high accuracy |
+
+Each generation logs:
+- `promptName` - Which prompt template was used
+- `promptVersion` - e.g., `v4-reset-high-baseline`
+- `resetConversation` - Whether conversation was cleared
 
 ---
 
