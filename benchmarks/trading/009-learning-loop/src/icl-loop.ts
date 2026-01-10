@@ -472,6 +472,28 @@ export async function runICLSession(
       timeframe: input.timeframe,
     });
     
+    // CRITICAL: Make it very clear this is a DIFFERENT chart
+    const transferPrompt = `
+⚠️ IMPORTANT: This is a COMPLETELY DIFFERENT chart from before.
+
+This is NOT a memory test. The correct answers for THIS chart may be DIFFERENT from the previous chart.
+
+What you should apply from the feedback:
+- The METHODOLOGY for analyzing charts (how to identify support, how to measure volatility, etc.)
+- The REASONING process (check VWAP distance, count bullish/bearish signals, etc.)
+- The DEFINITIONS of each field
+
+What you should NOT do:
+- Copy your previous answers
+- Assume this chart has the same conditions
+- Default to what was correct before
+
+Analyze THIS chart FRESH based on what you actually SEE in the image.
+The ground truth for this chart is likely DIFFERENT from the previous one.
+
+---
+
+`;
     const transferResult = await runAnalysisRound(
       client,
       modelId,
@@ -480,7 +502,7 @@ export async function runICLSession(
       input.timeframe,
       input.symbolId,
       input.candles.length,
-      'Apply what you learned from previous feedback to analyze this new chart with similar conditions:'
+      transferPrompt
     );
     
     const transferScore = transferResult.prediction
@@ -490,7 +512,7 @@ export async function runICLSession(
     // Track in Langfuse
     if (transferResult.prediction) {
       trackGeneration(transferTrace, {
-        prompt: 'Apply what you learned...',
+        prompt: transferPrompt,
         imageCount: 1,
         feedbackIncluded: true,
       }, {
@@ -534,7 +556,7 @@ export async function runICLSession(
       conversationHistory.push({
         role: 'user',
         content: [
-          { type: 'text', text: 'Apply what you learned from previous feedback to analyze this new chart with similar conditions:\n\n' + buildAnalysisPrompt(input.timeframe, input.symbolId, input.candles.length) },
+          { type: 'text', text: transferPrompt + buildAnalysisPrompt(input.timeframe, input.symbolId, input.candles.length) },
           { type: 'image', image: input.chartUrl },
         ],
       });
